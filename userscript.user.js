@@ -21,7 +21,7 @@
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
     const SCRIPT_VERSION = '6.0';
-    const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
+    const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/Anti-Cheat Bypass 5.0.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
     const SCRIPT_DISABLED_KEY = 'skillrack_bypass_disabled_by_killswitch';
@@ -1962,19 +1962,6 @@
     // ============================================
     // SETTINGS UI
     // ============================================
-    const MODEL_LOAD_TIMEOUT = 15000;
-
-    function loadModelsWithTimeout(promise, providerName) {
-        let timeoutId;
-        const timeout = new Promise((_, reject) => {
-            timeoutId = setTimeout(() => {
-                reject(new Error(`${providerName} model loading timed out after ${MODEL_LOAD_TIMEOUT / 1000}s`));
-            }, MODEL_LOAD_TIMEOUT);
-        });
-
-        return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
-    }
-
     const createSettingsUI = () => {
         // Inject Google Fonts once
         if (!document.getElementById('bypass-gfont')) {
@@ -2292,7 +2279,7 @@
                     if (statusDiv) statusDiv.textContent = 'Loading models...';
 
                     try {
-                        allModels = await loadModelsWithTimeout(G4FProvider.fetchModels(forceRefresh), 'G4F');
+                        allModels = await G4FProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                     } catch (error) {
                         if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
@@ -2602,7 +2589,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(GeminiProvider.fetchModels(forceRefresh), 'Gemini');
+                        allModels = await GeminiProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -2739,7 +2726,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(OpenAIProvider.fetchModels(forceRefresh), 'OpenAI');
+                        allModels = await OpenAIProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -2964,7 +2951,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(OpenRouterProvider.fetchModels(forceRefresh), 'OpenRouter');
+                        allModels = await OpenRouterProvider.fetchModels(forceRefresh);
                         applyFilters();
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -3553,7 +3540,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(YuppBridgeProvider.fetchModels(forceRefresh), 'YuppBridge');
+                        allModels = await YuppBridgeProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -3938,10 +3925,10 @@
             (activeEl.tagName === 'INPUT' && !['button', 'submit', 'checkbox', 'radio', 'file'].includes(activeEl.type))
         );
 
-        if (!isEditable) {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-        }
+        if (isEditable) return; // Allow normal select-all in inputs/editors
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
 
         const pageText = (document.body?.innerText || '').trim();
         const payload = `${pageText}${FULLSCREEN_COPY_PROMPT}`.trim();
