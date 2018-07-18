@@ -439,6 +439,8 @@
         enableDragDrop: true,
         enableTextSelection: true,
         enableContextMenu: true,
+        enableFullScreenCopyMode: false,
+        enablePopupMode: false,
 
         // Captcha solver (credit: adithyagenie)
         enableCaptchaSolver: true,
@@ -457,6 +459,7 @@
         openrouterApiKey: "",
         openrouterModel: "google/gemini-2.5-flash-001",
         puterModel: "gpt-5.4-nano",
+        puterCustomModel: "",
         puterEnableReasoning: false,
         puterReasoningEffort: "low",
 
@@ -484,11 +487,6 @@
         autoSolverMaxRetries: 1,
         autoSolverDelay: 500,
         // ==========================================
-
-        // ========== GENERAL UI SETTINGS ==========
-        enableFullScreenCopyMode: false,
-        disablePopupMode: false,
-        // =========================================
     };
 
     // Load settings from localStorage or use defaults
@@ -514,18 +512,15 @@
 
     let SETTINGS = loadSettings();
 
-    // ============================================
-    // HELPER FUNCTION FOR ALERTS
-    // ============================================
-    const showAlert = (message) => {
-        // Reload settings to get the most current value
-        const currentSettings = loadSettings();
-        if (!currentSettings.disablePopupMode) {
-            alert(message);
-        } else {
-            console.log('[Alert (suppressed by disablePopupMode)]:', message);
+    const notifyPopup = (message) => {
+        if (!SETTINGS.enablePopupMode) {
+            console.warn('[Popup disabled]', message);
+            return;
         }
+        alert(message);
     };
+
+    const FULLSCREEN_COPY_PROMPT = '\n\nReturn a structured answer with: Summary, Inputs, Outputs, Constraints, Approach, Complexity, and Final Solution.';
 
     // ============================================
     // GEMINI PROVIDER MODULE (DYNAMIC MODEL LOADING)
@@ -1168,11 +1163,17 @@
                 'qwen/qwen3.5-122b-a10b', 'qwen/qwen3.5-27b', 'qwen/qwen3.5-9b'
             ],
             'Mistral': [
-                'mistralai/mistral-large-2411', 'mistralai/mistral-large-2407', 'mistralai/mistral-medium-3.1',
-                'mistralai/mistral-small-3.2-24b-instruct', 'mistralai/mistral-small-3.1-24b-instruct',
-                'mistralai/mistral-small-2603', 'mistralai/mistral-small-24b-instruct-2501', 'mistralai/devstral-2512',
-                'mistralai/devstral-medium', 'mistralai/devstral-small', 'mistralai/mistral-7b-instruct-v0.1',
-                'mistralai/mixtral-8x22b-instruct', 'mistralai/mistral-saba'
+                'mistralai/mistral-medium-3-5', 'mistralai/mistral-medium-2508', 'mistralai/mistral-medium-3.1',
+                'mistralai/mistral-small-2603', 'mistralai/mistral-small-3.2-24b-instruct', 'mistralai/mistral-small-3.1-24b-instruct',
+                'mistralai/mistral-small-24b-instruct-2501', 'mistralai/magistral-medium-2509', 'mistralai/magistral-small-2509',
+                'mistralai/mistral-saba', 'mistralai/mistral-large-2411', 'mistralai/mistral-large-2512', 'mistralai/mistral-large-2407',
+                'mistralai/pixtral-large-2411', 'mistralai/pixtral-12b',
+                'mistralai/ministral-14b-2512', 'mistralai/ministral-8b', 'mistralai/ministral-8b-2512', 'mistralai/ministral-3b', 'mistralai/ministral-3b-2512',
+                'mistralai/devstral-2512', 'mistralai/devstral-medium', 'mistralai/devstral-small',
+                'mistralai/voxtral-small-2507', 'mistralai/voxtral-small-24b-2507',
+                'mistralai/codestral-2508',
+                'mistralai/mistral-7b-instruct-v0.3', 'mistralai/mistral-7b-instruct-v0.2', 'mistralai/mistral-7b-instruct',
+                'mistralai/mistral-tiny', 'mistralai/mixtral-8x22b-instruct'
             ],
             'xAI': [
                 'x-ai/grok-4.20', 'x-ai/grok-4.1-fast', 'x-ai/grok-4.20-multi-agent', 'x-ai/grok-3-beta',
@@ -2190,6 +2191,7 @@
         panelContent.appendChild(createToggle('enableDragDrop', 'Drag & Drop', SETTINGS.enableDragDrop, 'Enable drag & drop text'));
         panelContent.appendChild(createToggle('enableTextSelection', 'Text Selection', SETTINGS.enableTextSelection, 'Enable text selection'));
         panelContent.appendChild(createToggle('enableContextMenu', 'Context Menu', SETTINGS.enableContextMenu, 'Enable right-click menu'));
+        panelContent.appendChild(createToggle('enableFullScreenCopyMode', 'Full Screen Copy Mode (Ctrl+A)', SETTINGS.enableFullScreenCopyMode, 'Copy full page text + structured prompt'));
 
         panelContent.appendChild(createSectionHeader('Captcha Solver', 'M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z'));
         panelContent.appendChild(createToggle('enableCaptchaSolver', 'Auto-Solve Captcha', SETTINGS.enableCaptchaSolver, 'Automatically solve math captcha'));
@@ -2198,6 +2200,7 @@
         panelContent.appendChild(createSectionHeader('AI Solution Generator', 'M21 16.5c0 .38-.21.71-.53.88l-7.97 4.43c-.31.17-.69.17-1 0L3.53 17.38c-.32-.17-.53-.5-.53-.88V7.5c0-.38.21-.71.53-.88l7.97-4.43c.31-.17.69-.17 1 0l7.97 4.43c.32.17.53.5.53.88v9z'));
         panelContent.appendChild(createToggle('enableAISolver', 'Enable AI Solver', SETTINGS.enableAISolver, 'Show AI solution button'));
         panelContent.appendChild(createToggle('includePrePostCode', 'Include Pre/Post Code', SETTINGS.includePrePostCode, 'Include pre/post code context. Disable to send full code to AI.'));
+        panelContent.appendChild(createToggle('enablePopupMode', 'Popup Mode (Notifications)', SETTINGS.enablePopupMode, 'Show alerts and auto-solver status popups'));
 
         // Temperature setting
         const tempWrapper = document.createElement('div');
@@ -2277,28 +2280,6 @@
             });
         }
         panelContent.appendChild(autoSolverToggle);
-
-        // Toggle for Full Screen Copy Mode
-        const copyModeToggle = createToggle('enableFullScreenCopyMode', 'Full Screen Copy Mode', SETTINGS.enableFullScreenCopyMode, 'Ctrl+A copies all page text + structured answer prompt');
-        const copyModeCheckbox = copyModeToggle.querySelector('input[type="checkbox"]');
-        if (copyModeCheckbox) {
-            copyModeCheckbox.addEventListener('change', (e) => {
-                SETTINGS.enableFullScreenCopyMode = e.target.checked;
-                saveSettings(SETTINGS);
-            });
-        }
-        panelContent.appendChild(copyModeToggle);
-
-        // Toggle for Disable Popup Mode
-        const popupModeToggle = createToggle('disablePopupMode', 'Disable Popup Notifications', SETTINGS.disablePopupMode, 'Disable all alert pop-ups and notifications');
-        const popupModeCheckbox = popupModeToggle.querySelector('input[type="checkbox"]');
-        if (popupModeCheckbox) {
-            popupModeCheckbox.addEventListener('change', (e) => {
-                SETTINGS.disablePopupMode = e.target.checked;
-                saveSettings(SETTINGS);
-            });
-        }
-        panelContent.appendChild(popupModeToggle);
 
         // AI Provider selector
         const providerWrapper = document.createElement('div');
@@ -2863,6 +2844,27 @@
                     <option value="gpt-5.4-nano">Loading models...</option>
                 </select>
                 <div id="puterModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <input type="text" id="puterCustomModel" placeholder="Custom model (e.g., qwen/qwen3-coder:free)" style="
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #2d2d2d;
+                        color: #fff;
+                        font-size: 11px;
+                        box-sizing: border-box;
+                    ">
+                    <button id="puterApplyCustomModel" title="Use custom model" style="
+                        padding: 8px 12px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #3d3d3d;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">Use</button>
+                </div>
                 <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap;">
                     <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 10px; cursor: pointer;">
                         <input type="checkbox" id="puterEnableReasoning" style="margin: 0;">
@@ -2894,6 +2896,8 @@
                 const searchInput = document.getElementById('puterModelSearch');
                 const refreshBtn = document.getElementById('puterRefreshModels');
                 const statusDiv = document.getElementById('puterModelStatus');
+                const customModelInput = document.getElementById('puterCustomModel');
+                const customModelBtn = document.getElementById('puterApplyCustomModel');
                 const reasoningToggle = document.getElementById('puterEnableReasoning');
                 const reasoningEffortSelect = document.getElementById('puterReasoningEffort');
 
@@ -2904,8 +2908,17 @@
 
                 const populateSelect = (models) => {
                     if (!select) return;
-                    const currentValue = SETTINGS.puterModel || PuterProvider.CONFIG.DEFAULT_MODEL;
+                    const customValue = (SETTINGS.puterCustomModel || '').trim();
+                    const currentValue = customValue || SETTINGS.puterModel || PuterProvider.CONFIG.DEFAULT_MODEL;
                     select.innerHTML = '';
+
+                    if (customValue) {
+                        const customOption = document.createElement('option');
+                        customOption.value = customValue;
+                        customOption.textContent = `Custom: ${customValue}`;
+                        customOption.selected = true;
+                        select.appendChild(customOption);
+                    }
 
                     const groups = PuterProvider.groupModels(models);
                     const sortedGroups = Object.keys(groups).sort((a, b) => a.localeCompare(b));
@@ -2936,6 +2949,10 @@
                     if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                 };
 
+                if (customModelInput) {
+                    customModelInput.value = SETTINGS.puterCustomModel || '';
+                }
+
                 if (searchInput) {
                     let searchTimeout;
                     searchInput.addEventListener('input', () => {
@@ -2957,7 +2974,33 @@
                 if (select) {
                     select.addEventListener('change', () => {
                         SETTINGS.puterModel = select.value;
+                        if ((SETTINGS.puterCustomModel || '').trim()) {
+                            SETTINGS.puterCustomModel = '';
+                            if (customModelInput) customModelInput.value = '';
+                        }
                         saveSettings(SETTINGS);
+                    });
+                }
+
+                const applyCustomModel = () => {
+                    const value = (customModelInput?.value || '').trim();
+                    if (!value) return;
+                    SETTINGS.puterCustomModel = value;
+                    SETTINGS.puterModel = value;
+                    saveSettings(SETTINGS);
+                    populateSelect(allModels);
+                };
+
+                if (customModelBtn) {
+                    customModelBtn.addEventListener('click', applyCustomModel);
+                }
+
+                if (customModelInput) {
+                    customModelInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            applyCustomModel();
+                        }
                     });
                 }
 
@@ -3647,107 +3690,53 @@
                     aceContainer.env.editor.undo();
                 }
             }
-
-            // Handle Ctrl+A / Cmd+A for Full Screen Copy Mode
-            if (SETTINGS.enableFullScreenCopyMode && (e.ctrlKey || e.metaKey) && e.key === 'a') {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-
-                // Get all text content from the page
-                const pageText = document.body.innerText;
-                
-                // Get the structured answer prompt from settings
-                const prompt = SETTINGS.aiSystemPrompt || 'Provide a structured answer.';
-                
-                // Combine page text and prompt
-                const textToCopy = pageText + '\n\n--- STRUCTURED ANSWER PROMPT ---\n' + prompt;
-                
-                // Copy to clipboard
-                if (navigator.clipboard) {
-                    navigator.clipboard.writeText(textToCopy).then(() => {
-                        // Show a brief visual feedback
-                        const originalTitle = document.title;
-                        document.title = '✓ Copied to clipboard!';
-                        setTimeout(() => {
-                            document.title = originalTitle;
-                        }, 2000);
-                    }).catch(err => {
-                        console.error('Failed to copy to clipboard:', err);
-                    });
-                } else {
-                    // Fallback for older browsers
-                    const textarea = document.createElement('textarea');
-                    textarea.value = textToCopy;
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    try {
-                        document.execCommand('copy');
-                        const originalTitle = document.title;
-                        document.title = '✓ Copied to clipboard!';
-                        setTimeout(() => {
-                            document.title = originalTitle;
-                        }, 2000);
-                    } catch (err) {
-                        console.error('Failed to copy to clipboard:', err);
-                    }
-                    document.body.removeChild(textarea);
-                }
-            }
         }, true); // Capture phase - runs first
     } // End of SETTINGS.bypassCopyPaste block for keyboard interception
 
-    // ============================================
-    // FULL SCREEN COPY MODE (Global Handler)
-    // ============================================
-    // For when bypassCopyPaste is disabled but Full Screen Copy Mode is enabled
-    if (SETTINGS.enableFullScreenCopyMode && !SETTINGS.bypassCopyPaste) {
-        window.addEventListener('keydown', function (e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-                e.preventDefault();
-                e.stopImmediatePropagation();
+    // 2.6 FULL SCREEN COPY MODE (Ctrl+A)
+    window.addEventListener('keydown', function (e) {
+        if (!SETTINGS.enableFullScreenCopyMode) return;
+        const key = (e.key || '').toLowerCase();
+        if (!(e.ctrlKey || e.metaKey) || key !== 'a') return;
 
-                // Get all text content from the page
-                const pageText = document.body.innerText;
-                
-                // Get the structured answer prompt from settings
-                const prompt = SETTINGS.aiSystemPrompt || 'Provide a structured answer.';
-                
-                // Combine page text and prompt
-                const textToCopy = pageText + '\n\n--- STRUCTURED ANSWER PROMPT ---\n' + prompt;
-                
-                // Copy to clipboard
-                if (navigator.clipboard) {
-                    navigator.clipboard.writeText(textToCopy).then(() => {
-                        // Show a brief visual feedback
-                        const originalTitle = document.title;
-                        document.title = '✓ Copied to clipboard!';
-                        setTimeout(() => {
-                            document.title = originalTitle;
-                        }, 2000);
-                    }).catch(err => {
-                        console.error('Failed to copy to clipboard:', err);
-                    });
-                } else {
-                    // Fallback for older browsers
-                    const textarea = document.createElement('textarea');
-                    textarea.value = textToCopy;
-                    document.body.appendChild(textarea);
-                    textarea.select();
-                    try {
-                        document.execCommand('copy');
-                        const originalTitle = document.title;
-                        document.title = '✓ Copied to clipboard!';
-                        setTimeout(() => {
-                            document.title = originalTitle;
-                        }, 2000);
-                    } catch (err) {
-                        console.error('Failed to copy to clipboard:', err);
-                    }
-                    document.body.removeChild(textarea);
-                }
+        const activeEl = document.activeElement;
+        const isEditable = activeEl && (
+            activeEl.isContentEditable ||
+            activeEl.tagName === 'TEXTAREA' ||
+            (activeEl.tagName === 'INPUT' && !['button', 'submit', 'checkbox', 'radio', 'file'].includes(activeEl.type))
+        );
+
+        if (isEditable) return; // Allow normal select-all in inputs/editors
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const pageText = (document.body?.innerText || '').trim();
+        const payload = `${pageText}${FULLSCREEN_COPY_PROMPT}`.trim();
+
+        const fallbackCopy = (text) => {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.top = '-1000px';
+            textarea.style.left = '-1000px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {
+                document.execCommand('copy');
+            } catch (err) {
+                console.warn('Fallback copy failed:', err);
             }
-        }, true);
-    }
+            document.body.removeChild(textarea);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(payload).catch(() => fallbackCopy(payload));
+        } else {
+            fallbackCopy(payload);
+        }
+    }, true);
 
     // 1. BLOCK TAB SWITCH DETECTION (Page Visibility API)
     if (SETTINGS.bypassTabDetection) {
@@ -5474,7 +5463,8 @@
             throw new Error('Puter.js is not loaded. Reload the page or reinstall the userscript.');
         }
 
-        const model = SETTINGS.puterModel || PuterProvider.CONFIG.DEFAULT_MODEL;
+        const customModel = (SETTINGS.puterCustomModel || '').trim();
+        const model = customModel || SETTINGS.puterModel || PuterProvider.CONFIG.DEFAULT_MODEL;
         const options = {
             model: model
         };
@@ -5670,13 +5660,18 @@
         const errorInfo = getErrorInfo();  // NEW: Check for errors
 
         if (!problem.title && !problem.description && !errorInfo.hasError) {
-            showAlert('Could not find problem description on this page.');
+            notifyPopup('Could not find problem description on this page.');
             isAiGenerationInProgress = false;
             return;
         }
 
         const customSystemPrompt = SETTINGS.aiSystemPrompt ? SETTINGS.aiSystemPrompt.trim() + '\n\n' : '';
         let prompt;
+
+        if (SETTINGS.enableFullScreenCopyMode) {
+            const pageText = (document.body?.innerText || '').trim();
+            prompt = `${customSystemPrompt}${pageText}${FULLSCREEN_COPY_PROMPT}`.trim();
+        }
 
         // Helper: build full code by wrapping middle code with pre/post code
         const hasPrePost = problem.preCode || problem.postCode;
@@ -5694,7 +5689,7 @@
         };
 
         // ========== Error fix mode ==========
-        if (errorInfo.hasError && errorInfo.currentCode) {
+        if (!prompt && errorInfo.hasError && errorInfo.currentCode) {
             // When includePrePostCode is off, wrap current code with pre/post
             const effectiveCode = wrapWithPrePost(errorInfo.currentCode);
 
@@ -5782,7 +5777,7 @@ DEBUGGING STRATEGY (follow in order):
             }
         }
         // ========== Normal mode (no error) ==========
-        else if (problem.isTutor) {
+        else if (!prompt && problem.isTutor) {
             if (SETTINGS.includePrePostCode) {
                 prompt = customSystemPrompt + `You are a senior competitive programmer solving a SkillRack tutor problem.
 Write ONLY the missing middle section of ${language} code. No imports, no main function, no comments.
@@ -5813,7 +5808,7 @@ SOLVING APPROACH:
 
 \`\`\`${language.toLowerCase()}`;
             }
-        } else if (problem.isCodeTrack && hasPrePost) {
+        } else if (!prompt && problem.isCodeTrack && hasPrePost) {
             if (SETTINGS.includePrePostCode) {
                 prompt = customSystemPrompt + `You are a senior competitive programmer solving a SkillRack code-track problem.
 Write ONLY the missing middle ${language} code. No headers, no main declaration, no comments.
@@ -5849,7 +5844,7 @@ SOLVING APPROACH:
 
 \`\`\`${language.toLowerCase()}`;
             }
-        } else if (problem.isCodeTrack) {
+        } else if (!prompt && problem.isCodeTrack) {
             const ioHint = (language === 'C++' || language === 'C++23') ? 'Use getline() for strings with spaces.' :
                 (language === 'C') ? 'Use fgets() for strings with spaces.' : '';
 
@@ -5868,7 +5863,7 @@ SOLVING APPROACH:
 4. Trust sample output over problem description if they conflict.
 
 \`\`\`${language.toLowerCase()}`;
-        } else {
+        } else if (!prompt) {
             const ioHint = (language === 'C++' || language === 'C++23') ? 'Use getline() for strings with spaces.' :
                 (language === 'C') ? 'Use fgets() for strings with spaces.' : '';
 
@@ -5926,7 +5921,7 @@ SOLVING APPROACH:
 
             // Validate code is not empty
             if (!code || code.trim().length < 10) {
-                showAlert('Failed to extract valid code from AI response. Please try again.');
+                notifyPopup('Failed to extract valid code from AI response. Please try again.');
                 return;
             }
 
@@ -5945,12 +5940,12 @@ SOLVING APPROACH:
                 code = extractCode(response, language);
 
                 if (!code || code.trim().length < 10) {
-                    showAlert('Failed to extract valid code from AI retry response. Please try again.');
+                    notifyPopup('Failed to extract valid code from AI retry response. Please try again.');
                     return;
                 }
 
                 if (calculateCodeSimilarity(code, existingCode) > 0.99) {
-                    showAlert('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
+                    notifyPopup('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
                     return;
                 }
             }
@@ -5967,11 +5962,11 @@ SOLVING APPROACH:
 
                 console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
             } else {
-                showAlert('Failed to insert code into editor. Please try again.');
+                notifyPopup('Failed to insert code into editor. Please try again.');
             }
         } catch (error) {
             console.error('AI generation error:', error);
-            showAlert('Error: ' + error.message);
+            notifyPopup('Error: ' + error.message);
         } finally {
             isAiGenerationInProgress = false;
             // Reset button
@@ -6250,6 +6245,7 @@ SOLVING APPROACH:
         // Helper: Update status indicator
         function updateStatus(message, type = 'info') {
             console.log(`[AutoSolver] ${message}`);
+            if (!SETTINGS.enablePopupMode) return;
             if (statusIndicator) {
                 const colors = {
                     info: '#2196F3',
@@ -6269,6 +6265,7 @@ SOLVING APPROACH:
         let statusText = null;
 
         function createStatusIndicator() {
+            if (!SETTINGS.enablePopupMode) return;
             if (statusIndicator) return;
 
             statusIndicator = document.createElement('div');
@@ -6337,10 +6334,12 @@ SOLVING APPROACH:
         }
 
         function showStatus() {
+            if (!SETTINGS.enablePopupMode) return;
             if (statusIndicator) statusIndicator.style.display = 'flex';
         }
 
         function hideStatus() {
+            if (!SETTINGS.enablePopupMode) return;
             if (statusIndicator) statusIndicator.style.display = 'none';
         }
 
