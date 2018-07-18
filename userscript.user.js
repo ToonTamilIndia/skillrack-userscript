@@ -7188,16 +7188,27 @@ SOLVING APPROACH:
             return null;
         }
 
-        // Single-event click (avoids triple-submission)
+        // Single-event click — prefer native .click() because PrimeFaces buttons
+        // use inline onclick handlers (PrimeFaces.bcn / PrimeFaces.ab) that only
+        // fire when the click comes through the DOM's built-in onclick path.
+        // dispatchEvent(MouseEvent) alone does NOT trigger inline onclick on some browsers.
         function forceClick(el, name) {
             if (!el) { console.warn(`[AutoSolver] ${name} not found`); return false; }
             try {
-                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                // .click() invokes inline onclick, which PrimeFaces needs
+                el.click();
                 console.log(`[AutoSolver] Clicked: ${name}`);
                 return true;
             } catch (e) {
-                console.error(`[AutoSolver] Click failed: ${name}`, e);
-                return false;
+                // Fallback: dispatch MouseEvent
+                try {
+                    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                    console.log(`[AutoSolver] Clicked (fallback dispatchEvent): ${name}`);
+                    return true;
+                } catch (e2) {
+                    console.error(`[AutoSolver] Click failed: ${name}`, e2);
+                    return false;
+                }
             }
         }
 
@@ -7366,12 +7377,22 @@ SOLVING APPROACH:
         }
 
         // ── Clear stale results ───────────────────────────────────────────────────
+        // NOTE: Do NOT wipe #errormsg innerHTML — that destroys the PrimeFaces Panel
+        // widget DOM (toggler, titlebar, etc.) and breaks the next AJAX response.
+        // Instead, only clear the visible text content inside the content area.
         function clearPreviousResults() {
             try {
                 const successEl = document.querySelector('#successmsg');
                 if (successEl) successEl.innerHTML = '';
-                const errorEl = document.querySelector('#errormsg');
-                if (errorEl) errorEl.innerHTML = '';
+
+                // Only clear the inner content div, not the entire PrimeFaces panel
+                const errorContent = document.querySelector('#errormsg_content');
+                if (errorContent) {
+                    // Remove child cards/labels but keep the panel structure intact
+                    const cards = errorContent.querySelectorAll('.ui-card, .ui-outputpanel');
+                    cards.forEach(c => c.remove());
+                }
+
                 document.querySelectorAll('.ui-growl-item-container').forEach(el => el.remove());
                 console.log('[AutoSolver] Cleared previous results');
             } catch (e) {
@@ -7821,23 +7842,45 @@ SOLVING APPROACH:
 
                 // Step 3: Click Run button
                 clearPreviousResults();
-                const runBtn = await waitFor('#j_id_bg, button[id*="_bg"]', 5000);
+
+                // Find the Run button — JSF generates dynamic IDs like j_id_bg, j_id_bj, etc.
+                // so we CANNOT hardcode a specific ID. Use text-based detection instead.
+                const findRunButton = () => {
+                    // Strategy 1: Find button whose visible text is exactly "Run"
+                    for (const btn of document.querySelectorAll('button[type="submit"], button:not([type])')) {
+                        // Check the span.ui-button-text child (PrimeFaces buttons)
+                        const spanText = btn.querySelector('span.ui-button-text');
+                        const btnText = (spanText?.textContent || btn.textContent || '').trim();
+                        if (btnText === 'Run') return btn;
+                    }
+                    // Strategy 2: Looser match — button containing "Run" in text
+                    for (const btn of document.querySelectorAll('button')) {
+                        const spanText = btn.querySelector('span.ui-button-text');
+                        const btnText = (spanText?.textContent || btn.textContent || '').trim();
+                        if (btnText.includes('Run') && !btnText.includes('Back') && !btnText.includes('custom')) return btn;
+                    }
+                    return null;
+                };
+
+                let runBtn = findRunButton();
+                // If not found immediately, poll briefly (AJAX might be updating DOM)
+                if (!runBtn) {
+                    const runStart = Date.now();
+                    while (!runBtn && (Date.now() - runStart) < 5000) {
+                        if (shouldStop) break;
+                        await sleep(200);
+                        runBtn = findRunButton();
+                    }
+                }
                 checkStop();
 
                 if (!runBtn) {
-                    // Fallback: find Run button by text
-                    let foundRun = false;
-                    for (const btn of document.querySelectorAll('button')) {
-                        if (btn.textContent.includes('Run')) {
-                            forceClick(btn, 'Run');
-                            foundRun = true;
-                            break;
-                        }
-                    }
-                    if (!foundRun) { updateStatus('Run button not found', 'error'); return false; }
-                } else {
-                    forceClick(runBtn, 'Run');
+                    updateStatus('Run button not found', 'error');
+                    console.error('[AutoSolver] Could not find Run button on page');
+                    return false;
                 }
+
+                forceClick(runBtn, 'Run');
 
                 // Step 4: Wait for result
                 const resultController = createResultWaitController();
