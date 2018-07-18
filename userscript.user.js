@@ -5656,28 +5656,38 @@ SOLVING APPROACH:
         async function clickProceedNext() {
             updateStatus('Looking for Proceed Next...', 'info');
 
-            // Method 1: Try by ID (j_id_9i)
-            let nextBtn = document.querySelector('#j_id_9i');
+            const findProceedNextButton = () => {
+                // Method 1: Try known ID
+                let btn = document.querySelector('#j_id_9i');
+                if (btn) return btn;
 
-            // Method 2: Try by partial ID match
-            if (!nextBtn) {
-                nextBtn = document.querySelector('button[id*="_9i"]');
-            }
+                // Method 2: Try partial ID match
+                btn = document.querySelector('button[id*="_9i"], a[id*="_9i"], input[id*="_9i"]');
+                if (btn) return btn;
 
-            // Method 3: Find by button text "Proceed Next"
-            if (!nextBtn) {
-                const buttons = document.querySelectorAll('button');
-                for (const btn of buttons) {
-                    const span = btn.querySelector('span.ui-button-text');
-                    if (span && span.textContent.includes('Proceed Next')) {
-                        nextBtn = btn;
-                        break;
-                    }
-                    if (btn.textContent.includes('Proceed Next')) {
-                        nextBtn = btn;
-                        break;
+                // Method 3: Find by text variants
+                const candidates = document.querySelectorAll('button, a, input[type="button"], input[type="submit"]');
+                for (const el of candidates) {
+                    const span = el.querySelector?.('span.ui-button-text');
+                    const spanText = (span?.textContent || '').trim();
+                    const ownText = (el.textContent || '').trim();
+                    const inputValue = (el.value || '').trim();
+                    const text = `${spanText} ${ownText} ${inputValue}`.toLowerCase();
+                    if (text.includes('proceed next') || text.includes('proceed to next') || text.includes('next')) {
+                        return el;
                     }
                 }
+                return null;
+            };
+
+            // Wait for button to appear (PrimeFaces updates can be delayed after retries)
+            let nextBtn = null;
+            const maxWaitMs = 12000;
+            const waitStart = Date.now();
+            while (!nextBtn && (Date.now() - waitStart) < maxWaitMs) {
+                if (shouldStop) return false;
+                nextBtn = findProceedNextButton();
+                if (!nextBtn) await sleep(200);
             }
 
             if (!nextBtn) {
@@ -5691,7 +5701,13 @@ SOLVING APPROACH:
 
             // Single click to avoid duplicate submissions
             try {
-                nextBtn.click();
+                if (typeof nextBtn.onclick === 'function') {
+                    nextBtn.onclick();
+                }
+                nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                if (typeof nextBtn.click === 'function') {
+                    nextBtn.click();
+                }
                 console.log('[AutoSolver] Clicked: Proceed Next');
                 updateStatus('Moving to next...', 'info');
 
@@ -6153,8 +6169,20 @@ SOLVING APPROACH:
                     await sleep(CONFIG.delayBeforeNext);
                     if (shouldStop) throw new Error('STOPPED_BY_USER');
 
-                    await clickProceedNext();
-                    return true;
+                    const movedNext = await clickProceedNext();
+                    if (movedNext) {
+                        return true;
+                    }
+
+                    // If next button wasn't clickable yet, retry instead of falsely reporting success
+                    currentRetries++;
+                    updateStatus(`Passed but Next click failed - Retry ${currentRetries}/${maxRetries}`, 'warning');
+                    if (currentRetries < maxRetries) {
+                        await sleep(CONFIG.delayBetweenRetries);
+                        if (shouldStop) throw new Error('STOPPED_BY_USER');
+                        continue;
+                    }
+                    return false;
 
                 } else if (result === 'failed' || result === 'compilation_error' || result === 'runtime_error') {
                     currentRetries++;
