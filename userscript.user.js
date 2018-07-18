@@ -6244,6 +6244,35 @@
 
         const language = getSelectedLanguage();
         const problem = getProblemDescription();
+
+        // ========== Try View Solution first ==========
+        const showBtn = document.getElementById('showbtn');
+        const hideBtn = document.getElementById('hidebtn');
+        const solnDiv = document.getElementById('solndiv');
+        const solutionAvailable = (showBtn && showBtn.style.display !== 'none') || (hideBtn && hideBtn.style.display !== 'none');
+        if (solutionAvailable) {
+            if (showBtn && showBtn.style.display !== 'none') showBtn.click();
+            await new Promise(r => setTimeout(r, 100));
+            const langMap = { 'Java': 'Java', 'Python': 'Python', 'C++': 'CPP', 'C++23': 'CPP', 'C': 'C' };
+            const langKey = langMap[language] || language;
+            const langSoln = document.getElementById('soln' + langKey);
+            if (langSoln) {
+                const pre = langSoln.querySelector('pre.brush\\:' + language.toLowerCase().replace('++', 'pp').replace('23', '')) || langSoln.querySelector('pre');
+                const code = pre ? pre.textContent.trim() : '';
+                if (code && code.length > 10) {
+                    if (window.txtCode && typeof window.txtCode.getSession === 'function') {
+                        window.txtCode.getSession().setValue(code);
+                    } else if (window.txtCode && 'value' in window.txtCode) {
+                        window.txtCode.value = code;
+                    }
+                    const $ = window.jQuery || window.$;
+                    if ($ && $('#txtCode').length) $('#txtCode').val(code);
+                    isAiGenerationInProgress = false;
+                    return;
+                }
+            }
+        }
+
         const errorInfo = getErrorInfo();  // NEW: Check for errors
 
         if (!problem.title && !problem.description && !errorInfo.hasError) {
