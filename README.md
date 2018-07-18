@@ -10,11 +10,28 @@ A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanism
 
 ---
 
-## Version 4.9 Features
+## Version 5.0 Features (Latest)
 
-### 🆕 New in v4.9
+### 🆕 New in v5.0 - Major Bug Fixes & Improvements
 
-#### 🌉 YuppBridge AI Provider (200+ Models!)
+#### 🔧 Fixed Code Extraction Issues
+- **Fixed C/C++ language tag stripping** - Responses with language specifiers like `c++`, `++23`, `cpp` are now properly cleaned
+- **JSON response handling** - Now properly extracts code from API responses wrapped in JSON metadata
+- **Improved language-specific comment removal** - Better handling of C/C++ style comments (`//` and `/* */`)
+- **Language specifier filtering** - Lines containing only language tags (e.g., "c++", "cpp23") are automatically removed
+
+#### 🛡️ Enhanced Code Validation
+- **Code similarity checking** - Prevents submitting AI-generated code that's identical to existing code
+- **Empty code validation** - Rejects invalid or empty code responses with helpful error messages
+- **Better error messages** - Users get clear feedback if extraction or insertion fails
+
+#### 🔄 Improved Pre/Post Code Support
+- **Fixed includePrePostCode logic** - Now correctly handles both modes:
+  - When **disabled**: Full code (pre + middle + post) is sent to AI
+  - When **enabled**: Only middle code is sent to AI (useful when you want AI to fill in a function)
+- **Better code wrapping** - Ensures proper code structure in both modes
+
+#### 📋 YuppBridge AI Provider (200+ Models!)
 - **Access 200+ AI models** through Yupp AI
 - **Self-hosted** OpenAI-compatible API proxy
 - Requires your own YuppBridge instance ([self-host guide](https://github.com/cloudWaddie/yuppbridge))
@@ -47,7 +64,7 @@ A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanism
 - No API key required!
 - Custom proxy URL support for self-hosted instances
 
-### 🆕 Previous Updates (v4.6-4.8)
+### 🆕 Previous Updates (v4.6-4.9)
 
 #### 🔄 Mandatory Update Check
 - Automatically checks for updates from GitHub
