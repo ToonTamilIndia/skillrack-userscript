@@ -40,7 +40,6 @@
             if (l > r) return 1;  // Local is newer
         }
         return 0; // Equal
-    };
 
     // ============================================
     // KILL SWITCH CHECK
@@ -1962,19 +1961,6 @@
     // ============================================
     // SETTINGS UI
     // ============================================
-    const MODEL_LOAD_TIMEOUT = 15000;
-
-    function loadModelsWithTimeout(promise, providerName) {
-        let timeoutId;
-        const timeout = new Promise((_, reject) => {
-            timeoutId = setTimeout(() => {
-                reject(new Error(`${providerName} model loading timed out after ${MODEL_LOAD_TIMEOUT / 1000}s`));
-            }, MODEL_LOAD_TIMEOUT);
-        });
-
-        return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
-    }
-
     const createSettingsUI = () => {
         // Inject Google Fonts once
         if (!document.getElementById('bypass-gfont')) {
@@ -2292,7 +2278,7 @@
                     if (statusDiv) statusDiv.textContent = 'Loading models...';
 
                     try {
-                        allModels = await loadModelsWithTimeout(G4FProvider.fetchModels(forceRefresh), 'G4F');
+                        allModels = await G4FProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                     } catch (error) {
                         if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
@@ -2602,7 +2588,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(GeminiProvider.fetchModels(forceRefresh), 'Gemini');
+                        allModels = await GeminiProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -2739,7 +2725,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(OpenAIProvider.fetchModels(forceRefresh), 'OpenAI');
+                        allModels = await OpenAIProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -2964,7 +2950,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(OpenRouterProvider.fetchModels(forceRefresh), 'OpenRouter');
+                        allModels = await OpenRouterProvider.fetchModels(forceRefresh);
                         applyFilters();
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -3553,7 +3539,7 @@
                     }
 
                     try {
-                        allModels = await loadModelsWithTimeout(YuppBridgeProvider.fetchModels(forceRefresh), 'YuppBridge');
+                        allModels = await YuppBridgeProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -3938,10 +3924,10 @@
             (activeEl.tagName === 'INPUT' && !['button', 'submit', 'checkbox', 'radio', 'file'].includes(activeEl.type))
         );
 
-        if (!isEditable) {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-        }
+        if (isEditable) return; // Allow normal select-all in inputs/editors
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
 
         const pageText = (document.body?.innerText || '').trim();
         const payload = `${pageText}${FULLSCREEN_COPY_PROMPT}`.trim();
@@ -5282,7 +5268,7 @@
             }, 500);
         });
 
-        console.log('Anti-cheat bypass script v6.0 loaded successfully');
+        console.log('Anti-cheat bypass script v5.0 loaded successfully');
         console.log('Settings:', SETTINGS);
     });
 
@@ -7761,13 +7747,13 @@ SOLVING APPROACH:
                     if (freshState) {
                         currentViewState = freshState;
                         console.log("Got fresh ViewState. Retrying original request...");
-
+                        
                         if (options.method === 'POST') {
                             let bodyParams = new URLSearchParams(options.body || '');
                             bodyParams.set('jakarta.faces.ViewState', freshState);
                             options.body = bodyParams.toString();
                         }
-
+                        
                         return queuedFetch(url, options, retries, delay);
                     }
                     throw new Error("JSF session expired and could not be restored.");
@@ -7781,7 +7767,7 @@ SOLVING APPROACH:
             const signal = activeController ? activeController.signal : null;
             const controller = new AbortController();
             const id = setTimeout(() => controller.abort(), timeout);
-
+            
             const cleanupObj = {};
             const combinedSignal = signal ? createCombinedSignal([signal, controller.signal], cleanupObj) : controller.signal;
 
@@ -7808,11 +7794,11 @@ SOLVING APPROACH:
             const abort = () => ctrl.abort();
             const activeSignals = signals.filter(Boolean);
             activeSignals.forEach(s => s.addEventListener('abort', abort));
-
+            
             cleanupObj.cleanup = () => {
                 activeSignals.forEach(s => s.removeEventListener('abort', abort));
             };
-
+            
             return ctrl.signal;
         }
 
@@ -7835,7 +7821,7 @@ SOLVING APPROACH:
             } catch (_) {}
             const m = html.match(/jakarta\.faces\.ViewState.*?value="([^"]+)"/) || html.match(/value="([^"]+)".*?jakarta\.faces\.ViewState/);
             if (m) return m[1];
-
+            
             const xmlMatch = html.match(/<update[^>]*id="jakarta\.faces\.ViewState"[^>]*><!\[CDATA\[([^\]]+)\]\]><\/update>/) || html.match(/id="jakarta\.faces\.ViewState"[^>]*><!\[CDATA\[([^\]]+)\]\]>/);
             return xmlMatch ? xmlMatch[1] : null;
         }
@@ -8054,7 +8040,7 @@ SOLVING APPROACH:
             }
 
             console.log(`ensureServerAt: Path mismatch. Resetting and navigating to target path of length ${targetPath.length}`);
-
+            
             // 1. Reset state by GET request to levelUrl
             let html = await queuedFetch(levelUrl, { method: 'GET' });
             let freshState = extractViewState(html);
@@ -8093,7 +8079,7 @@ SOLVING APPROACH:
         // ── Recursive Deep Crawler ───────────────────────────────────────────
         async function crawlPage(url, transition, parentViewState, pathNames, buttonPath, statusCallback) {
             if (activeController && activeController.signal.aborted) throw new Error('Cancelled');
-
+            
             const currentPathName = pathNames.join(' ➔ ');
             if (currentPathName) {
                 statusCallback(`Scraping: ${currentPathName}...`);
@@ -8112,7 +8098,7 @@ SOLVING APPROACH:
                 // Entry page of the level
                 html = await queuedFetch(url, { method: 'GET' });
                 thisPageState = extractViewState(html);
-
+                
                 // Clear any previous state tracking for new level
                 activeServerLevelUrl = levelUrl;
                 currentServerPath = [];
@@ -8140,7 +8126,7 @@ SOLVING APPROACH:
 
                 const txt = card.textContent || '';
                 const isPart = /challenges\s*count/i.test(txt) || CHILD_PART_REGEX.test(name);
-
+                
                 if (isPart) {
                     const clickTarget = card.querySelector('button, input[type="submit"], input[type="button"], a');
                     if (clickTarget) {
@@ -8175,8 +8161,8 @@ SOLVING APPROACH:
             if (partCards.length > 0) {
                 return partCards.map(c => ({
                     partName: c.partName,
-                    buttonPath: [...buttonPath, c.type === 'POST' ?
-                        { type: 'POST', name: c.partName, btnName: c.btnName } :
+                    buttonPath: [...buttonPath, c.type === 'POST' ? 
+                        { type: 'POST', name: c.partName, btnName: c.btnName } : 
                         { type: 'LINK', name: c.partName, href: c.href }
                     ],
                     totalCount: c.totalCount,
@@ -8226,8 +8212,8 @@ SOLVING APPROACH:
             if (partRows.length > 0) {
                 return partRows.map(r => ({
                     partName: r.partName,
-                    buttonPath: [...buttonPath, r.type === 'POST' ?
-                        { type: 'POST', name: r.partName, btnName: r.btnName } :
+                    buttonPath: [...buttonPath, r.type === 'POST' ? 
+                        { type: 'POST', name: r.partName, btnName: r.btnName } : 
                         { type: 'LINK', name: r.partName, href: r.href }
                     ],
                     totalCount: r.totalCount,
@@ -8445,7 +8431,7 @@ SOLVING APPROACH:
                 setState(STATE.IDLE);
                 showStatus('Scan completed! 🎉', '✅');
                 setTimeout(hideStatus, 3000);
-
+                
                 if (dropdown && dropdown.style.display === 'block' && dropdown.style.opacity !== '0') {
                     renderList(allParts, cacheData.timestamp);
                 }
@@ -8475,13 +8461,13 @@ SOLVING APPROACH:
                         part.ratio = part.totalCount > 0 ? (part.solvedCount / part.totalCount) : 1.0;
                     }
                 });
-
+                
                 const cacheData = {
                     parts: cachedParts,
                     timestamp: Date.now()
                 };
                 storage.setValue('find_incomplete_cache_v2', JSON.stringify(cacheData));
-
+                
                 if (dropdown && dropdown.style.display === 'block' && dropdown.style.opacity !== '0') {
                     renderList(cachedParts, cacheData.timestamp);
                 }
@@ -8525,13 +8511,13 @@ SOLVING APPROACH:
             if (activeController) activeController.abort();
             setState(STATE.IDLE);
             hideStatus();
-
+            
             let cache = null;
             try {
                 const rawCache = storage.getValue('find_incomplete_cache_v2');
                 if (rawCache) cache = JSON.parse(rawCache);
             } catch (_) {}
-
+            
             if (cache && cache.parts) {
                 renderList(cache.parts, cache.timestamp);
             } else {
@@ -8545,10 +8531,10 @@ SOLVING APPROACH:
             setState(STATE.NAVIGATING);
             showStatus(`Navigating to ${item.partName}...`, '🚀');
             hideDropdown();
-
+            
             try {
                 let currentUrl = item.levelUrl;
-
+                
                 // Step 1: GET currentUrl to get initial ViewState
                 const html = await queuedFetch(currentUrl, { method: 'GET' });
                 let freshState = extractViewState(html);
@@ -8605,7 +8591,7 @@ SOLVING APPROACH:
                 } else if (lastStep.type === 'LINK') {
                     window.location.href = lastStep.href;
                 }
-
+                
                 setState(STATE.IDLE);
             } catch (err) {
                 setState(STATE.IDLE);
@@ -8637,11 +8623,11 @@ SOLVING APPROACH:
         function showDropdown(btnEl) {
             ensureDropdown(btnEl);
             injectStyles();
-
+            
             const rect = btnEl.getBoundingClientRect();
             dropdown.style.top = `${rect.bottom + window.scrollY + 8}px`;
             dropdown.style.left = `${Math.max(10, rect.left + window.scrollX - 180)}px`;
-
+            
             dropdown.style.display = 'block';
             dropdown.offsetHeight; // trigger reflow
             dropdown.style.opacity = '1';
@@ -8652,7 +8638,7 @@ SOLVING APPROACH:
             if (!dropdown) return;
             dropdown.style.opacity = '0';
             dropdown.style.transform = 'translateY(-8px)';
-
+            
             setTimeout(() => {
                 if (dropdown && dropdown.style.opacity === '0') {
                     dropdown.style.display = 'none';
@@ -8696,7 +8682,7 @@ SOLVING APPROACH:
 
             const header = document.createElement('div');
             header.style.cssText = 'font-weight: 700; font-size: 18px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;';
-            header.innerHTML = '<span>Incomplete Tracks</span>' +
+            header.innerHTML = '<span>Incomplete Tracks</span>' + 
                                `<span style="font-size: 11px; background: rgba(99,179,237,0.15); color: #63b3ed; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">` +
                                `${incompleteList.length} Tracks | ${remainingQuestions} Qs Left</span>`;
             dropdown.appendChild(header);
@@ -8768,7 +8754,7 @@ SOLVING APPROACH:
                         listContainer.appendChild(itemEl);
                     });
                 }
-
+                
                 dropdown.appendChild(listContainer);
             }
 
@@ -9010,9 +8996,9 @@ SOLVING APPROACH:
             }
 
             document.addEventListener('click', (e) => {
-                if (dropdown && dropdown.style.display === 'block' &&
-                    !dropdown.contains(e.target) &&
-                    e.target.id !== 'find-incomplete-btn' &&
+                if (dropdown && dropdown.style.display === 'block' && 
+                    !dropdown.contains(e.target) && 
+                    e.target.id !== 'find-incomplete-btn' && 
                     !e.target.closest('#find-incomplete-btn')) {
                     hideDropdown();
                 }
@@ -9048,4 +9034,4 @@ SOLVING APPROACH:
         window.FindIncompleteModule = FindIncompleteModule;
     });
 
-})();
+})();                 
