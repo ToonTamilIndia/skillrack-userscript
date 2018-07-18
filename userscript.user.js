@@ -1542,22 +1542,9 @@
             DEFAULT_MODEL: 'gpt-4o-mini'
         };
 
-        const AVAILABLE_MODELS = [
-            { id: 'gpt-4o-mini', name: 'GPT-4o Mini', owner: 'OpenAI', desc: 'General-purpose AI' },
-            { id: 'gpt-5-mini', name: 'GPT-5 Mini (Beta)', owner: 'OpenAI', desc: 'Reasoning AI' },
-            { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'OpenAI', desc: 'Open source, Reasoning AI' },
-            { id: 'llama-4-scout', name: 'Llama 4 Scout', owner: 'Meta', desc: 'Open source' },
-            { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owner: 'Anthropic', desc: 'General-purpose + Reasoning AI' },
-            { id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI', desc: 'Open source' },
-            { id: 'mixtral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI', desc: 'Open source' },
-            { id: 'mistral-small-4', name: 'Mistral Small 4', owner: 'Mistral AI', desc: 'Latest Mistral' },
-            { id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owner: 'Anthropic', desc: 'Latest Haiku' },
-            { id: 'gpt-5-4-mini', name: 'GPT-5.4 Mini', owner: 'OpenAI', desc: 'Latest GPT Mini' },
-            { id: 'gpt-5-4-nano', name: 'GPT-5.4 Nano', owner: 'OpenAI', desc: 'Fast & lightweight' },
-            { id: 'gemma-4-31b', name: 'Gemma 4 31B', owner: 'Google', desc: 'Open source' }
-        ];
-        const REASONING_MODELS = new Set(['gpt-5-mini', 'gpt-oss-120b', 'claude-haiku-4-5', 'gpt-5-4-mini', 'gpt-5-4-nano']);
-        const REASONING_EFFORTS = new Set(['minimal', 'low', 'medium', 'high', 'none']);
+        let _cachedModels = null;
+        let _cachedReasoningModels = new Set();
+        let _modelsFetchPromise = null;
 
         function getApiUrl() {
             return SETTINGS.duckduckgoApiUrl || CONFIG.DEFAULT_API_URL;
@@ -1567,9 +1554,55 @@
             return SETTINGS.duckduckgoApiKey || '';
         }
 
-        function supportsReasoningModel(modelId) {
-            return REASONING_MODELS.has(modelId);
+        async function fetchModels(apiUrl) {
+            const url = apiUrl || getApiUrl();
+            try {
+                const res = await fetch(`${url}/models`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const models = Array.isArray(data.data) ? data.data : [];
+                _cachedModels = models;
+                _cachedReasoningModels = new Set(
+                    models.filter(m => m.reasoning).map(m => m.id)
+                );
+                return models;
+            } catch (e) {
+                console.warn('DuckDuckGo: failed to fetch models, using fallback', e);
+                _cachedModels = _cachedModels || [
+                    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', owned_by: 'openai' },
+                    { id: 'gpt-5-mini', name: 'GPT-5 Mini', owned_by: 'openai', reasoning: true },
+                    { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owned_by: 'openai', reasoning: true },
+                    { id: 'llama-4-scout', name: 'Llama 4 Scout', owned_by: 'meta' },
+                    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owned_by: 'anthropic', reasoning: true },
+                    { id: 'mistral-small-3', name: 'Mistral Small 3', owned_by: 'mistral' }
+                ];
+                _cachedReasoningModels = new Set(
+                    _cachedModels.filter(m => m.reasoning).map(m => m.id)
+                );
+                return _cachedModels;
+            }
         }
+
+        function getModelsSync() {
+            return _cachedModels || [];
+        }
+
+        async function getModels(apiUrl) {
+            if (_cachedModels) return _cachedModels;
+            if (!_modelsFetchPromise) {
+                _modelsFetchPromise = fetchModels(apiUrl).catch(() => {
+                    _modelsFetchPromise = null;
+                    return getModelsSync();
+                });
+            }
+            return _modelsFetchPromise;
+        }
+
+        function supportsReasoningModel(modelId) {
+            return _cachedReasoningModels.has(modelId);
+        }
+
+        const REASONING_EFFORTS = new Set(['minimal', 'low', 'medium', 'high', 'none']);
 
         function normalizeReasoningEffort(value) {
             const effort = `${value || ''}`.toLowerCase();
@@ -1639,15 +1672,14 @@
             return content;
         }
 
-        function getModels() {
-            return AVAILABLE_MODELS;
-        }
-
         return {
             CONFIG,
             getModels,
+            getModelsSync,
+            fetchModels,
             generateCompletion,
-            getApiUrl
+            getApiUrl,
+            supportsReasoningModel
         };
     })();
 
@@ -3247,16 +3279,11 @@
             wrapper.id = 'duckduckgo-model-wrapper';
             wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'duckduckgo' ? 'block' : 'none'};`;
 
-            const models = DuckDuckGoProvider.getModels();
             const currentModel = SETTINGS.duckduckgoModel || 'gpt-4o-mini';
             const currentApiUrl = SETTINGS.duckduckgoApiUrl || 'https://duckduckgo-api.toontamilindia.workers.dev';
             const currentApiKey = SETTINGS.duckduckgoApiKey || '';
             const currentIncludeReasoning = Boolean(SETTINGS.duckduckgoIncludeReasoning);
             const currentReasoningEffort = (SETTINGS.duckduckgoReasoningEffort || 'low').toLowerCase();
-
-            let optionsHtml = models.map(m =>
-                `<option value="${m.id}" ${m.id === currentModel ? 'selected' : ''}>${m.name} (${m.owner})</option>`
-            ).join('');
 
             wrapper.innerHTML = `
                 <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">🦆 DuckDuckGo AI (Proxy)</div>
@@ -3302,11 +3329,11 @@
                         font-size: 16px;
                         box-sizing: border-box;
                     ">
-                        ${optionsHtml}
+                        <option value="${currentModel}">Loading models...</option>
                     </select>
                 </div>
                 <div style="margin: 8px 0 6px 0; padding: 8px; border: 1px solid #333; border-radius: 6px; background: #232323;">
-                    <div style="color: #fff; font-size: 15px; margin-bottom: 6px;">Reasoning (GPT-5 / GPT-OSS / Claude)</div>
+                    <div style="color: #fff; font-size: 15px; margin-bottom: 6px;">Reasoning</div>
                     <label style="display: flex; align-items: center; gap: 8px; color: #aaa; font-size: 15px; margin-bottom: 6px; cursor: pointer;">
                         <input type="checkbox" id="ddgIncludeReasoning" ${currentIncludeReasoning ? 'checked' : ''}>
                         Include reasoning in output
@@ -3341,9 +3368,17 @@
                 const reasoningHint = document.getElementById('ddgReasoningHint');
                 const validReasoningEfforts = new Set(['minimal', 'low', 'medium', 'high', 'none']);
 
+                const populateModels = (models) => {
+                    if (!select) return;
+                    select.innerHTML = models.map(m =>
+                        `<option value="${m.id}" ${m.id === currentModel ? 'selected' : ''}>${m.name || m.id} (${m.owned_by || ''})</option>`
+                    ).join('');
+                    updateReasoningControls();
+                };
+
                 const updateReasoningControls = () => {
                     const selectedModel = select ? select.value : currentModel;
-                    const supportsReasoning = REASONING_MODELS.has(selectedModel);
+                    const supportsReasoning = DuckDuckGoProvider.supportsReasoningModel(selectedModel);
                     const isEnabled = Boolean(includeReasoningToggle && includeReasoningToggle.checked);
 
                     if (includeReasoningToggle) {
@@ -3358,6 +3393,15 @@
                             : 'Reasoning is not available for this model.';
                     }
                 };
+
+                // Load models from API
+                const apiUrl = apiUrlInput ? apiUrlInput.value : currentApiUrl;
+                DuckDuckGoProvider.getModels(apiUrl).then(models => {
+                    populateModels(models);
+                }).catch(() => {
+                    const fallback = DuckDuckGoProvider.getModelsSync();
+                    if (fallback.length) populateModels(fallback);
+                });
 
                 if (select) {
                     select.addEventListener('change', () => {

@@ -632,7 +632,8 @@ function handleModels() {
 			id: m.id,
 			object: 'model',
 			created: 1686935002,
-			owned_by: m.owner.toLowerCase()
+			owned_by: m.owner.toLowerCase(),
+			reasoning: REASONING_SUPPORTED_MODELS.has(MODEL_MAP[m.id] || m.id)
 		}))
 	}), {
 		status: 200,
