@@ -466,7 +466,145 @@
         enableAISolver: false,
         includePrePostCode: false,
         aiTemperature: 0,
-        aiSystemPrompt: "",
+        aiSystemPrompt: `You are an expert competitive programmer solving a SkillRack coding challenge.  
+
+Your response will be automatically parsed and run, then reviewed by other AI systems for correctness. Follow these rules with 100% strictness. Accuracy is mandatory — never invent syntax, APIs, table names, column names, function names, or behaviors that are not grounded in the problem statement, pre-code, or sample I/O. 
+
+Supported languages: C, C++, Java, Python, SQL (and any other language explicitly stated in the problem). Apply the correct language rules below based on what the problem asks for. 
+
+[CRITICAL - OUTPUT MODE]
+
+For Fill-In-The-Blanks (MFIB) problems:  
+
+- Output ONLY the values that belong in the blank fields ([BLANK_0], [BLANK_1], etc.).  
+- Print each blank's value on a new line, in order of appearance.  
+- Do NOT include any code markdown fences, notes, explanations, or labels. 
+
+For Full-Code problems (C / C++ / Java / Python / other):  
+
+- Output ONLY the raw source code.  
+- Do NOT wrap code in markdown fences (do NOT use cpp, java, python, sql, or similar).  
+- Do NOT include any comments, introductory text, explanations, or placeholders like // your code here. 
+
+For SQL problems:  
+
+- Output ONLY the SQL query/statement(s) required.  
+- Do NOT wrap in markdown fences.  
+- Do NOT invent table names, column names, schemas, or sample data — use exactly what the problem and pre-code provide.  
+- Prefer standard SQL unless the problem specifies a dialect (MySQL, SQLite, PostgreSQL, H2, etc.); then match that dialect exactly.  
+- Do NOT add USE database, CREATE TABLE, DROP TABLE, or INSERT unless the problem explicitly requires them (e.g. “CREATE with SELECT” / “create a new table” problems). 
+
+*SQL Formatting (STRICT):*  
+
+- Emit the *entire SQL solution as a SINGLE LINE*.  
+- Do NOT insert line breaks anywhere in the SQL statement.  
+- Do NOT pretty-print or format clauses on separate lines.  
+- Use only spaces to separate SQL keywords and clauses.
+
+*Correct (Single Line) examples:*  
+
+- SELECT c.id, c.name, c.age, p.name, p.price FROM customer c INNER JOIN plan p ON c.planid = p.id ORDER BY c.id; 
+- SELECT name, age FROM customer WHERE age >= 18 ORDER BY age DESC; 
+- SELECT p.name, COUNT(*) FROM customer c INNER JOIN plan p ON c.planid = p.id GROUP BY p.name HAVING COUNT(*) > 1 ORDER BY p.name; 
+- UPDATE customer SET age = age + 1 WHERE id = 5; 
+- DELETE FROM customer WHERE age < 18; 
+- CREATE TABLE filledbus AS SELECT * FROM bus WHERE seats > 0; 
+
+*Incorrect (Multi-Line) examples:*  
+
+-  
+  SELECT c.id,  
+         c.name,  
+         p.name  
+   FROM customer c  
+   INNER JOIN plan p  
+   ON c.planid = p.id  
+   ORDER BY c.id;
+
+-  
+  SELECT *  
+   FROM customer  
+   WHERE age > 18;
+
+*Rule:* Every SQL answer must be one continuous line with spaces between clauses only. No newline characters are allowed anywhere in the SQL statement. 
+
+[ANTI-HALLUCINATION RULES]
+
+- Never invent problem constraints, input formats, output formats, function signatures, library functions, or SQL schema details that are not present in the problem. 
+- If something is ambiguous, choose the interpretation that matches the sample I/O exactly. Sample I/O is ground truth over the written description.
+- Do not use non-existent or language-specific APIs unless they appear in the problem or pre-code.
+- Do not add extra print statements, debug output, labels, or decorative text. 
+- Mentally verify every identifier (variables, columns, tables, functions) against the problem before emitting output. 
+
+Your final output will be reviewed by Claude Mythos Preview and Codex — it must be exact, minimal, and correct on first parse. No partial answers, no "assuming that...", no commentary. 
+
+[PRE-CODE & INTEGRATION RULES]
+
+Respect Pre-Code Conventions:  
+
+- Do NOT re-declare or include #include directives or import statements if they are already in the pre-code.  
+- If the pre-code uses using namespace std;, respect it and align with it.  
+- Do not override existing conventions. 
+
+C / C++:  
+
+- Use correct headers only if not already provided.  
+- For decimals: when N decimal places are required, include <iomanip> and use std::fixed << std::setprecision(N) (or fixed << setprecision(N) if using namespace std; is active).  
+- Prevent integer overflow: use long long for any variables that accumulate large numbers. 
+
+Java structure:  
+
+- Class name must be Hello.  
+- Do NOT include a package declaration.  
+- Prevent integer overflow: use long for accumulators that can grow large. 
+
+Python execution:  
+
+- Do NOT define functions unless explicitly asked by the problem.  
+- Write code to execute directly at the top level.
+
+SQL Execution (SkillRack / H2 and similar):  
+
+- SkillRack almost always pre-creates tables and loads sample data before your code runs. Your job is usually a SELECT (or SELECT with JOIN / ORDER BY / WHERE / GROUP BY), not DDL/DML. 
+- Default: write ONLY the query that produces the required result set. Do NOT emit CREATE TABLE, DROP, or INSERT unless the problem text explicitly says to create/insert (e.g. “CREATE TABLE … AS SELECT …”, “create a new table filledbus”, etc.).
+- If you re-create a table that already exists, the judge fails with errors such as java.sql.SQLException: Table "CUSTOMER" already exists — that means you must remove CREATE and only SELECT from the given tables.
+- Use table and column names exactly as in the problem DDL (e.g., customer, plan, courseid, etc.). Do not rename or invent columns. 
+- Match column order, aliases, sorting, NULL handling, and aggregation exactly as specified by the problem and samples. 
+- Use correct JOIN types and filters as required (e.g., INNER JOIN on foreign keys like planid = plan.id when output mixes customer + plan fields, LEFT JOIN when rows with null foreign keys must still appear). 
+- ORDER BY must match sample row order (for example, id DESC when samples list highest id first).
+- Names with spaces (e.g., "Spoken English", "Basic Plus") come from table data — do not hardcode sample rows. 
+- Always output SQL as one continuous single line (spaces between clauses only; zero newline characters in the SQL body). 
+
+[OUTPUT SPECIFICATION]
+
+- Match the EXPECTED output format exactly. NEVER add labels, prefixes, or decorative text (e.g., if the expected output is 23.52, output exactly 23.52 — do NOT output Result: 23.52). 
+- Treat ALL sample input/output as ground truth. If the problem description conflicts with the sample I/O, obey the sample I/O behavior. 
+- If the expected output ends without a newline, do NOT add one. If it ends with one, add one.
+- Time complexity: Must not exceed O(n^2) for n > 10^4. Prefer O(n) or O(n log n). 
+- SQL correctness: result columns, row order, NULL handling, and aggregate behavior must match samples character-for-character when compared as the judge does. 
+
+[SKILLRACK SQL FAILURE PATTERNS TO AVOID]
+
+- Table already exists → You submitted CREATE TABLE; tables are pre-created. Output SELECT only. 
+- Wrong column order → Reorder SELECT list to match expected output fields left-to-right. 
+- Wrong sort → Add ORDER BY exactly as samples imply (often primary key DESC or ASC). 
+- Missing JOIN → When output needs columns from two tables (e.g., customer name + plan name + amount), JOIN on the foreign key; do not invent columns on one table. 
+
+- Hardcoded sample rows → Never INSERT or SELECT literal sample values; query the live tables.
+- CREATE WITH SELECT problems only → Emit CREATE TABLE … AS SELECT … (or equivalent) only when the problem title/statement explicitly requires creating a new table from a query. 
+- Multi-line SQL → Forbidden. Collapse the full statement into one line before emitting. 
+
+[SELF-CHECK STEP]
+
+Before generating your final response, mentally trace your solution with the sample inputs (or sample tables for SQL). 
+
+For SQL:  
+
+- Confirm you did not CREATE/INSERT unless required.  
+- Confirm JOIN keys, SELECT column order, and ORDER BY reproduce the expected rows character-for-character (including trailing spaces if present).  
+- Confirm the entire SQL is a single line with no line breaks. 
+
+Compare the output character-by-character against the expected sample outputs (including trailing spaces and newlines). Verify it matches exactly. Only then emit the final answer — nothing else.`,
         aiProvider: "gemini",
         geminiApiKey: "",
         geminiModel: "gemini-2.5-flash",
@@ -3817,9 +3955,9 @@
                         editor.session.on = function (event, callback) {
                             if (event === 'change' && callback) {
                                 const cbStr = callback.toString();
-                                // Block the 30-char diff detection handler
-                                if (cbStr.includes('diff > 30') || cbStr.includes('diff>30')) {
-                                    console.log('Blocked ACE 30-char anti-paste change handler');
+                                // Block the diff detection handler (15-char, 30-char, or any diff check)
+                                if (cbStr.includes('diff') || cbStr.includes('nowsnew') || cbStr.includes('nowsold') || cbStr.includes('nlen') || cbStr.includes('olen')) {
+                                    console.log('Blocked ACE anti-paste change handler');
                                     // Replace with a simple sync handler that always syncs
                                     return originalSessionOn(event, function (e) {
                                         const $ = window.jQuery || window.$;
@@ -4064,31 +4202,37 @@
         });
 
         // ============================================
-        // CRITICAL: Neutralize the hidden #mp1 submit button
-        // Even if onblur somehow fires, prevent #mp1 from submitting the form.
-        // The button is: <button id="mp1" name="mp1" style="display:none" type="submit">OnBlur</button>
-        // Clicking it performs a normal form POST with mp1=OnBlur to the server.
+        // CRITICAL: Neutralize hidden anti-cheat submit buttons (#mp1, #mp, OnBlur)
+        // Daily test pages use id="mp" while normal coding pages use id="mp1".
         // ============================================
         const neutralizeMp1Button = () => {
-            const mp1 = document.getElementById('mp1');
-            if (mp1) {
-                // Remove type="submit" so clicking it can't submit the form
-                mp1.type = 'button';
-                // Remove name so even if form submits, no mp1 parameter is sent
-                mp1.removeAttribute('name');
-                // Override click to be a no-op
-                mp1.onclick = function (e) {
+            const targets = [
+                document.getElementById('mp1'),
+                document.getElementById('mp')
+            ].filter(Boolean);
+
+            document.querySelectorAll('button').forEach(b => {
+                if ((b.textContent || '').trim().includes('OnBlur') && !targets.includes(b)) {
+                    targets.push(b);
+                }
+            });
+
+            targets.forEach(btn => {
+                if (btn._neutralized) return;
+                btn._neutralized = true;
+                btn.type = 'button';
+                btn.removeAttribute('name');
+                btn.onclick = function (e) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
-                    console.log('[SkillRack Bypass] Blocked mp1 button click (anti-cheat trigger)');
+                    console.log('[SkillRack Bypass] Blocked anti-cheat button click:', btn.id || 'OnBlur');
                     return false;
                 };
-                // Also override the click method directly
-                mp1.click = function () {
-                    console.log('[SkillRack Bypass] Blocked mp1.click() call');
+                btn.click = function () {
+                    console.log('[SkillRack Bypass] Blocked anti-cheat .click() call:', btn.id || 'OnBlur');
                 };
-                console.log('[SkillRack Bypass] Neutralized #mp1 hidden submit button');
-            }
+                console.log('[SkillRack Bypass] Neutralized anti-cheat submit button:', btn.id || 'OnBlur');
+            });
         };
 
         // Run immediately and also after DOM is ready (button may not exist yet)
@@ -4285,11 +4429,76 @@
         }, true);
     }
 
+    // Global helpers for active ACE editor and textarea (handles randomized IDs on Daily Test)
+    function getActiveAceEditor() {
+        if (window.txtCode && typeof window.txtCode.getSession === 'function') {
+            return window.txtCode;
+        }
+        const aceEl = document.querySelector('.ace_editor');
+        if (aceEl) {
+            if (aceEl.env && aceEl.env.editor) return aceEl.env.editor;
+            if (window.ace) {
+                try {
+                    const ed = window.ace.edit(aceEl.id || aceEl);
+                    if (ed && typeof ed.getSession === 'function') return ed;
+                } catch (e) { }
+            }
+        }
+        for (const key in window) {
+            try {
+                if (window[key] && typeof window[key] === 'object' && window[key].session && typeof window[key].setValue === 'function') {
+                    return window[key];
+                }
+            } catch (e) { }
+        }
+        return null;
+    }
+
+    function injectCodeToActiveEditor(code) {
+        const editor = getActiveAceEditor();
+        const $ = window.jQuery || window.$;
+        const $area = $ ? ($('#txtCode').length ? $('#txtCode') : $('#codediv textarea')) : null;
+        const domArea = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+
+        if (domArea) domArea.value = code;
+        if ($area && $area.length) $area.val(code);
+
+        if (editor) {
+            try {
+                if (editor.getSession && typeof editor.getSession().setValue === 'function') {
+                    editor.getSession().setValue(code);
+                } else if (typeof editor.setValue === 'function') {
+                    editor.setValue(code);
+                }
+                if (typeof editor.clearSelection === 'function') {
+                    editor.clearSelection();
+                }
+                if (typeof editor.resize === 'function') {
+                    editor.resize(true);
+                }
+                if (editor.renderer && typeof editor.renderer.updateFull === 'function') {
+                    editor.renderer.updateFull(true);
+                }
+            } catch (e) {
+                console.error('[SkillRack] Error setting ACE editor value:', e);
+            }
+            if (domArea) domArea.value = code;
+            if ($area && $area.length) $area.val(code);
+            return true;
+        } else if (domArea) {
+            domArea.value = code;
+            domArea.dispatchEvent(new Event('input', { bubbles: true }));
+            domArea.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+        }
+        return false;
+    }
+
     // 2.5 ACE EDITOR BYPASS - Handle all ACE-specific restrictions (post-load cleanup)
     const bypassAceEditor = () => {
         if (!SETTINGS.bypassCopyPaste) return;
 
-        // Find ACE editor instances (txtCode or any ace editor)
+        // Find ACE editor instances (txtCode or any ace editor / randomized Daily Test instances)
         const aceEditors = [];
 
         // Check for txtCode specifically (SkillRack uses this)
@@ -4305,13 +4514,29 @@
             }
         });
 
-        // Also find via ace.edit instances
+        // Also find via ace.edit instances / DOM elements
         if (window.ace) {
             document.querySelectorAll('.ace_editor').forEach(el => {
                 if (el.env && el.env.editor && !aceEditors.includes(el.env.editor)) {
                     aceEditors.push(el.env.editor);
+                } else {
+                    try {
+                        const ed = window.ace.edit(el.id || el);
+                        if (ed && ed.commands && !aceEditors.includes(ed)) {
+                            aceEditors.push(ed);
+                        }
+                    } catch (e) { }
                 }
             });
+        }
+
+        // Search window object for randomized ACE instance names (e.g. cojmyqb1784616944160)
+        for (const key in window) {
+            try {
+                if (window[key] && typeof window[key] === 'object' && window[key].commands && window[key].session && !aceEditors.includes(window[key])) {
+                    aceEditors.push(window[key]);
+                }
+            } catch (e) { }
         }
 
         aceEditors.forEach(editor => {
@@ -4367,37 +4592,17 @@
                 }
             }
 
-            // 2.5.3 Remove change event listeners that do 30-char detection
+            // 2.5.3 Remove change event listeners that do char limit detection (15-char / 30-char / diff / nowsnew / nowsold)
             if (editor.session && editor.session._eventRegistry && editor.session._eventRegistry.change) {
                 const originalChangeHandlers = editor.session._eventRegistry.change;
                 editor.session._eventRegistry.change = originalChangeHandlers.filter(handler => {
                     const handlerStr = handler.toString();
-                    if (handlerStr.includes('diff > 30') || handlerStr.includes('diff>30')) {
-                        console.log('Removed 30-char anti-paste change handler');
+                    if (handlerStr.includes('diff') || handlerStr.includes('nowsnew') || handlerStr.includes('nowsold') || handlerStr.includes('nlen') || handlerStr.includes('olen')) {
+                        console.log('Removed anti-paste change handler');
                         return false;
                     }
                     return true;
                 });
-            }
-
-            // 2.5.4 Override setValue to prevent reset attempts
-            if (editor.session && !editor.session._setValueOverridden) {
-                editor.session._setValueOverridden = true;
-                const originalSetValue = editor.session.setValue.bind(editor.session);
-                const originalGetValue = editor.session.getValue.bind(editor.session);
-
-                editor.session.setValue = function (text, cursorPos) {
-                    const currentValue = originalGetValue();
-
-                    // If current value is substantial and new value is much shorter, block it
-                    // This catches the anti-paste reset
-                    if (currentValue.length > 10 && text.length < currentValue.length - 10) {
-                        console.log('Blocked setValue reset attempt');
-                        return;
-                    }
-
-                    return originalSetValue(text, cursorPos);
-                };
             }
 
             // 2.5.5 Enable drop events on ACE container
@@ -4661,18 +4866,31 @@
         }
 
         // ============================================
-        // Override the global fscr() function
+        // Override the global fscr() function with getter/setter protection
         // SkillRack defines: function fscr() { screenfull.request(); }
         // The "Proceed to Solve" button calls fscr() to enter fullscreen.
-        // We make it a no-op since we're spoofing fullscreen state.
+        // If screenfull fails or browser blocks non-user-gesture fullscreen,
+        // it throws an error and crashes PrimeFaces.bcn, preventing AJAX submission.
+        // Using Object.defineProperty prevents inline <script> redefinition.
         // ============================================
         const overrideFscr = () => {
-            window.fscr = function () {
-                console.log('[SkillRack Bypass] fscr() call intercepted — fullscreen already spoofed');
+            const noopFscr = function () {
+                console.log('[SkillRack Bypass] fscr() call intercepted — fullscreen bypassed');
+                return Promise.resolve();
             };
+            try {
+                Object.defineProperty(window, 'fscr', {
+                    get: function () { return noopFscr; },
+                    set: function (val) {
+                        console.log('[SkillRack Bypass] Prevented inline redefinition of window.fscr');
+                    },
+                    configurable: true
+                });
+            } catch (e) {
+                window.fscr = noopFscr;
+            }
         };
         overrideFscr();
-        // Re-apply after DOM load in case it gets redefined
         document.addEventListener('DOMContentLoaded', overrideFscr);
 
         // ============================================
@@ -5353,56 +5571,44 @@
             });
         }
 
-        // ===== USE ONE OCR METHOD PER RETRY (HIERARCHY) =====
+        // ===== TRY ALL OCR METHODS IN SEQUENCE =====
         const processingMethods = [
             { name: "Enhanced", fn: () => processImageForOCR(image) },
             { name: "Inverted", fn: () => invertColors(image) },
             { name: "Original", fn: () => image.src }
         ];
 
-        // Use retry count to pick which method to try (hierarchy: Enhanced → Inverted → Original)
-        const retryIdx = getCaptchaRetryCount();
-        const methodIdx = Math.min(retryIdx, processingMethods.length - 1);
-        const method = processingMethods[methodIdx];
+        for (const method of processingMethods) {
+            console.log(`[Captcha] Trying ${method.name} OCR processing...`);
+            try {
+                const processedImg = method.fn();
 
-        console.log(`[Captcha] Using ${method.name} processing (attempt ${retryIdx + 1}/${CAPTCHA_MAX_AUTO_RETRIES})...`);
+                const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
+                    tessedit_char_whitelist: "0123456789+= ",
+                    tessedit_pageseg_mode: "7", // Single line
+                });
 
-        try {
-            const processedImg = method.fn();
+                console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
+                const result = solveCaptcha(text);
 
-            const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
-                tessedit_char_whitelist: "0123456789+= ",
-                tessedit_pageseg_mode: "7", // Single line
-            });
+                if (result !== null && result >= 1 && result <= 198) {
+                    console.log(`[Captcha] ✓ Solution found (${method.name}): ${result}`);
+                    console.log(`[Captcha] Submitting answer...`);
 
-            console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
-            const result = solveCaptcha(text);
+                    // Mark that we're attempting (will be checked on next page load)
+                    localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
 
-            if (result !== null) {
-                // Validate result is reasonable (1-198 for sum of two 1-99 numbers)
-                if (result < 1 || result > 198) {
-                    console.log(`[Captcha] ⚠️ Result ${result} seems invalid`);
-                    handleIncorrectCaptcha();
+                    textbox.value = result;
+                    setTimeout(() => safeButtonClick(button), 100);
                     return;
                 }
-
-                console.log(`[Captcha] ✓ Solution found: ${result}`);
-                console.log(`[Captcha] Submitting answer...`);
-
-                // Mark that we're attempting (will be checked on next page load)
-                localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
-
-                textbox.value = result;
-                setTimeout(() => safeButtonClick(button), 100);
-                return;
+            } catch (error) {
+                console.error(`[Captcha] ${method.name} OCR Error:`, error);
             }
-
-        } catch (error) {
-            console.error(`[Captcha] ${method.name} OCR Error:`, error);
         }
 
-        // Method failed to produce a valid result
-        console.log(`[Captcha] ✗ ${method.name} OCR method failed`);
+        // All methods failed to produce a valid result
+        console.log(`[Captcha] ✗ All OCR processing methods failed`);
         handleIncorrectCaptcha();
     }
 
@@ -5931,8 +6137,9 @@
         };
 
         // Get current code from editor
-        if (window.txtCode && window.txtCode.getSession) {
-            errorInfo.currentCode = window.txtCode.getSession().getValue();
+        const activeEd = getActiveAceEditor();
+        if (activeEd && activeEd.getSession) {
+            errorInfo.currentCode = activeEd.getSession().getValue();
         }
 
         // Check for "Incorrect Captcha" - ignore this
@@ -6544,13 +6751,7 @@
 
                 const code = pre ? pre.textContent.trim() : '';
                 if (code && code.length > 10) {
-                    if (window.txtCode && typeof window.txtCode.getSession === 'function') {
-                        window.txtCode.getSession().setValue(code);
-                    } else if (window.txtCode && 'value' in window.txtCode) {
-                        window.txtCode.value = code;
-                    }
-                    const $ = window.jQuery || window.$;
-                    if ($ && $('#txtCode').length) $('#txtCode').val(code);
+                    injectCodeToActiveEditor(code);
 
                     // Hide the solution panel after extracting code
                     const hideBtnNow = document.getElementById('hidebtn');
@@ -6587,7 +6788,7 @@
             return;
         }
 
-        const customSystemPrompt = SETTINGS.aiSystemPrompt ? SETTINGS.aiSystemPrompt.trim() + '\n\n' : '';
+        const customSystemPrompt = (SETTINGS.aiSystemPrompt || DEFAULT_SETTINGS.aiSystemPrompt || '').trim() + '\n\n';
         let prompt;
 
         if (SETTINGS.enableFullScreenCopyMode) {
@@ -6916,11 +7117,12 @@ SOLVING APPROACH:
 
                 // Check if code is similar to existing code
                 let existingCode = '';
-                if (window.txtCode && window.txtCode.getSession) {
-                    existingCode = window.txtCode.getSession().getValue();
+                const activeEditor = getActiveAceEditor();
+                if (activeEditor && activeEditor.getSession) {
+                    existingCode = activeEditor.getSession().getValue();
                 }
 
-                if (existingCode && calculateCodeSimilarity(code, existingCode) > 0.99) {
+                if (existingCode && existingCode.trim().length > 0 && calculateCodeSimilarity(code, existingCode) > 0.99) {
                     console.warn('Generated code is too similar to existing code, retrying with lenient prompt');
 
                     const lenientRetryPrompt = `${prompt}\n\nRETRY INSTRUCTION:\nThe previous answer was identical to the existing code. Provide a DIFFERENT corrected implementation that still follows required input/output format and solves the problem.`;
@@ -6939,23 +7141,8 @@ SOLVING APPROACH:
                     }
                 }
 
-                if (code && window.txtCode) {
-                    if (typeof window.txtCode.getSession === 'function') {
-                        // Insert the code into ACE editor
-                        window.txtCode.getSession().setValue(code);
-                    } else if ('value' in window.txtCode) {
-                        // Fallback for raw textarea element
-                        window.txtCode.value = code;
-                        window.txtCode.dispatchEvent(new Event('input', { bubbles: true }));
-                        window.txtCode.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-
-                    // Sync with hidden textarea element in DOM
-                    const $ = window.jQuery || window.$;
-                    if ($ && $("#txtCode").length) {
-                        $("#txtCode").val(code);
-                    }
-
+                const injected = injectCodeToActiveEditor(code);
+                if (injected) {
                     console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
                 } else {
                     notifyPopup('Failed to insert code into editor. Please try again.');
@@ -7690,6 +7877,7 @@ SOLVING APPROACH:
 
         function hasCodeEditor() {
             if (document.getElementById('txtCode') !== null) return true;
+            if (document.querySelector('#codediv textarea') !== null) return true;
             if (document.querySelector('.ace_editor') !== null) return true;
             return extractMFIBTemplate().inputs.length > 0;
         }
