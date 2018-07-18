@@ -5270,15 +5270,16 @@
 
         setTimeout(() => {
             try {
+                // Call native .click() first so inline onclick (PrimeFaces.bcn / PrimeFaces.ab) executes
+                button.click();
+            } catch (err) {
+                console.log('Button click fallback:', err);
                 const evt = new MouseEvent('click', {
                     bubbles: true,
                     cancelable: true,
                     view: window
                 });
                 button.dispatchEvent(evt);
-            } catch (err) {
-                console.log('Button click fallback:', err);
-                button.click();
             }
         }, 50);
     }
