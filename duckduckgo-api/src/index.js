@@ -1,8 +1,4 @@
 const MODEL_MAP = {
-	'gpt-4o-mini': 'gpt-4o-mini',
-	'gpt-5-mini': 'gpt-5-mini',
-	'gpt-oss-120b': 'tinfoil/gpt-oss-120b',
-	'llama-4-scout': 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
 	'claude-haiku-4-5': 'claude-haiku-4-5',
 	'mistral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501',
 	'mixtral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501',
@@ -11,14 +7,11 @@ const MODEL_MAP = {
 	'claude-4-5-haiku': 'claude-4-5-haiku',
 	'gpt-5.4-mini': 'gpt-5.4-mini',
 	'gpt-5.4-nano': 'gpt-5.4-nano',
+	'gpt-oss-120b': 'tinfoil/gpt-oss-120b',
 	'gemma-4-31b': 'tinfoil/gemma4-31b'
 };
 
 const AVAILABLE_MODELS = [
-	{ id: 'gpt-4o-mini', name: 'GPT-4o Mini', owner: 'OpenAI' },
-	{ id: 'gpt-5-mini', name: 'GPT-5 Mini', owner: 'OpenAI' },
-	{ id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'Tinfoil' },
-	{ id: 'llama-4-scout', name: 'Llama 4 Scout', owner: 'Meta' },
 	{ id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owner: 'Anthropic' },
 	{ id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI' },
 	{ id: 'mixtral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI' },
@@ -27,6 +20,7 @@ const AVAILABLE_MODELS = [
 	{ id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owner: 'Anthropic' },
 	{ id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', owner: 'OpenAI' },
 	{ id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', owner: 'OpenAI' },
+	{ id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'Tinfoil' },
 	{ id: 'gemma-4-31b', name: 'Gemma 4 31B', owner: 'Google' }
 ];
 
@@ -35,16 +29,16 @@ const ORIGIN_API = 'https://duck.ai';
 const STATUS_URL = 'https://duck.ai/duckchat/v1/status';
 const CHAT_URL = 'https://duck.ai/duckchat/v1/chat';
 const GPT_OSS_MODEL = 'tinfoil/gpt-oss-120b';
-const GPT_5_MINI_MODEL = 'gpt-5-mini';
 const GPT_OSS_TOOL_CHOICE = {
 	NewsSearch: false,
 	VideosSearch: false,
 	LocalSearch: false,
 	WeatherForecast: false
 };
-const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL, 'gpt-5.4-mini', 'gpt-5.4-nano']);
+const REASONING_SUPPORTED_MODELS = new Set(['gpt-5.4-mini', 'gpt-5.4-nano', GPT_OSS_MODEL]);
 const CHAT_MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 900;
+const FE_VERSION = 'serp_20260718_003933_ET-0dbc340d5c5b2ba773a319f0f7cecbecc376fdac';
 
 // SHA256 hash function for Cloudflare Workers
 async function sha256Base64(input) {
@@ -333,6 +327,8 @@ function normalizeReasoningEffort(value) {
 }
 
 function buildPayload(modelId, messages, options = {}) {
+	const isEncrypted = modelId.startsWith('tinfoil/');
+
 	const payload = {
 		model: modelId,
 		messages,
@@ -340,10 +336,17 @@ function buildPayload(modelId, messages, options = {}) {
 			? options.metadata
 			: { toolChoice: { ...GPT_OSS_TOOL_CHOICE } },
 		canUseTools: typeof options.canUseTools === 'boolean' ? options.canUseTools : true,
-		reasoningEffort: normalizeReasoningEffort(options.reasoningEffort),
-		canUseApproxLocation: options.canUseApproxLocation ?? null,
-		canDelegateImageGeneration: options.canDelegateImageGeneration ?? null
+		canUseApproxLocation: options.canUseApproxLocation ?? null
 	};
+
+	if (isEncrypted) {
+		payload.reasoningEffort = 'low';
+		payload.canDelegateImageGeneration = null;
+		payload.canUseWebSearch = null;
+		payload.canUploadFiles = null;
+	} else {
+		payload.reasoningEffort = normalizeReasoningEffort(options.reasoningEffort);
+	}
 
 	if (options.durableStream && typeof options.durableStream === 'object') {
 		payload.durableStream = options.durableStream;
@@ -360,7 +363,9 @@ function buildChatHeaders(modelId, token) {
 		'Referer': `${ORIGIN_API}/`,
 		'User-Agent': USER_AGENT,
 		'x-vqd-hash-1': token,
-		'x-fe-signals': buildFeSignals()
+		'x-fe-signals': buildFeSignals(),
+		'x-fe-version': FE_VERSION,
+		'x-duckai-chat-model': modelId
 	};
 
 	if (supportsReasoning(modelId)) {
@@ -371,6 +376,7 @@ function buildChatHeaders(modelId, token) {
 }
 
 function extractChunkText(parsed) {
+	if (parsed?.role === 'reasoning') return '';
 	return (
 		textFromValue(parsed?.message) ||
 		textFromValue(parsed?.content) ||
@@ -381,6 +387,9 @@ function extractChunkText(parsed) {
 }
 
 function extractChunkReasoning(parsed) {
+	if (parsed?.role === 'reasoning' && parsed?.text) {
+		return parsed.text;
+	}
 	return (
 		reasoningFromValue(parsed?.reasoning) ||
 		reasoningFromValue(parsed?.parts) ||
@@ -404,16 +413,9 @@ async function readDuckStream(response) {
 	let reasoningMessage = '';
 	let lastChunk = '';
 	let lastReasoningChunk = '';
-	let debugLines = '';
-
-	const appendDebug = (line) => {
-		if (debugLines.length >= 1000 || !line) return;
-		debugLines += `${line.slice(0, 200)}\n`;
-	};
 
 	const applyLine = (line) => {
 		if (!line) return false;
-		appendDebug(line);
 		if (!line.startsWith('data:')) return false;
 
 		const data = line.slice(5).trimStart();
@@ -423,13 +425,13 @@ async function readDuckStream(response) {
 		try {
 			const parsed = JSON.parse(data);
 			const reasoningChunk = extractChunkReasoning(parsed);
-			if (reasoningChunk && reasoningChunk !== lastReasoningChunk) {
-				reasoningMessage = mergeChunkValue(reasoningMessage, reasoningChunk, '\n');
+			if (reasoningChunk) {
+				reasoningMessage = mergeChunkValue(reasoningMessage, reasoningChunk);
 				lastReasoningChunk = reasoningChunk;
 			}
 
 			const chunk = extractChunkText(parsed);
-			if (chunk && chunk !== lastChunk) {
+			if (chunk) {
 				fullMessage = mergeChunkValue(fullMessage, chunk);
 				lastChunk = chunk;
 			}
@@ -443,7 +445,7 @@ async function readDuckStream(response) {
 		for (const line of raw.split('\n')) {
 			if (applyLine(line.trim())) break;
 		}
-		return { fullMessage, reasoningMessage, debugLines: debugLines || raw.slice(0, 1000) };
+		return { fullMessage, reasoningMessage };
 	}
 
 	const reader = response.body.getReader();
@@ -476,7 +478,7 @@ async function readDuckStream(response) {
 		applyLine(buffer.trim());
 	}
 
-	return { fullMessage, reasoningMessage, debugLines };
+	return { fullMessage, reasoningMessage };
 }
 
 async function handleChat(request, env) {
@@ -524,7 +526,7 @@ async function handleChat(request, env) {
 		});
 	}
 
-	const modelName = model || 'gpt-4o-mini';
+	const modelName = model || 'gpt-5.4-nano';
 	const modelId = MODEL_MAP[modelName] || modelName;
 
 	const normalizedMessages = normalizeMessages(messages);
@@ -597,14 +599,10 @@ async function handleChat(request, env) {
 		});
 	}
 
-	const { fullMessage, reasoningMessage, debugLines } = await readDuckStream(response);
+	const { fullMessage, reasoningMessage } = await readDuckStream(response);
 
 	if (!fullMessage) {
-		return new Response(JSON.stringify({ error: 'Empty response from AI', raw: debugLines.slice(0, 500) }), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' }
-		});
-	}
+		return new Response(JSON.stringify({ error: 'Empty response from AI' }), {
 
 	const outputMessage = { role: 'assistant', content: fullMessage };
 	if (includeReasoning && reasoningMessage) {
