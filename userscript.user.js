@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      5.0
+// @version      6.0
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -20,7 +20,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '5.0';
+    const SCRIPT_VERSION = '6.0';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -103,61 +103,67 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.9);
+                background: rgba(0,0,0,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
                 z-index: 999999;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: 'VT323', monospace;
             `;
 
             overlay.innerHTML = `
                 <div style="
-                    background: #1e1e1e;
-                    border-radius: 16px;
-                    padding: 32px;
+                    background: rgba(15,15,15,0.97);
+                    border-radius: 20px;
+                    padding: 36px 32px;
                     max-width: 450px;
                     text-align: center;
-                    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-                    border: 2px solid #f44336;
+                    box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05) inset;
+                    border: 1px solid rgba(239,68,68,0.3);
+                    animation: bypassSlideIn 0.3s cubic-bezier(.34,1.56,.64,1) forwards;
                 ">
                     <div style="margin-bottom: 16px;">
                         <svg viewBox="0 0 24 24" width="48" height="48" fill="#f44336">
                             <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"></path>
                         </svg>
                     </div>
-                    <h2 style="color: #f44336; margin: 0 0 16px 0; font-size: 24px;">Update Required</h2>
-                    <p style="color: #fff; margin: 0 0 8px 0; font-size: 14px;">
+                    <h2 style="margin:0 0 14px;font-size:26px;font-weight:800;font-family:'VT323',monospace;background:linear-gradient(90deg,#ef4444,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Update Required</h2>
+                    <p style="color: #fff; margin: 0 0 8px 0; font-size: 18px;">
                         A new version of SkillRack Bypass is available!
                     </p>
-                    <p style="color: #888; margin: 0 0 24px 0; font-size: 13px;">
+                    <p style="color: #888; margin: 0 0 24px 0; font-size: 17px;">
                         Your version: <span style="color: #ff9800;">${SCRIPT_VERSION}</span><br>
                         Latest version: <span style="color: #4CAF50;">${remoteVersion}</span>
                     </p>
-                    <p style="color: #ff9800; margin: 0 0 24px 0; font-size: 12px;">
+                    <p style="color: #ff9800; margin: 0 0 24px 0; font-size: 16px;">
                         You must update to continue using this script.
                     </p>
                     <div style="display: flex; gap: 12px; justify-content: center;">
                         <button id="bypass-update-btn" style="
-                            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                            background: linear-gradient(135deg,#22c55e,#16a34a);
                             color: white;
                             border: none;
-                            padding: 12px 32px;
-                            border-radius: 8px;
-                            font-size: 14px;
-                            font-weight: bold;
+                            padding: 11px 28px;
+                            border-radius: 10px;
+                            font-size: 17px;
+                            font-weight: 700;
                             cursor: pointer;
-                            transition: transform 0.2s;
-                        ">Update Now</button>
+                            font-family: 'VT323', monospace;
+                            letter-spacing: 0.3px;
+                            transition: transform 0.2s, box-shadow 0.2s;
+                            box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">Update Now</button>
                         <button id="bypass-update-close" style="
-                            background: #333;
-                            color: #888;
-                            border: 1px solid #444;
-                            padding: 12px 24px;
-                            border-radius: 8px;
-                            font-size: 14px;
+                            background: rgba(255,255,255,0.06);
+                            color: #71717a;
+                            border: 1px solid rgba(255,255,255,0.1);
+                            padding: 11px 20px;
+                            border-radius: 10px;
+                            font-size: 17px;
+                            font-family: 'VT323', monospace;
                             cursor: pointer;
-                        ">Close (Disable Script)</button>
+                            transition: background 0.2s;
+" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">Close (Disable Script)</button>
                     </div>
                 </div>
             `;
@@ -195,34 +201,35 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0,0,0,0.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
             z-index: 999999;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'VT323', monospace;
         `;
 
         overlay.innerHTML = `
             <div style="
-                background: #1e1e1e;
-                border-radius: 16px;
-                padding: 32px;
+                background: rgba(15,15,15,0.97);
+                border-radius: 20px;
+                padding: 36px 32px;
                 max-width: 400px;
                 text-align: center;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-                border: 2px solid #f44336;
+                box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05) inset;
+                border: 1px solid rgba(239,68,68,0.3);
+                animation: bypassSlideIn 0.3s cubic-bezier(.34,1.56,.64,1) forwards;
             ">
                 <div style="margin-bottom: 16px;">
                     <svg viewBox="0 0 24 24" width="48" height="48" fill="#f44336">
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8 0-1.85.63-3.55 1.69-4.9L16.9 18.31C15.55 19.37 13.85 20 12 20zm5.31-3.1L6.69 6.29C8.04 5.23 9.74 4.6 11.4 4.6c4.42 0 8 3.58 8 8 0 1.85-.63 3.55-1.69 4.9z"></path>
                     </svg>
                 </div>
-                <h2 style="color: #f44336; margin: 0 0 16px 0; font-size: 24px;">Script Disabled</h2>
-                <p style="color: #fff; margin: 0 0 16px 0; font-size: 14px;">
+                <h2 style="margin:0 0 14px;font-size:26px;font-weight:800;font-family:'VT323',monospace;background:linear-gradient(90deg,#ef4444,#dc2626);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Script Disabled</h2>
+                <p style="color: #fff; margin: 0 0 16px 0; font-size: 18px;">
                     This script has been temporarily disabled by the author.
                 </p>
-                <p style="color: #888; margin: 0; font-size: 12px;">
+                <p style="color: #888; margin: 0; font-size: 16px;">
                     Please check back later or visit the GitHub repository for updates.
                 </p>
             </div>
@@ -256,41 +263,44 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.95);
+                background: rgba(0,0,0,0.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
                 z-index: 999999;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: 'VT323', monospace;
             `;
 
             overlay.innerHTML = `
                 <div style="
-                    background: #1e1e1e;
-                    border-radius: 16px;
-                    padding: 32px;
+                    background: rgba(15,15,15,0.97);
+                    border-radius: 20px;
+                    padding: 36px 32px;
                     max-width: 500px;
                     text-align: center;
-                    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-                    border: 2px solid #ff9800;
+                    box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05) inset;
+                    border: 1px solid rgba(249,115,22,0.35);
+                    animation: bypassSlideIn 0.3s cubic-bezier(.34,1.56,.64,1) forwards;
                 ">
                     <div style="margin-bottom: 16px;">
                         <svg viewBox="0 0 24 24" width="48" height="48" fill="#ff9800">
                             <path d="M12 2L1 21h22L12 2zm0 3.45L20.14 19H3.86L12 5.45zM13 17h-2v-2h2v2zm0-4h-2v-4h2v4z"></path>
                         </svg>
                     </div>
-                    <h2 style="color: #ff9800; margin: 0 0 16px 0; font-size: 22px;">Disclaimer & Terms of Use</h2>
+                    <h2 style="margin:0 0 14px;font-size:24px;font-weight:800;font-family:'VT323',monospace;background:linear-gradient(90deg,#f97316,#eab308);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Disclaimer & Terms of Use</h2>
                     <div style="
-                        background: #2d2d2d;
-                        border-radius: 8px;
-                        padding: 16px;
-                        margin-bottom: 20px;
+                        background: rgba(255,255,255,0.04);
+                        border: 1px solid rgba(255,255,255,0.08);
+                        border-radius: 10px;
+                        padding: 14px 16px;
+                        margin-bottom: 18px;
                         text-align: left;
                         max-height: 200px;
                         overflow-y: auto;
-                        font-size: 12px;
-                        color: #ccc;
-                        line-height: 1.6;
+                        font-size: 16px;
+                        color: #a1a1aa;
+                        line-height: 1.65;
+                        font-family: 'VT323', monospace;
                     ">
                         <p style="margin: 0 0 12px 0;"><strong style="color: #f44336;">IMPORTANT - READ CAREFULLY:</strong></p>
                         <ul style="margin: 0; padding-left: 20px;">
@@ -308,29 +318,35 @@
                             <li style="margin-bottom: 8px;">This script is for <strong>educational purposes only</strong>.</li>
                         </ul>
                     </div>
-                    <p style="color: #888; margin: 0 0 20px 0; font-size: 11px;">
+                    <p style="color: #888; margin: 0 0 20px 0; font-size: 15px;">
                         By clicking "I Accept", you confirm that you have read, understood, and agree to these terms.
                     </p>
                     <div style="display: flex; gap: 12px; justify-content: center;">
                         <button id="bypass-accept-btn" style="
-                            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                            background: linear-gradient(135deg,#22c55e,#16a34a);
                             color: white;
                             border: none;
-                            padding: 12px 32px;
-                            border-radius: 8px;
-                            font-size: 14px;
-                            font-weight: bold;
+                            padding: 11px 28px;
+                            border-radius: 10px;
+                            font-size: 17px;
+                            font-weight: 700;
                             cursor: pointer;
-                        ">I Accept & Understand</button>
+                            font-family: 'VT323', monospace;
+                            letter-spacing: 0.3px;
+                            box-shadow: 0 4px 16px rgba(34,197,94,0.3);
+                            transition: transform 0.2s;
+" onmouseover="this.style.transform='scale(1.04)'" onmouseout="this.style.transform='scale(1)'">I Accept & Understand</button>
                         <button id="bypass-decline-btn" style="
-                            background: #333;
-                            color: #888;
-                            border: 1px solid #444;
-                            padding: 12px 24px;
-                            border-radius: 8px;
-                            font-size: 14px;
+                            background: rgba(255,255,255,0.06);
+                            color: #71717a;
+                            border: 1px solid rgba(255,255,255,0.1);
+                            padding: 11px 20px;
+                            border-radius: 10px;
+                            font-size: 17px;
+                            font-family: 'VT323', monospace;
                             cursor: pointer;
-                        ">Decline</button>
+                            transition: background 0.2s;
+" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">Decline</button>
                     </div>
                 </div>
             `;
@@ -457,7 +473,7 @@
         openaiApiKey: "",
         openaiModel: "gpt-4o-mini",
         openrouterApiKey: "",
-        openrouterModel: "google/gemini-2.5-flash-001",
+        openrouterModel: "qwen/qwen3-coder:free",
         puterModel: "gpt-5.4-nano",
         puterCustomModel: "",
         puterEnableReasoning: false,
@@ -484,9 +500,13 @@
 
         // ========== AUTO SOLVER SETTINGS ==========
         enableAutoSolver: false,
-        autoSolverMaxRetries: 1,
+        autoSolverMaxRetries: 3,
         autoSolverDelay: 500,
         // ==========================================
+
+        // ========== FIND INCOMPLETE SETTINGS ==========
+        enableFindIncomplete: true,
+        // ===============================================
     };
 
     // Load settings from localStorage or use defaults
@@ -494,7 +514,10 @@
         try {
             const saved = localStorage.getItem('skillrack_bypass_settings');
             if (saved) {
-                return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+                const merged = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+                // Migrate: old default was 1 which made retry loop never fire — bump to 5
+                if (merged.autoSolverMaxRetries < 2) merged.autoSolverMaxRetries = 5;
+                return merged;
             }
         } catch (e) {
             console.log('Failed to load settings:', e);
@@ -986,29 +1009,60 @@
             }
 
             console.log('[OpenRouter] Fetching models from API...');
-            const response = await fetch(CONFIG.API_URL, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': window.location.href,
-                    'X-Title': 'SkillRack Bypass'
-                }
-            });
 
-            if (!response.ok) {
-                console.warn('[OpenRouter] API request failed, using fallback models');
+            // Wrap the entire network call so CORS errors, DNS failures, and
+            // any other network-level exceptions fall back gracefully.
+            let response;
+            try {
+                response = await fetch(CONFIG.API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': window.location.href,
+                        'X-Title': 'SkillRack Bypass'
+                    }
+                });
+            } catch (networkErr) {
+                console.warn('[OpenRouter] Network error while fetching models:', networkErr.message);
                 return getFallbackModels();
             }
 
-            const rawResponse = await response.json();
+            if (!response.ok) {
+                // Try to extract a helpful error message from the body.
+                let errDetail = '';
+                try {
+                    const errBody = await response.json();
+                    errDetail = errBody?.error?.message || errBody?.message || '';
+                } catch (_) {
+                    try { errDetail = await response.text(); } catch (_2) { }
+                }
+                console.warn(
+                    `[OpenRouter] Models API HTTP ${response.status}` +
+                    (errDetail ? `: ${errDetail}` : '') +
+                    ' — using fallback models'
+                );
+                return getFallbackModels();
+            }
+
+            let rawResponse;
+            try {
+                rawResponse = await response.json();
+            } catch (parseErr) {
+                console.warn('[OpenRouter] Failed to parse models response JSON:', parseErr.message);
+                return getFallbackModels();
+            }
+
             let modelArray = [];
 
             // API returns { data: [...] }
-            if (rawResponse.data && Array.isArray(rawResponse.data)) {
+            if (rawResponse && rawResponse.data && Array.isArray(rawResponse.data)) {
                 modelArray = rawResponse.data;
             } else if (Array.isArray(rawResponse)) {
                 modelArray = rawResponse;
+            } else {
+                console.warn('[OpenRouter] Unexpected models response shape — using fallback models');
+                return getFallbackModels();
             }
 
             // Filter and normalize models
@@ -1026,28 +1080,31 @@
 
             if (normalizedModels.length > 0) {
                 setCachedModels(normalizedModels);
+            } else {
+                console.warn('[OpenRouter] Fetched 0 models — falling back to built-in list');
+                return getFallbackModels();
             }
 
             return normalizedModels;
         }
 
-        // Fallback models when API is unavailable or no API key
         function getFallbackModels() {
             return [
-                { id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash Exp', author: 'google', group: 'Google', isFree: true },
-                { id: 'google/gemini-2.5-flash-preview', name: 'Gemini 2.5 Flash', author: 'google', group: 'Google', isFree: false },
-                { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro', author: 'google', group: 'Google', isFree: false },
-                { id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1', author: 'deepseek', group: 'DeepSeek', isFree: true },
-                { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3', author: 'deepseek', group: 'DeepSeek', isFree: false },
-                { id: 'qwen/qwen3-235b-a22b:free', name: 'Qwen3 235B', author: 'qwen', group: 'Qwen', isFree: true },
-                { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', author: 'meta-llama', group: 'Meta', isFree: true },
-                { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', author: 'anthropic', group: 'Anthropic', isFree: false },
-                { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku', author: 'anthropic', group: 'Anthropic', isFree: false },
-                { id: 'openai/gpt-4o', name: 'GPT-4o', author: 'openai', group: 'OpenAI', isFree: false },
+                { id: 'qwen/qwen3-coder:free', name: 'Qwen3 Coder 480B (Free)', author: 'qwen', group: 'Qwen', isFree: true },
+                { id: 'poolside/laguna-m.1:free', name: 'Laguna M.1 Coder (Free)', author: 'poolside', group: 'Poolside', isFree: true },
+                { id: 'poolside/laguna-xs-2.1:free', name: 'Laguna XS 2.1 Coder (Free)', author: 'poolside', group: 'Poolside', isFree: true },
+                { id: 'poolside/laguna-xs.2:free', name: 'Laguna XS.2 Coder (Free)', author: 'poolside', group: 'Poolside', isFree: true },
+                { id: 'cohere/north-mini-code:free', name: 'North Mini Code 30B (Free)', author: 'cohere', group: 'Cohere', isFree: true },
+                { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'Nemotron Ultra 550B (Free)', author: 'nvidia', group: 'NVIDIA', isFree: true },
+                { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron Super 120B (Free)', author: 'nvidia', group: 'NVIDIA', isFree: true },
+                { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B (Free)', author: 'google', group: 'Google', isFree: true },
+                { id: 'google/gemma-4-26b-a4b-it:free', name: 'Gemma 4 26B MoE (Free)', author: 'google', group: 'Google', isFree: true },
+                { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B (Free)', author: 'meta-llama', group: 'Meta', isFree: true },
+                { id: 'qwen/qwen-2.5-coder-32b-instruct:free', name: 'Qwen 2.5 Coder 32B (Free)', author: 'qwen', group: 'Qwen', isFree: true },
+                { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B (Free)', author: 'openai', group: 'OpenAI', isFree: true },
+                { id: 'openai/gpt-oss-20b:free', name: 'GPT-OSS 20B (Free)', author: 'openai', group: 'OpenAI', isFree: true },
                 { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', author: 'openai', group: 'OpenAI', isFree: false },
-                { id: 'openai/o3-mini', name: 'o3-mini', author: 'openai', group: 'OpenAI', isFree: false },
-                { id: 'mistralai/mistral-large', name: 'Mistral Large', author: 'mistralai', group: 'Mistral', isFree: false },
-                { id: 'mistralai/codestral-latest', name: 'Codestral', author: 'mistralai', group: 'Mistral', isFree: false },
+                { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', author: 'anthropic', group: 'Anthropic', isFree: false },
             ].map(m => ({ ...m, fullName: m.name, description: '', context_length: null, supportsReasoning: false, inputModalities: ['text'], outputModalities: ['text'] }));
         }
 
@@ -1906,61 +1963,116 @@
     // SETTINGS UI
     // ============================================
     const createSettingsUI = () => {
-        // Create settings button
+        // Inject Google Fonts once
+        if (!document.getElementById('bypass-gfont')) {
+            const gfont = document.createElement('link');
+            gfont.id = 'bypass-gfont';
+            gfont.rel = 'stylesheet';
+            gfont.href = 'https://fonts.googleapis.com/css2?family=VT323&display=swap';
+            document.head.appendChild(gfont);
+        }
+
+        // Inject keyframe animations once
+        if (!document.getElementById('bypass-keyframes')) {
+            const ks = document.createElement('style');
+            ks.id = 'bypass-keyframes';
+            ks.textContent = `
+                @keyframes bypassPulse {
+                    0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5), 0 8px 32px rgba(0,0,0,0.6); }
+                    50%      { box-shadow: 0 0 0 10px rgba(239,68,68,0),  0 8px 32px rgba(0,0,0,0.6); }
+                }
+                @keyframes bypassSlideIn {
+                    from { opacity:0; transform:translateY(20px) scale(0.95); }
+                    to   { opacity:1; transform:translateY(0)     scale(1);    }
+                }
+                @keyframes bypassFadeIn {
+                    from { opacity:0; }
+                    to   { opacity:1; }
+                }
+                @keyframes bypassSpin {
+                    from { transform: rotate(0deg); }
+                    to   { transform: rotate(360deg); }
+                }
+                @keyframes bypassGlow {
+                    0%,100% { filter: drop-shadow(0 0 4px rgba(239,68,68,0.6)); }
+                    50%      { filter: drop-shadow(0 0 12px rgba(239,68,68,1)); }
+                }
+                #bypass-settings-panel::-webkit-scrollbar { width:5px; }
+                #bypass-settings-panel::-webkit-scrollbar-track { background:transparent; }
+                #bypass-settings-panel::-webkit-scrollbar-thumb { background:#3f3f46; border-radius:4px; }
+                #bypass-settings-panel::-webkit-scrollbar-thumb:hover { background:#52525b; }
+            `;
+            document.head.appendChild(ks);
+        }
+
+         // Create settings button with custom pixel-art icon
         const settingsBtn = document.createElement('button');
-        settingsBtn.innerHTML = '⚙️';
         settingsBtn.title = 'Bypass Settings';
+        settingsBtn.innerHTML = `<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAeDklEQVR42m16Z4xk2XndOd99sUJXde6emZ6ZnbRpZnMO3F2Sq6WkpShSlE0JNGlBpmQbFiAYEJz1QzAMwzYMCIIESLQtS7YlixYlmWYmLW7Ou9wd7uxOjj0znbsr13vv3vv5R1WHodzoHnTXe3Pj+eI5rNVmQBAAAYVCARJQVRAKUDH8IggOXuHgEQgAg183f9n8QxWAgiSGg2+9Nnisg3mGY27NsGMVxOYD1e3Zt4cAANlaxeBv7ngaKAK94SMdrgpOt4bTrf+sCoVyaw7F5og62M6OOXR7j7rjhG5cyeb4Opx96+nWtIBsf6Kqm0MOfmIiIhTcGpKEA/aJjhEWKoCQAghAqKFGWwvV4fs7t6ObG1UFObyb4fCbJ7C1Hx2ch+489BsuYHjKg9vZ+cJgQAN0hvDZWhNBGGBJeVTQ9VCA3sdCIQuFAUJoE1CoIyNoMbzAIVQMVKF2e8Id+9txY9y6FhJK/P+/hlA3aVodDkaAiAG/edgAS9AYyAjBEJQG6AMADhEN1UOhRIWVwnrvK17r6jOKCPcREaUJNQpHEPBkGQigOUU4NJXNeba/NxFNgMbITmTxhr0MbzD4sf07blulhzpiGlBFBwg2j6gErHlE8KOFfnrP1NPTIxebnSvdrNHLVnvZO5nrWxsF5hoYgzmRqDpQiTZAUDahMECZ3ugFdGioKmK6vX4UhiJUbq8QN/gbmDipbC2ZpAdiwAAFUAYUWAdmgQ4ZAyWgAI1qlci9Tii13bsrkrsr6c3V0iPT9cdmx35ysjaWxu81OpH3XZEUGkF7pLnxKIdnP/iMxNZVDExTpN3tPvHwfVleNNsdI+YG+HALmTBpUt5xQXSKVEAgB0LAQ0vAOBCBDSAHq9AEqBGJcyPk/UZv8VnFZlevra91+o1Or9/L7y/H49QP2r06oeCKyMAl6ACfWzjfQg10y4cSCAJptTs//fQTv/YrX/jW959vt7smMNse+UbbCQaWsnlHmgAdhQAR0Ac8Oaa6j2hAE2BBASAl9lBT6qMx70vkwIGZ8i2HguffuJ4VHUWl22Ab95nwHfpz4FVKqsigGegAw80AsekqCLXYBn4QmFar/fRHHv7i5/9283t/3V9YlCSF9yQAJXeEAhKqAg6sc2hEQhAw0BIUQKpYJC8Ac8QcsBc6KpwROOAcJBCzP0R859Hs736ptHuypLbii92TlfrnPjU7O37MFy2KqBqoAxWYgMoOgxs4jM3VE9DAmHa78/QTj/zUTz7Teunl5a9/01Jkc726jfzNUQgTJ5WBSRhFQOQggBKQgAINwP3EOWWNPCI6KWhY17HaVix6RJTZLJ/qtpMPftQ7P7+EMLD5+KG97pe/FJ88gYUF47TttQlmRBWIoZ0h1JVkGZqBUB04lNCYbrf7sccfeuzRR/3y4sHm8lffOP5hWg6993qjD9oRQEyaVLY8vQCOqAIHySaQAXvIOar1GqmPyQ8KfyyNf366Pmb1VGbHCBNEB+CLK9fnnWlHkYoxq2ulN16bP3HuubZ9jsE8CKIHVoAOmA+CPyBED6BicPtGpN/vP/zA3UeP3tkv7Ef2T579yl/+RV/7xmArOG2H9m1nKzusgkoK0Acy4DbqMQG8+zBzM1EYRuFzfX0qiX9tuj6hWMttB3rS+mYQnpXw9aC0HsXOoyVmGeHK1dX/2bKveVlTLFM82CebQLh59aOEAoFXAzVARLq8uPuO2/cdvn319LmP7x299txLr5y/2o0jo34LN0Ok61ZIJsBgmCSoVzABFLDQea8zhvQ6Af7W4Zl7puunrq1++eLyy/3i3PxaJ3fHvR40wTnrRyP5i1Yf3kfkd5u935iuXy7szVHwopcrQAzsUb1GTkP3Ee8pFBRoFzAYevcS2SvsHXcc3TV3oHPx4k88fnfju9//w++9mldr3ut2yACU+jfjsUmTCnekgtNEA5wVthVh4X9zz8TusWq702cUHaqkHxstz3eyVws3bthxetHai85ezD0Vr/WL05m9oxT9VaO7LwnWM+s91lU96bzuM7ICrIEGGgEejIEZuHHoQu52zc1NzM611tY+Ols1b7/1rTd+9EpSVqI99LbcCfrtmDywgSSpDDYZEAJMQmcAL2wU/uNRECuWO/2bxqpz4yOjpTgv3G7vL/bso6Xw6dHS3mrpcj+/0suvWNf0WjJyqpdbr2928/czeyw0/3rP+E+MV3/U6l2yrikC6C5ojxKoF+e86q0hnDFrzqsJH7l5v7zxxrV3j7+UVHNjvGpO+mFOf6Pt7kigTZyUB28MHOgauBs6Sr1YYI8ELeceHImN8Fone2+5Oab6w/XuRav3V5OPzk1+bKb2uen6AyOlJLPLhTcikeJQaH52qvalPeMbrd7caGUuMrsK+06/yEQmgBxsqx4LzRcrycud/D2Lw6ksd/ujExPT85dOnj3XL1U+NKECRjUjdSvEDiyA2JlUEDBpUlEgIqpQBVNAiI7TplVQAso4tNvLX1lujas73ug938mtyH3VOA0MKer1SKX08ZnRer//fLv/xdHyv7nrpsd3je0KTF34O+eXFtv5B+3sSmF7wrJIj4Tzj4Xm1U7+dDX5+9P1P17p1pNgYXV9cWV1r8EFBssUB/SG6cNg2eR27rFZI5EgTZJUBhubAUDWibZ1D0Xhz5bir/XyhFyz/jvdIldczPxrmT3v/QOxOZKGpWqpauT6cuNao73U7c+V4nPN7idmR6fT+PLC6nvX15ser3Szt3L/6V2jD0yNrLZ6HxQuhKrqW53iqWq8SprCF7l/PbfjofYkrKufl6AtMqo+BjoUs+V2NnOg7fKNBGCSpCKABQTcTxREXuinyrEjdxl5K7PGcCyQs4V/v3CnvQ3AcRrNi8sbnfmNTklVgW5WXOnkr2ROcjuR541+kQZyuZu/lbnHE/NLc6NHK+mJ1eZMHO43Zj1zR+LgSBrdEZovr3TGTbDmfcNDiJi6ZEJLWjKnbFVtO9LnHfn1phFXAUTQPlgBRqBNj9VCD4YyGXBfEv3qzMh9I6kr3HJur3ltqV/1EMhUIHD+euFEte/95cy9kbsaOC7seH+uZ9/L7Enrpmjazc5fr7WcyBdG0qvd/B3rn60mK4V7tZk9lIQfOt8NWA2kEENoqJpA+6TbkZ96oAQYaA4Iub0FgvX6jEIjoA4dIej8SsFny9GdsbzYtj8/mkyV4vOeqxutv2znPyiKUUpXtUzuEjNtpAQ41RXn2/ALipLiJhOMCzZUP3Cuo/pAEI6JnLDFs6Wo6dxL8JnBcsf9dBh68LJz58VHgbFAD5z0VoGmmJzUTbSIgqRXharnziQcqmqSpELAEik4Tlwp/E1GPl6Olgv/Yuaq6puK1U7/QuZ+UDgFR4hJMhW2vL/gdUV9AX1qvPzFsXJY+J+sp+esfbWwy6pL3sfCDeCqc4HIKPSE0yKRZqEdpx1wSd110XIgGVgohHSqOdgaQH/znGOoJZTc0WAYhmSCJknKCg2AKbJpfaIsQR4fLT09N3Gh0fmrbl7kftHqa9aOiW96TooYoZDTxhwwMivyTBrOGXm3V7zYL2YoddWOMiAOBFjxSIASmDt33GlDcaFbdJ3OCktwLjRVI03QKkgImFEKMtjKfsgEKCs6EG4mDz9WQg76JrSAAwqFBTvwPityxS/tm3jzw2vfK2winApxq5i6+LdzX6OMC1NgSnja6Q9y91gQNJwLhC3vX8ltR7En0DHqEnQ8CGpB8Jmp0YP1yrevrEwnEaz9k9V2EQSJkWWFV3iCgAUm1XnFkjFGVRUxNAAaJKg7ejg3tAKGEAJgCPEaKxOhgLvh8sJJ4aDqBOXAXFEeMxoAVx2OBcG4wQdWC9XPpOGhNDyb2UBxZxRcLnxTYdVVw/Cf7p96LAmfrKZPjJZPr7YnvH7+8My90/VSs3u8cC3QA4YgkAIZEBGOkpEJoEQZ6IIFWVEUWyvejgokhqkEalCS4jSG3BzIeCjNzLrc9hQzwrPO5mQfyME9cKcdM+iocK/BomLVoZ25s861FE3rT3vtqD6cRv9stpY7vLrWXS3ca6udxW7WVry83JyBXu9mJ/OiRxhFAVahBVkAXTADY2gKDCo4S45DDdClAAigwY4aSIeRmIzJaWDFYZTigU/V4kNjIy81srb171m/DKVhDdhH/aDQJcUIuaRIBR1FR31IzaA9yLz6i949GprPVeMLPfvuRu+pifJ4GLzV7L1pMQE9nrt+p79s/Vu5rwsyyiDZaZKiKEM9MQtYckZtmQQlVV0AZVD5Kwpy0NscFvVJUiGYEeOqqXDD+hGKcf5wKTpYir7Z6J9xdjY0G4qMuB3utEcLLBk5EJq+8Egotxj0yIK4rnoVqKl+NAws2fDaVuSZfaedvVi4AvhMNZ4O5FSuC6ozoj1Va0SBlOwCQobEBDBFNBUbpIDT0A2gBwoQDIt/wZZH0s2iHopL4EHRFaoHWg4rvaweBhXRMlAROKv7BG3ldY8SWPFcKYrRMDjuMCbskFe8LwCqL4s55eCsN147Xv88wzlX7DLmwVDagkNh0LH+kuNug8XC54ocmIY6cJVIFNPEGUUOBJA5+CtgAwC0pOgBjgQ0BCLVNoVQGeyqDBRAH5wNuOJdAL3cdyq8LY2gbFp/1GAWet0pFPcb88nY/FQpcdar6vtWG96XCQcNgD655rVndd76d63fgN8AxoB70/By3x5vZ3siuS2Wc1YtWQB7oCnQBlPVm6kbgAdqwDHRguwCuSJW1KAybLch3K6Q1SRJVUELpEAFGpMLTkETeb8/MnfVSx+tlXrAlX5+yPD1Qg9J+HBijlXiW2tpkrsTuesIVhwyRcu6hHSqqfKy13WwBK55rYrvgbEyhL6X612pCUW+1ytywYTICHEGUiaOBtKh9MiEnBVSeIHiRcrAPuGiiFP1ZJUIoetKQwAMtvxqmwiVR6iJQL3fkwQXuvncSClz9vHQNMLgRJGPS3AkkIjYXU1rUdBnexdlxXkQrdwS9AJVPedtRSRQLEHnjB4yes2772d6KAjqgg45ArTUp+RY0bviXWqig2Kand4VZeBdRDTB64qOqoATUXglzzdEKuWSkiOqG7rdGAtIeMAAFXCdWIGOCuDQVwaqudc3esV/XWjdk5plz6pyfySBSDUKlrrZxdzvC+Rq5hbUD6Jhz3kqLFDA7xW/K5AVlTc1GNd+KLjq/G2hhOAt9dLDnfyFrD8/cfDDyszMxqW1fG3miadngGq17FWt6jHAQ0NF78wZc/hwq5e/+OKbY663IqY/bHRjs7mrSrKkPgO7lJDoUde9gvxfi43dwsnQvJHZFFoXHEmC4z3X6PS+u9o9HMqCh6E47yJgSrjk1QB14ZMRAganrRObNWqzlxRhZ/mRwJtAIuL4RveuOLTefsfR7T52cWnxjrvv+Be//itJHDZanTRJnHdJHJXS5Id/+D/W6nc9/NlPvnF+7WtvXElbZyEmHK6eAAIdZFHAMllTZKp1YlH9t3r5jLCvOmZEFROCdSc1MaOGkeAry92ZODwa4/m1rKcakXsN7434Uq7TwnGDjuKCU4mq+djMWr8HoKJoOlyhT3p2V8BHRsu3VOOnugvfeOdPTnW7dGOtTmdhsUOKH/GBERcGv/vlPzn57vuf+ewnvS2++dqHvr3mjBivAHIOeTCTpBUAVHVkTKRARk4J19UvOQWxoj6n7jNY9TAqM4I3+i4D/9ZofLxTvNgvOtDbIkwbkiwRI4Ie5TJkXIsFNZcmj0ZhohuXS65/0AQdj7lQbq5EDedrUdD1sjvQu2Lz5ocXllQfuPeu+kglTRIA/+53/2h5o/lPfuMfHjqwNwP++zdeX75wclcIIRvDhGKQC6WVAeEmhAPMoNVK3G4YGqaCPYFQzJzgkvNrkAWre0KpC3q5/V7XzaseCvzuwCxAVsFJ6HXIgmIEvpBwtT6nKlqqJep8e2XNuwVKoLg5Ckbj8BsbnXIQ/LCXf7tjfRp/6TOfkImJf/lvf296ov6HX/m6kL/5679MQJ29vND4g68+N9m9mgTBMqCk2WzVDTmykAiAAmyBDlhUXgNr5LKYc5BZ+EXnWh4l6EfKwa9Olbuq/7ltT3o3bfz+0CwpO9BFygLoiBAQ71aDcvPwkzJz2FRH7cxhuem+Xm0GeeuFPPu91W7D+nXl7yw3n+9mUbfxhbmxVFBJ47tuP/KPf+u3K5XSP/8Hn+8uLa+2uiLywaWV1sbKmJEI2oNEwLT6gRUMaRejmgLL4BSUQA84p0yoM+qF7Kv+qOBuCQ4Z5E6/tZGTyKEG7tZALigVqmDNu4tgWdWJKYqiOb4/MobVmkaptJclSSvCKC1XV85ddP1/NZ+XCOPyO0IzMV4beehBP7ur0+5+9tmPVyvlTzx0Zy8rfK0uK2tSjV97/2LaWWHKhiKlxooWh9TOgGZlH2gAIXQVpCKCxsAZjzIwS71s8UAQ3hGbNtHI7fvt/tt931G9PWQTsqLYABvAXuokmYElb5tRJZ+5WYIIRW66G4GzNqku77mzGY+4PcfGpm46Vk5vDXmK6d5H7n3mF3/2VBAgiVuNDQP3hZ//qZXrC2fe/6BWq5iN5cXrK+euXK8yX6VZAefUO2B9SAtwwJHpIJYJ4RQBUQUE2ievkOqdUVbIAwbXrCwBZ9VuKCeFgPaBCrCosMApmiNwfUhMdr23p19WVXVWbW4lkriStBfW4nIr7/VVrhd2lqSws2vv9dlD6+cu/4ff/8pnP/vpSyevBx9e/u5zLz366GOrL52olkcun187feb8XIgAmIEvwHwHt8d6fWZnsysADHCAmqpeBUGOq9/IecCYB0OcslhTLKveb/i+tWmgIjKvaABe4YhZaCqy0uo88OzTz37iyW63J8ZEUdTpdL72v7/zzDNPJlHUXG90v/6NH3bdm1cXc3J1+va834vzFnuNvqkgLkWuK+p8VPHehUEY0rPXGHOdw4ZUvAdxRAGCVN3aySaha6FG9ZriHtF5ZaIeZJO+o2bZI4Smijnisvcb8BMiy17XyUmgAHLVhJjwbj2J773vnsMHD1TKKQCv2mx1jh29LU3i9cWVeJ/vtlZdZfcP/v1vm9n9M0fu25DYUpL+xvjrfza+fql9x09f3XdvlLXgnQZxfuXEyJnn+3HSUNcgOmAJiIBClapDLxQRA8qkBPSBMlEF7qEGQAiUqS3vrzk4chVY9Pquc3MBekBBGLBLTlIViIBKnk1OTd5/37EoMN9/6c2/+PZzjUbzv/zZ/zn+wenV1fXxXdOLy6vpk0/+8OSlts3a++7vRJUg76E8ahn1arv3BuEDrfla4xpMiqgiUSnMs1zCm9WCWIJEQDwkIKGASdMKCAcM/q1DC6BB9sD9AgfkihWLUZpxoSeveH/FFw/ELJPnIW2wDl0B9sHPQjtGgk731md/YmJy8o/+/BvNdueJh+556c33QmOmJsf/21e/uWt6Ytfs1NlTF776nReKbtN572ZudpUaly+79av+lo+sKc6XJ/zoHuu9Rgmzjj/75pGiMWvkrLJKJIpVETvQfpCyRV5SUYAZcICYVj+vvKSYIjecjtOMCxRoeY2AaWGVuAqJoYNa+ybV85ARQdnpq2nt/gfu6fV6754489j9d85Mjr357ofPPPHg7Uf2O+//059+LY2jEy+8sjp/IXj4c7bfcSdfQD9Tihy4z8fl9pHHXdZrFYUv1w2hvVaYt0cNTqokYAysAJH3W2IZk8SV7RYFkIEBcBO0Ch242GtWU+UtoRyLRKHXnDbV1400yQQowDYYqJsdYL2XlQ8d+LlPPXNo356b5na98PoPT5y6sG/PzMzUxH/88p8+dPfRv/e5nzn/3o/eXmi9d2nJ3v6UmT7ozr7OypjMHITN0vZqESR2bC5dPiPdZmdkVpcujy2d7ApXiSlfbFAAFjvIbpNsknwKhKoGWCGVnCIWwHWPhtVn4uBj1Sg2ciiWVuFesW40NF7RVVQJ9X45qkcuO51M/aivn37q3kOHDzc31g/eNHfnbYc/OHPhE088ZIx58O7bHn/w7pffPv77f/zVV19+2c8dxZ5jbK9xfE5bKyBRFGKzvFSn0KTVI2efTy6+u95t2azZIQPIYjoZ+DyEd6DfbI6aJCnvEEdwQN82gRzogh2PZ6Lw0UrkRELhutV9kdlw+k7h2oo2sGrt1bFbfHl6pbWS9dq1kfgffekXRqrVPMtJLQp3/523ACysq1crf/pX3/7w1Pm/8/mf+79vn9qwNPVZdVbq06zNYPmiT6qhsNJbb6d1zftMqw+vnupuXF0A6X2vOuf33NMxSdG6RjGBqh201wc8MVW3uD7xCtW21471gddxY9qeHxau4fXFXpEaGRe82i8C9QJxUQm9DWle210dpYSjo9V4cq9tr9l+/60TV8I0XW10mxsbI6Xkey+8Hgfyq7/4MyfOLnz9xXdx86O0FpVReos8Y1oVMjPx7VffCZxbjasT7ZVLUiq3Fn3e9d4FvnCtRWkvJLAcVPekQlmrTw+kVk5VSIWqH/Tx1Co8AK9V0qpGFAcNQBAqOq5OxBSUqs3L8OvV2fO9LruNWlrbVR+93NywpKmMGaI0Wh8thyuLi8fuezgQLFy59M7F5eiWx9TmgPGrl2V8TmrTpM+sjraXkrw7P3Hgk8e/eqnVPNnvjqfltSCZXb9YF3MtjAFmpBUZZA+s1adVEUAFGFxKqkqgUI1IBQxUyAQwqglBsg947wmOqZty+W4gAcQVXfAsg7Xa1HwyGa1euiVbv6pY3HX7+oGP5GfeTK69WyAqi+wJ/HWgE5QhtBKarM24wihFXEKQQBHBtePaPcvvt/utU6YaH3k8mJizC2cql16fth3SNEgL9MWo6pAf4KaOL1Id6BdE1QAjqg2RMlQBSwZAolpSH6im6knZEOkq9nt7iH6ZpqF0tijgxQQBg4sMOmHSkSjqNafr491+u5a19pOXPAt1d/risimdBiMCzoZ5r0VTU7tm4lHgYdqIeNEHS2GpGNsrRS/uLEVqu2JkKEgkoazVZ7AtGtwqNoe97AHPtt/beQkC1XF18zLoxqJHdsFx7xNqqLpAGaW0glJkOxDJvI+9FxGvnurERN2oGuVd9XbM25YYT86o7yrWaBAEqS00rXdueuS2pZNy/f0Gg7oxqbd99R3Ioita6agmo6Z9XcR4QFVl0F4cbIDbggSoqgEdUIWfUHeVgUAzClQH/QsDFMSMyIOiCrzkGBC7qG87TRSWvFVwq6AJ/sDqXiGBk04fpJ2n2U/uMrSqLzhEwP2hDHsf1i2YMsuThhxZPZcbUyT1tL8x4JpSolB4dVuRV3UH0T1UrnAYDggIqEBGrsEIUAz6kApDKOAAJT8XcE3hgTGyKrjD8HULIzIh/BnDN5weFIwRY4LdxDsOv5AES56PB1z2mhAHDQHcb3DcqgWu0NDnprvK7moRRh6g7VlIKBBFNpQAyk6aflAQBDfI6IYta3Gb4hUh/NBdbWsoBzHQe/2Bw4oHqU8arIMFKIoQasFFyBoQQltKDwWw5tVCV5VfdxgDng20o7DgLtEXHdpeEzEqgapCPRVKQ8ICFJgd/fRtsCtADTYpJ91KqXWopt0E1Q7J6qZSgUptQPZSdxk1YEcRKPYJBtcl4EOBzpKnHLuqVXCXgVV2FYXiZmEJWPJKxYrT0w4jYAvqVbmpm8EOilWHmt2hZW7iZChbM0lc3nkFW09vEHLeyJSr9x7Y8Hqz+l3CecU6MEvsg6+pzjttKL7pcK1whH7odTf1KPxFj5OKOnBAUFJ9zSED6tAqMKI6r2pVd3KQmyjZ1jtvaSV2UMZgrT49ICy30KX6Y7C6QZtKcmSkmud5EEUeaLRacRi6vAiSpFIuZVlWjuOV9Q3aYnR83HrvisICYRhZa/udThBF3SyrVsppFHW73TCOsyxP00StpaLb61nnuEPRwS1N7w0UHzf9jR8Y8aYaYQtkJH5MMbsp1SRxYP9+a20ax5U0DYBKmkZRWKuUx6pVb22llKrznX62Z3Y2NGZifFytLSdJOUkI1CrlSEy9WhmplOMonBobK8VRkWWVcnlifGxtfcOrktAhRnjjsnGjfBQEWatNb0sqtpXjwN8UFw3gKYyjCEAcx0VRxHGcZVmaJP1+FkVRXuRhGDabLVWtVMrqtbCFUKIoKooiSZMsy6Io6vV6qhChiDjnoijKspxCW9jCFtzSxpPbwu+tVfEGm9zcwE5xr94olOcOu1EMalwMUiaheh3Q6CIyODfvfWAMSO/dltjTqycHL0C9inBTOKYkvVcR7tBDcMDCc8vl/42j1GGHXf8fAFH0iB0rhcgAAAAASUVORK5CYII=" alt="Settings" style="width:46px;height:46px;object-fit:cover;border-radius:50%;display:block;transition:transform 0.3s ease,filter 0.3s ease;">`;
         settingsBtn.style.cssText = `
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 24px;
+            right: 24px;
             z-index: 99999;
-            width: 50px;
-            height: 50px;
+            width: 58px;
+            height: 58px;
             border-radius: 50%;
-            border: none;
-            background: #4CAF50;
-            color: white;
-            font-size: 24px;
+            border: 2px solid rgba(239,68,68,0.7);
+            background: #0f0f0f;
+            padding: 4px;
             cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            transition: transform 0.2s, background 0.2s;
+            animation: bypassPulse 2.5s infinite;
+            transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), border-color 0.2s;
         `;
-        settingsBtn.onmouseover = () => settingsBtn.style.transform = 'scale(1.1)';
-        settingsBtn.onmouseout = () => settingsBtn.style.transform = 'scale(1)';
+        settingsBtn.onmouseover = () => {
+            settingsBtn.style.transform = 'scale(1.15) rotate(-5deg)';
+            const img = settingsBtn.querySelector('img');
+            if (img) img.style.filter = 'brightness(1.15) drop-shadow(0 0 8px rgba(239,68,68,0.8))';
+        };
+        settingsBtn.onmouseout = () => {
+            settingsBtn.style.transform = 'scale(1) rotate(0deg)';
+            const img = settingsBtn.querySelector('img');
+            if (img) img.style.filter = 'none';
+        };
 
         // Create settings panel
         const panel = document.createElement('div');
         panel.id = 'bypass-settings-panel';
         panel.style.cssText = `
             position: fixed;
-            bottom: 80px;
-            right: 20px;
+            bottom: 92px;
+            right: 24px;
             z-index: 99998;
-            width: 320px;
-            max-height: 500px;
+            width: 340px;
+            max-height: 560px;
             overflow-y: auto;
-            background: #1e1e1e;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            overflow-x: hidden;
+            background: rgba(15,15,15,0.97);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 18px;
+            border: 1px solid rgba(239,68,68,0.25);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04) inset;
             display: none;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'VT323', monospace;
         `;
 
         const panelHeader = document.createElement('div');
         panelHeader.style.cssText = `
-            padding: 16px;
-            border-bottom: 1px solid #333;
-            background: #2d2d2d;
-            border-radius: 12px 12px 0 0;
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            background: linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(15,15,15,0) 60%);
+            border-radius: 18px 18px 0 0;
         `;
         panelHeader.innerHTML = `
-            <h3 style="margin: 0; color: #4CAF50; font-size: 16px;">🛡️ Bypass Settings</h3>
-            <small style="color: #888;">Toggle features on/off</small>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                <svg viewBox="0 0 24 24" width="22" height="22" style="flex-shrink:0;filter:drop-shadow(0 0 6px rgba(239,68,68,0.6));">
+            </div>
+            <small style="color:#71717a;font-size:15px;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;">Configure features &amp; AI providers</small>
         `;
 
         const panelContent = document.createElement('div');
-        panelContent.style.cssText = 'padding: 12px;';
+        panelContent.style.cssText = 'padding: 12px 14px 14px;';
 
         const createToggle = (id, label, checked, description = '') => {
             const wrapper = document.createElement('div');
@@ -1968,34 +2080,41 @@
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 10px 0;
-                border-bottom: 1px solid #333;
+                padding: 9px 2px;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+                transition: background 0.15s;
+                border-radius: 8px;
+                margin: 1px 0;
+                cursor: pointer;
             `;
+            wrapper.onmouseover = () => wrapper.style.background = 'rgba(255,255,255,0.03)';
+            wrapper.onmouseout = () => wrapper.style.background = 'transparent';
             wrapper.innerHTML = `
-                <div style="flex: 1;">
-                    <div style="color: #fff; font-size: 13px;">${label}</div>
-                    ${description ? `<div style="color: #666; font-size: 11px; margin-top: 2px;">${description}</div>` : ''}
+                <div style="flex: 1; padding-right: 12px;">
+                    <div style="color: #e4e4e7; font-size: 16.5px; font-weight: 500; font-family: 'VT323', monospace;">${label}</div>
+                    ${description ? `<div style="color: #52525b; font-size: 14.5px; margin-top: 2px; font-family: 'VT323', monospace; line-height:1.4;">${description}</div>` : ''}
                 </div>
-                <label style="position: relative; display: inline-block; width: 44px; height: 24px;">
+                <label style="position: relative; display: inline-block; width: 42px; height: 23px; flex-shrink:0;">
                     <input type="checkbox" id="${id}" ${checked ? 'checked' : ''} style="opacity: 0; width: 0; height: 0;">
                     <span style="
                         position: absolute;
                         cursor: pointer;
                         top: 0; left: 0; right: 0; bottom: 0;
-                        background-color: ${checked ? '#4CAF50' : '#555'};
-                        transition: .3s;
-                        border-radius: 24px;
+                        background: ${checked ? 'linear-gradient(135deg,#ef4444,#dc2626)' : '#27272a'};
+                        transition: background 0.25s ease, box-shadow 0.25s ease;
+                        border-radius: 23px;
+                        box-shadow: ${checked ? '0 0 8px rgba(239,68,68,0.4)' : 'inset 0 1px 3px rgba(0,0,0,0.4)'};
                     "></span>
                     <span style="
                         position: absolute;
-                        content: '';
-                        height: 18px;
-                        width: 18px;
-                        left: ${checked ? '23px' : '3px'};
-                        bottom: 3px;
-                        background-color: white;
-                        transition: .3s;
+                        height: 17px;
+                        width: 17px;
+                        left: ${checked ? '22px' : '3px'};
+                        top: 3px;
+                        background: white;
+                        transition: left 0.25s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s;
                         border-radius: 50%;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
                     "></span>
                 </label>
             `;
@@ -2006,9 +2125,17 @@
 
             checkbox.addEventListener('change', () => {
                 SETTINGS[id] = checkbox.checked;
-                slider.style.backgroundColor = checkbox.checked ? '#4CAF50' : '#555';
-                circle.style.left = checkbox.checked ? '23px' : '3px';
+                slider.style.background = checkbox.checked ? 'linear-gradient(135deg,#ef4444,#dc2626)' : '#27272a';
+                slider.style.boxShadow = checkbox.checked ? '0 0 8px rgba(239,68,68,0.4)' : 'inset 0 1px 3px rgba(0,0,0,0.4)';
+                circle.style.left = checkbox.checked ? '22px' : '3px';
                 saveSettings(SETTINGS);
+            });
+
+            wrapper.addEventListener('click', (e) => {
+                if (e.target.closest('label') || e.target.tagName === 'INPUT') {
+                    return;
+                }
+                checkbox.click();
             });
 
             return wrapper;
@@ -2016,19 +2143,22 @@
 
         const createTextInput = (id, label, value, placeholder = '') => {
             const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'padding: 10px 0; border-bottom: 1px solid #333;';
+            wrapper.style.cssText = 'padding: 9px 2px; border-bottom: 1px solid rgba(255,255,255,0.05);';
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">${label}</div>
+                <div style="color: #a1a1aa; font-size: 15px; font-weight: 600; font-family: 'VT323',monospace; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px;">${label}</div>
                 <input type="text" id="${id}" value="${value}" placeholder="${placeholder}" style="
                     width: 100%;
-                    padding: 8px;
-                    border: 1px solid #444;
-                    border-radius: 6px;
-                    background: #2d2d2d;
-                    color: #fff;
-                    font-size: 12px;
+                    padding: 8px 10px;
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    background: rgba(255,255,255,0.05);
+                    color: #e4e4e7;
+                    font-size: 16px;
                     box-sizing: border-box;
-                ">
+                    font-family: 'VT323', monospace;
+                    outline: none;
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                " onfocus="this.style.borderColor='rgba(239,68,68,0.5)';this.style.boxShadow='0 0 0 3px rgba(239,68,68,0.1)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)';this.style.boxShadow='none'">
             `;
 
             const input = wrapper.querySelector('input');
@@ -2043,30 +2173,31 @@
         const createSectionHeader = (title, iconPath = '') => {
             const header = document.createElement('div');
             header.style.cssText = `
-                color: #4CAF50;
-                font-size: 11px;
-                font-weight: 800;
-                text-transform: uppercase;
-                padding: 12px 0 6px 0;
-                letter-spacing: 1.2px;
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                border-bottom: 2px solid #333;
-                margin-top: 10px;
-                margin-bottom: 5px;
+                padding: 14px 2px 8px;
+                margin-top: 6px;
+                border-bottom: 1px solid rgba(255,255,255,0.07);
+                margin-bottom: 4px;
             `;
 
-            if (iconPath) {
-                header.innerHTML = `
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                        <path d="${iconPath}"></path>
-                    </svg>
-                    <span>${title}</span>
-                `;
-            } else {
-                header.textContent = title;
-            }
+            const iconSvg = iconPath ? `
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="rgba(239,68,68,0.85)">
+                    <path d="${iconPath}"></path>
+                </svg>` : '';
+
+            header.innerHTML = `
+                ${iconSvg}
+                <span style="
+                    color: #a1a1aa;
+                    font-size: 14px;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 1.4px;
+                    font-family: 'VT323', monospace;
+                ">${title}</span>
+            `;
             return header;
         };
 
@@ -2077,7 +2208,7 @@
             wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'g4f' ? 'block' : 'none'};`;
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">G4F Model</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">G4F Model</div>
                 <div style="display: flex; gap: 6px; margin-bottom: 6px;">
                     <input type="text" id="g4fModelSearch" placeholder="Search models (e.g., qwen, gpt)" style="
                         flex: 1;
@@ -2086,7 +2217,7 @@
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                     <button id="g4fRefreshModels" style="
@@ -2096,22 +2227,23 @@
                         background: #3d3d3d;
                         color: #fff;
                         cursor: pointer;
-                        font-size: 11px;
-                    ">🔄</button>
+                        font-size: 15px;
+                    "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
                 </div>
                 <select id="g4fModel" style="
                     width: 100%;
                     padding: 8px;
                     border: 1px solid #444;
                     border-radius: 6px;
-                    background: #2d2d2d;
-                    color: #fff;
-                    font-size: 11px;
+                    background: #000000;
+                    color: #ffffff;
+                    font-size: 15px;
                     box-sizing: border-box;
+                    font-family: 'VT323', monospace;
                 ">
                     <option value="auto">Auto (Automatic Model Selection)</option>
                 </select>
-                <div id="g4fModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div id="g4fModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
             `;
 
             setTimeout(() => {
@@ -2204,26 +2336,26 @@
 
         // Temperature setting
         const tempWrapper = document.createElement('div');
-        tempWrapper.style.cssText = 'padding: 10px 0; border-bottom: 1px solid #333;';
+        tempWrapper.style.cssText = 'padding: 9px 2px; border-bottom: 1px solid rgba(255,255,255,0.05);';
         tempWrapper.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div style="color: #fff; font-size: 13px;">AI Temperature</div>
-                <div id="temp-value" style="color: #4CAF50; font-size: 13px; font-weight: bold;">${SETTINGS.aiTemperature}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="color:#a1a1aa;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;font-family:'VT323',monospace;">AI Temperature</div>
+                <div id="temp-value" style="color:#ef4444;font-size:16px;font-weight:700;font-family:'VT323',monospace;background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:99px;border:1px solid rgba(239,68,68,0.25);">${SETTINGS.aiTemperature}</div>
             </div>
             <input type="range" id="aiTemperature" min="0" max="1" step="0.1" value="${SETTINGS.aiTemperature}" style="
                 width: 100%;
-                height: 4px;
-                background: #444;
-                border-radius: 2px;
+                height: 5px;
+                background: #27272a;
+                border-radius: 3px;
                 outline: none;
                 cursor: pointer;
-                accent-color: #4CAF50;
+                accent-color: #ef4444;
             ">
-            <div style="color: #888; font-size: 11px; margin-top: 4px;">Lower is more predictable, higher is more creative.</div>
+            <div style="color:#52525b;font-size:14.5px;margin-top:5px;font-family:'VT323',monospace;">Lower = deterministic &nbsp;·&nbsp; Higher = creative</div>
         `;
         tempWrapper.querySelector('input').addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
-            document.getElementById('temp-value').textContent = val;
+            const tv = document.getElementById('temp-value'); if (tv) { tv.textContent = val; }
             SETTINGS.aiTemperature = val;
             saveSettings(SETTINGS);
         });
@@ -2231,23 +2363,25 @@
 
         // Custom System Prompt
         const promptWrapper = document.createElement('div');
-        promptWrapper.style.cssText = 'padding: 10px 0; border-bottom: 1px solid #333;';
+        promptWrapper.style.cssText = 'padding: 9px 2px; border-bottom: 1px solid rgba(255,255,255,0.05);';
         promptWrapper.innerHTML = `
-            <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">Custom System Prompt</div>
+            <div style="color:#a1a1aa;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:7px;font-family:'VT323',monospace;">Custom System Prompt</div>
             <textarea id="aiSystemPrompt" placeholder="Inject custom instructions to AI solver..." style="
                 width: 100%;
-                height: 60px;
-                padding: 8px;
-                border: 1px solid #444;
-                border-radius: 6px;
-                background: #2d2d2d;
-                color: #fff;
-                font-size: 12px;
+                height: 62px;
+                padding: 8px 10px;
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 8px;
+                background: rgba(255,255,255,0.05);
+                color: #e4e4e7;
+                font-size: 15.5px;
                 resize: vertical;
                 box-sizing: border-box;
-                font-family: inherit;
-            ">${SETTINGS.aiSystemPrompt || ''}</textarea>
-            <div style="color: #888; font-size: 11px; margin-top: 4px;">Prepended to every AI request. Absolute priority.</div>
+                font-family: 'VT323', monospace;
+                outline: none;
+                transition: border-color 0.2s;
+" onfocus="this.style.borderColor='rgba(239,68,68,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.1)'">${SETTINGS.aiSystemPrompt || ''}</textarea>
+            <div style="color:#52525b;font-size:14.5px;margin-top:5px;font-family:'VT323',monospace;">Prepended to every AI request · Absolute priority</div>
         `;
         promptWrapper.querySelector('textarea').addEventListener('input', (e) => {
             SETTINGS.aiSystemPrompt = e.target.value;
@@ -2263,10 +2397,10 @@
                 if (e.target.checked) {
                     const confirmed = confirm(
                         'AUTO SOLVER - EXPERIMENTAL FEATURE\n\n' +
-                        'â€¢ This feature is UNDER DEVELOPMENT\n' +
-                        'â€¢ Errors and unexpected behavior may occur\n' +
-                        'â€¢ Not fully tested on all problem types\n' +
-                        'â€¢ May cause page reloads or get stuck\n\n' +
+                        '• This feature is UNDER DEVELOPMENT\n' +
+                        '• Errors and unexpected behavior may occur\n' +
+                        '• Not fully tested on all problem types\n' +
+                        '• May cause page reloads or get stuck\n\n' +
                         'USE AT YOUR OWN RISK!\n\n' +
                         'You can stop it anytime using the STOP button that appears.\n\n' +
                         'Do you want to enable Auto Solver?'
@@ -2281,11 +2415,32 @@
         }
         panelContent.appendChild(autoSolverToggle);
 
+        // Find Incomplete toggle
+        const findIncompleteToggle = createToggle('enableFindIncomplete', 'Incomplete Question', SETTINGS.enableFindIncomplete, 'Show incomplete tracks in the dropdown (requires scan)');
+        panelContent.appendChild(findIncompleteToggle);
+        const findIncompleteCheckbox = findIncompleteToggle.querySelector('input');
+        findIncompleteCheckbox.addEventListener('change', () => {
+            if (findIncompleteCheckbox.checked) {
+                if (window.FindIncompleteModule) {
+                    window.FindIncompleteModule.init();
+                }
+            } else {
+                if (window.FindIncompleteModule) {
+                    window.FindIncompleteModule.cancel();
+                }
+                const btn = document.getElementById('find-incomplete-btn');
+                if (btn) {
+                    const li = btn.closest('li');
+                    if (li) li.remove();
+                }
+            }
+        });
+
         // AI Provider selector
         const providerWrapper = document.createElement('div');
         providerWrapper.style.cssText = 'padding: 10px 0; border-bottom: 1px solid #333;';
         providerWrapper.innerHTML = `
-            <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">AI Provider</div>
+            <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">AI Provider</div>
             <select id="aiProvider" style="
                 width: 100%;
                 padding: 8px;
@@ -2293,7 +2448,7 @@
                 border-radius: 6px;
                 background: #2d2d2d;
                 color: #fff;
-                font-size: 12px;
+                font-size: 16px;
                 box-sizing: border-box;
             ">
                 <option value="gemini" ${SETTINGS.aiProvider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
@@ -2351,7 +2506,7 @@
             wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'gemini' ? 'block' : 'none'};`;
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">Gemini Model</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">Gemini Model</div>
                 <div style="display: flex; gap: 6px; margin-bottom: 6px;">
                     <input type="text" id="geminiModelSearch" placeholder="Search models (e.g., 2.5, flash, pro)" style="
                         flex: 1;
@@ -2360,7 +2515,7 @@
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                     <button id="geminiRefreshModels" title="Refresh models list" style="
@@ -2370,22 +2525,23 @@
                         background: #3d3d3d;
                         color: #fff;
                         cursor: pointer;
-                        font-size: 11px;
-                    ">🔄</button>
+                        font-size: 15px;
+                    "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
                 </div>
                 <select id="geminiModel" style="
                     width: 100%;
                     padding: 8px;
                     border: 1px solid #444;
                     border-radius: 6px;
-                    background: #2d2d2d;
-                    color: #fff;
-                    font-size: 11px;
+                    background: #000000;
+                    color: #ffffff;
+                    font-size: 15px;
                     box-sizing: border-box;
+                    font-family: 'VT323', monospace;
                 ">
                     <option value="gemini-2.5-flash">Loading models...</option>
                 </select>
-                <div id="geminiModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div id="geminiModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
             `;
 
             setTimeout(() => {
@@ -2429,7 +2585,7 @@
                     if (statusDiv) statusDiv.textContent = 'Loading models...';
                     if (refreshBtn) {
                         refreshBtn.disabled = true;
-                        refreshBtn.textContent = '⏳';
+                        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;animation:bypassSpin 1s linear infinite"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
                     }
 
                     try {
@@ -2443,7 +2599,7 @@
                     } finally {
                         if (refreshBtn) {
                             refreshBtn.disabled = false;
-                            refreshBtn.textContent = '🔄';
+                            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>';
                         }
                     }
                 };
@@ -2488,7 +2644,7 @@
             wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'openai' ? 'block' : 'none'};`;
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">OpenAI Model</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">OpenAI Model</div>
                 <div style="display: flex; gap: 6px; margin-bottom: 6px;">
                     <input type="text" id="openaiModelSearch" placeholder="Search models (e.g., gpt-4, o1, turbo)" style="
                         flex: 1;
@@ -2497,7 +2653,7 @@
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                     <button id="openaiRefreshModels" title="Refresh models list" style="
@@ -2507,22 +2663,23 @@
                         background: #3d3d3d;
                         color: #fff;
                         cursor: pointer;
-                        font-size: 11px;
-                    ">🔄</button>
+                        font-size: 15px;
+                    "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
                 </div>
                 <select id="openaiModel" style="
                     width: 100%;
                     padding: 8px;
                     border: 1px solid #444;
                     border-radius: 6px;
-                    background: #2d2d2d;
-                    color: #fff;
-                    font-size: 11px;
+                    background: #000000;
+                    color: #ffffff;
+                    font-size: 15px;
                     box-sizing: border-box;
+                    font-family: 'VT323', monospace;
                 ">
                     <option value="gpt-4o-mini">Loading models...</option>
                 </select>
-                <div id="openaiModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div id="openaiModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
             `;
 
             setTimeout(() => {
@@ -2565,7 +2722,7 @@
                     if (statusDiv) statusDiv.textContent = 'Loading models...';
                     if (refreshBtn) {
                         refreshBtn.disabled = true;
-                        refreshBtn.textContent = '⏳';
+                        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;animation:bypassSpin 1s linear infinite"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
                     }
 
                     try {
@@ -2579,7 +2736,7 @@
                     } finally {
                         if (refreshBtn) {
                             refreshBtn.disabled = false;
-                            refreshBtn.textContent = '🔄';
+                            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>';
                         }
                     }
                 };
@@ -2624,51 +2781,75 @@
             wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'openrouter' ? 'block' : 'none'};`;
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">OpenRouter Model</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">OpenRouter Model</div>
+
+                <!-- Custom model ID input (highest priority) -->
+                <div style="margin-bottom: 8px;">
+                    <input type="text" id="orCustomModel" value="${SETTINGS.openrouterModel || 'qwen/qwen3-coder:free'}" placeholder="e.g. qwen/qwen3-coder:free" style="
+                        width: 100%;
+                        padding: 8px;
+                        border: 1px solid #4CAF50;
+                        border-radius: 6px;
+                        background: #1a2a1a;
+                        color: #4CAF50;
+                        font-size: 15px;
+                        box-sizing: border-box;
+                        font-family: monospace;
+                    ">
+                    <div style="color: #555; font-size: 14px; margin-top: 3px;">Type any model ID directly. Changes auto-save.</div>
+                </div>
+
+                <!-- Search + Refresh row -->
                 <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-                    <input type="text" id="orModelSearch" placeholder="Search models (e.g., gemini, claude, free)" style="
+                    <input type="text" id="orModelSearch" placeholder="Search dropdown (e.g., gemini, claude, free)" style="
                         flex: 1;
                         padding: 8px;
                         border: 1px solid #444;
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
-                    <button id="orRefreshModels" title="Refresh models list" style="
+                    <button id="orRefreshModels" title="Refresh models from OpenRouter API" style="
                         padding: 8px 12px;
                         border: 1px solid #444;
                         border-radius: 6px;
                         background: #3d3d3d;
                         color: #fff;
                         cursor: pointer;
-                        font-size: 11px;
-                    ">🔄</button>
+                        font-size: 15px;
+                    "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
                 </div>
+
+                <!-- Model dropdown -->
                 <select id="openrouterModel" style="
                     width: 100%;
                     padding: 8px;
                     border: 1px solid #444;
                     border-radius: 6px;
-                    background: #2d2d2d;
-                    color: #fff;
-                    font-size: 11px;
+                    background: #000000;
+                    color: #ffffff;
+                    font-size: 15px;
                     box-sizing: border-box;
+                    font-family: 'VT323', monospace;
                 ">
-                    <option value="google/gemini-2.0-flash-001">Loading models...</option>
+                    <option value="">Loading models...</option>
                 </select>
-                <div id="orModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
-                <div style="display: flex; gap: 6px; margin-top: 6px;">
-                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 10px; cursor: pointer;">
+                <div id="orModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
+
+                <!-- Filter checkboxes -->
+                <div style="display: flex; gap: 12px; margin-top: 6px;">
+                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 14px; cursor: pointer;">
                         <input type="checkbox" id="orShowFreeOnly" style="margin: 0;">
-                        Show free only
+                        Free only
                     </label>
                 </div>
             `;
 
             setTimeout(() => {
                 const select = document.getElementById('openrouterModel');
+                const customInput = document.getElementById('orCustomModel');
                 const searchInput = document.getElementById('orModelSearch');
                 const refreshBtn = document.getElementById('orRefreshModels');
                 const statusDiv = document.getElementById('orModelStatus');
@@ -2677,9 +2858,34 @@
                 let allModels = [];
                 let showFreeOnly = false;
 
+                // Save model from custom input (takes priority)
+                const saveCustomModel = (value) => {
+                    const trimmed = (value || '').trim();
+                    if (trimmed) {
+                        SETTINGS.openrouterModel = trimmed;
+                        saveSettings(SETTINGS);
+                    }
+                };
+
+                if (customInput) {
+                    // Debounced save on typing
+                    let customSaveTimeout;
+                    customInput.addEventListener('input', () => {
+                        clearTimeout(customSaveTimeout);
+                        customSaveTimeout = setTimeout(() => {
+                            saveCustomModel(customInput.value);
+                            // Sync dropdown selection if the typed ID matches a known model
+                            if (select) {
+                                const found = Array.from(select.options).find(o => o.value === customInput.value.trim());
+                                if (found) select.value = found.value;
+                            }
+                        }, 400);
+                    });
+                }
+
                 const populateSelect = (models) => {
                     if (!select) return;
-                    const currentValue = SETTINGS.openrouterModel || 'google/gemini-2.0-flash-001';
+                    const currentValue = SETTINGS.openrouterModel || 'qwen/qwen3-coder:free';
                     select.innerHTML = '';
 
                     // Group models
@@ -2722,31 +2928,26 @@
                     }
 
                     const totalCount = showFreeOnly ? freeModels.length : models.length;
-                    if (statusDiv) statusDiv.textContent = `${totalCount} models available`;
+                    if (statusDiv) statusDiv.textContent = `${totalCount} models loaded`;
                 };
 
                 const applyFilters = () => {
                     let filtered = allModels;
-
-                    // Apply search filter
                     const searchQuery = searchInput?.value?.trim() || '';
                     if (searchQuery) {
                         filtered = OpenRouterProvider.filterModels(filtered, searchQuery);
                     }
-
-                    // Apply free-only filter
                     if (showFreeOnly) {
                         filtered = filtered.filter(m => m.isFree);
                     }
-
                     populateSelect(filtered);
                 };
 
                 const loadModels = async (forceRefresh = false) => {
-                    if (statusDiv) statusDiv.textContent = 'Loading models...';
+                    if (statusDiv) statusDiv.textContent = 'Loading models from OpenRouter...';
                     if (refreshBtn) {
                         refreshBtn.disabled = true;
-                        refreshBtn.textContent = '⏳';
+                        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;animation:bypassSpin 1s linear infinite"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
                     }
 
                     try {
@@ -2755,13 +2956,12 @@
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
                         console.error('[OpenRouter] Failed to load models:', error);
-                        if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
-                        // Fallback to default model
-                        select.innerHTML = '<option value="google/gemini-2.0-flash-001" selected>Gemini 2.0 Flash (Default)</option>';
+                        if (statusDiv) statusDiv.textContent = `Error loading: ${error.message}`;
+                        select.innerHTML = '<option value="qwen/qwen3-coder:free" selected>Qwen3 Coder Free (Default)</option>';
                     } finally {
                         if (refreshBtn) {
                             refreshBtn.disabled = false;
-                            refreshBtn.textContent = '🔄';
+                            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>';
                         }
                     }
                 };
@@ -2786,13 +2986,15 @@
                 }
 
                 if (select) {
+                    // When user picks from dropdown, sync to the custom input and save
                     select.addEventListener('change', () => {
-                        SETTINGS.openrouterModel = select.value;
+                        const val = select.value;
+                        if (val && customInput) customInput.value = val;
+                        SETTINGS.openrouterModel = val;
                         saveSettings(SETTINGS);
                     });
                 }
 
-                // Load models on init
                 loadModels();
             }, 100);
 
@@ -2809,7 +3011,7 @@
             wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'puter' ? 'block' : 'none'};`;
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">Puter.js Model</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">Puter.js Model</div>
                 <div style="display: flex; gap: 6px; margin-bottom: 6px;">
                     <input type="text" id="puterModelSearch" placeholder="Search models (e.g., gemini, claude, gpt)" style="
                         flex: 1;
@@ -2818,7 +3020,7 @@
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                     <button id="puterRefreshModels" title="Reset models list" style="
@@ -2828,22 +3030,23 @@
                         background: #3d3d3d;
                         color: #fff;
                         cursor: pointer;
-                        font-size: 11px;
-                    ">🔄</button>
+                        font-size: 15px;
+                    "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
                 </div>
                 <select id="puterModel" style="
                     width: 100%;
                     padding: 8px;
                     border: 1px solid #444;
                     border-radius: 6px;
-                    background: #2d2d2d;
-                    color: #fff;
-                    font-size: 11px;
+                    background: #000000;
+                    color: #ffffff;
+                    font-size: 15px;
                     box-sizing: border-box;
+                    font-family: 'VT323', monospace;
                 ">
                     <option value="gpt-5.4-nano">Loading models...</option>
                 </select>
-                <div id="puterModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div id="puterModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
                 <div style="display: flex; gap: 6px; margin-top: 6px;">
                     <input type="text" id="puterCustomModel" placeholder="Custom model (e.g., qwen/qwen3-coder:free)" style="
                         flex: 1;
@@ -2852,7 +3055,7 @@
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                     <button id="puterApplyCustomModel" title="Use custom model" style="
@@ -2862,15 +3065,15 @@
                         background: #3d3d3d;
                         color: #fff;
                         cursor: pointer;
-                        font-size: 11px;
+                        font-size: 15px;
                     ">Use</button>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap;">
-                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 10px; cursor: pointer;">
+                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 14px; cursor: pointer;">
                         <input type="checkbox" id="puterEnableReasoning" style="margin: 0;">
                         Enable reasoning
                     </label>
-                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 10px; cursor: pointer;">
+                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 14px; cursor: pointer;">
                         <span>Effort</span>
                         <select id="puterReasoningEffort" style="
                             padding: 4px 6px;
@@ -2878,7 +3081,7 @@
                             border-radius: 4px;
                             background: #2d2d2d;
                             color: #fff;
-                            font-size: 10px;
+                            font-size: 14px;
                         ">
                             <option value="low">Low</option>
                             <option value="medium">Medium</option>
@@ -2886,7 +3089,7 @@
                         </select>
                     </label>
                 </div>
-                <div style="color: #888; font-size: 10px; margin-top: 4px; line-height: 1.4;">
+                <div style="color: #888; font-size: 14px; margin-top: 4px; line-height: 1.4;">
                     No API key required. Uses your Puter account and supports short aliases plus full model IDs.
                 </div>
             `;
@@ -3050,13 +3253,13 @@
             ).join('');
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">🦆 DuckDuckGo AI (Proxy)</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">🦆 DuckDuckGo AI (Proxy)</div>
                 <div style="background: #1a3a1a; border: 1px solid #4CAF50; border-radius: 6px; padding: 8px; margin-bottom: 8px;">
-                    <div style="color: #4CAF50; font-size: 11px; font-weight: bold;">✨ FREE - Uses Cloudflare Worker Proxy</div>
-                    <div style="color: #888; font-size: 10px; margin-top: 4px;">Bypasses CSP restrictions</div>
+                    <div style="color: #4CAF50; font-size: 15px; font-weight: bold;">✨ FREE - Uses Cloudflare Worker Proxy</div>
+                    <div style="color: #888; font-size: 14px; margin-top: 4px;">Bypasses CSP restrictions</div>
                 </div>
                 <div style="margin-bottom: 8px;">
-                    <label style="color: #aaa; font-size: 11px; display: block; margin-bottom: 4px;">API URL</label>
+                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">API URL</label>
                     <input type="text" id="ddgApiUrl" value="${currentApiUrl}" placeholder="https://your-worker.workers.dev" style="
                         width: 100%;
                         padding: 6px 8px;
@@ -3064,12 +3267,12 @@
                         border-radius: 4px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                 </div>
                 <div style="margin-bottom: 8px;">
-                    <label style="color: #aaa; font-size: 11px; display: block; margin-bottom: 4px;">API Key (optional)</label>
+                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">API Key (optional)</label>
                     <input type="password" id="ddgApiKey" value="${currentApiKey}" placeholder="Leave empty if not required" style="
                         width: 100%;
                         padding: 6px 8px;
@@ -3077,12 +3280,12 @@
                         border-radius: 4px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                 </div>
                 <div style="margin-bottom: 4px;">
-                    <label style="color: #aaa; font-size: 11px; display: block; margin-bottom: 4px;">Model</label>
+                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">Model</label>
                     <select id="ddgModelSelect" style="
                         width: 100%;
                         padding: 8px;
@@ -3090,19 +3293,19 @@
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 12px;
+                        font-size: 16px;
                         box-sizing: border-box;
                     ">
                         ${optionsHtml}
                     </select>
                 </div>
                 <div style="margin: 8px 0 6px 0; padding: 8px; border: 1px solid #333; border-radius: 6px; background: #232323;">
-                    <div style="color: #fff; font-size: 11px; margin-bottom: 6px;">Reasoning (GPT-5 / GPT-OSS / Claude)</div>
-                    <label style="display: flex; align-items: center; gap: 8px; color: #aaa; font-size: 11px; margin-bottom: 6px; cursor: pointer;">
+                    <div style="color: #fff; font-size: 15px; margin-bottom: 6px;">Reasoning (GPT-5 / GPT-OSS / Claude)</div>
+                    <label style="display: flex; align-items: center; gap: 8px; color: #aaa; font-size: 15px; margin-bottom: 6px; cursor: pointer;">
                         <input type="checkbox" id="ddgIncludeReasoning" ${currentIncludeReasoning ? 'checked' : ''}>
                         Include reasoning in output
                     </label>
-                    <label style="color: #aaa; font-size: 10px; display: block; margin-bottom: 4px;">Reasoning Effort</label>
+                    <label style="color: #aaa; font-size: 14px; display: block; margin-bottom: 4px;">Reasoning Effort</label>
                     <select id="ddgReasoningEffort" style="
                         width: 100%;
                         padding: 6px;
@@ -3110,7 +3313,7 @@
                         border-radius: 4px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                         <option value="minimal" ${currentReasoningEffort === 'minimal' ? 'selected' : ''}>Minimal</option>
@@ -3119,7 +3322,7 @@
                         <option value="high" ${currentReasoningEffort === 'high' ? 'selected' : ''}>High</option>
                         <option value="none" ${currentReasoningEffort === 'none' ? 'selected' : ''}>None (omit)</option>
                     </select>
-                    <div id="ddgReasoningHint" style="color: #777; font-size: 10px; margin-top: 6px;"></div>
+                    <div id="ddgReasoningHint" style="color: #777; font-size: 14px; margin-top: 6px;"></div>
                 </div>
             `;
 
@@ -3203,16 +3406,16 @@
             const currentModel = SETTINGS.yuppbridgeModel || 'gpt-4o';
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">🌉 YuppBridge (200+ Models)</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;"><svg viewBox="0 0 24 24" width="13" height="13" fill="#3b82f6" style="display:inline-block;vertical-align:middle;margin-right:5px"><path d="M4 13h16v-2H4v2zm-2 4h20v-2H2v2zM2 7v2h20V7H2z"/></svg>YuppBridge (200+ Models)</div>
                 <div style="background: #1a2a3a; border: 1px solid #2196F3; border-radius: 6px; padding: 8px; margin-bottom: 8px;">
-                    <div style="color: #2196F3; font-size: 11px; font-weight: bold;">✨ Self-hosted Yupp AI Proxy</div>
-                    <div style="color: #888; font-size: 10px; margin-top: 4px;">OpenAI-compatible API with 200+ models</div>
-                    <div style="color: #666; font-size: 9px; margin-top: 2px;">
-                        <a href="https://github.com/cloudWaddie/yuppbridge" target="_blank" style="color:#64B5F6;">📖 Self-host Guide</a>
+                    <div style="color: #2196F3; font-size: 15px; font-weight: bold;"><svg viewBox="0 0 24 24" width="12" height="12" fill="#3b82f6" style="display:inline-block;vertical-align:middle;margin-right:4px"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Self-hosted Yupp AI Proxy</div>
+                    <div style="color: #888; font-size: 14px; margin-top: 4px;">OpenAI-compatible API with 200+ models</div>
+                    <div style="color: #666; font-size: 13px; margin-top: 2px;">
+                        <a href="https://github.com/cloudWaddie/yuppbridge" target="_blank" style="color:#64B5F6;">Self-host Guide</a>
                     </div>
                 </div>
                 <div style="margin-bottom: 8px;">
-                    <label style="color: #aaa; font-size: 11px; display: block; margin-bottom: 4px;">API URL <span style="color:#f44336;">*</span></label>
+                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">API URL <span style="color:#f44336;">*</span></label>
                     <input type="text" id="yuppbridgeApiUrl" value="${currentApiUrl}" placeholder="https://your-yuppbridge-instance.com" style="
                         width: 100%;
                         padding: 6px 8px;
@@ -3220,12 +3423,12 @@
                         border-radius: 4px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                 </div>
                 <div style="margin-bottom: 8px;">
-                    <label style="color: #aaa; font-size: 11px; display: block; margin-bottom: 4px;">API Key <span style="color:#f44336;">*</span></label>
+                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">API Key <span style="color:#f44336;">*</span></label>
                     <input type="password" id="yuppbridgeApiKey" value="${currentApiKey}" placeholder="Your YuppBridge API key" style="
                         width: 100%;
                         padding: 6px 8px;
@@ -3233,12 +3436,12 @@
                         border-radius: 4px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                 </div>
                 <div style="margin-bottom: 6px;">
-                    <label style="color: #aaa; font-size: 11px; display: block; margin-bottom: 4px;">Model</label>
+                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">Model</label>
                     <div style="display: flex; gap: 6px; margin-bottom: 6px;">
                         <input type="text" id="yuppbridgeModelSearch" placeholder="Search models (e.g., gpt-4, claude, gemini)" style="
                             flex: 1;
@@ -3247,7 +3450,7 @@
                             border-radius: 4px;
                             background: #2d2d2d;
                             color: #fff;
-                            font-size: 11px;
+                            font-size: 15px;
                             box-sizing: border-box;
                         ">
                         <button id="yuppbridgeRefreshModels" title="Refresh models list" style="
@@ -3257,8 +3460,8 @@
                             background: #3d3d3d;
                             color: #fff;
                             cursor: pointer;
-                            font-size: 11px;
-                        ">🔄</button>
+                            font-size: 15px;
+                        "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
                         <button id="yuppbridgeHealthCheck" title="Check API health" style="
                             padding: 6px 10px;
                             border: 1px solid #444;
@@ -3266,8 +3469,8 @@
                             background: #3d3d3d;
                             color: #fff;
                             cursor: pointer;
-                            font-size: 11px;
-                        ">❤️</button>
+                            font-size: 15px;
+                        "><svg viewBox="0 0 24 24" width="13" height="13" fill="#ef4444" style="display:block;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></button>
                     </div>
                     <select id="yuppbridgeModelSelect" style="
                         width: 100%;
@@ -3276,12 +3479,12 @@
                         border-radius: 6px;
                         background: #2d2d2d;
                         color: #fff;
-                        font-size: 11px;
+                        font-size: 15px;
                         box-sizing: border-box;
                     ">
                         <option value="${currentModel}">${currentModel}</option>
                     </select>
-                    <div id="yuppbridgeModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                    <div id="yuppbridgeModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
                 </div>
             `;
 
@@ -3333,7 +3536,7 @@
                     if (statusDiv) statusDiv.textContent = 'Loading models...';
                     if (refreshBtn) {
                         refreshBtn.disabled = true;
-                        refreshBtn.textContent = '⏳';
+                        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;animation:bypassSpin 1s linear infinite"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
                     }
 
                     try {
@@ -3346,7 +3549,7 @@
                     } finally {
                         if (refreshBtn) {
                             refreshBtn.disabled = false;
-                            refreshBtn.textContent = '🔄';
+                            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>';
                         }
                     }
                 };
@@ -3416,7 +3619,7 @@
                     healthBtn.addEventListener('click', async () => {
                         if (statusDiv) statusDiv.textContent = 'Checking health...';
                         healthBtn.disabled = true;
-                        healthBtn.textContent = '⏳';
+                        healthBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;animation:bypassSpin 1s linear infinite"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
 
                         const result = await YuppBridgeProvider.checkHealth();
 
@@ -3430,7 +3633,7 @@
                         }
 
                         healthBtn.disabled = false;
-                        healthBtn.textContent = '❤️';
+                        healthBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="#ef4444" style="display:block"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
                     });
                 }
 
@@ -3446,7 +3649,7 @@
         // ==============================================================
 
         const note = document.createElement('div');
-        note.style.cssText = 'color: #666; font-size: 10px; padding: 12px 0; text-align: center;';
+        note.style.cssText = 'color:#3f3f46;font-size:14px;padding:14px 4px;text-align:center;font-family:"VT323",monospace;line-height:1.7;border-top:1px solid rgba(255,255,255,0.05);margin-top:4px;';
         note.innerHTML = 'Reload page after changing settings<br>Keys: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a><br>Puter.js: no API key required | <a href="https://developer.puter.com/ai/" target="_blank" style="color:#2196F3;">Puter AI docs</a><br>DuckDuckGo AI is FREE! | <a href="https://github.com/cloudWaddie/yuppbridge" target="_blank" style="color:#2196F3;">YuppBridge</a>';
         panelContent.appendChild(note);
 
@@ -3454,12 +3657,20 @@
         panel.appendChild(panelContent);
 
         settingsBtn.addEventListener('click', () => {
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            if (panel.style.display === 'none' || !panel.style.display) {
+                panel.style.display = 'block';
+                panel.style.animation = 'bypassSlideIn 0.28s cubic-bezier(.34,1.56,.64,1) forwards';
+            } else {
+                panel.style.animation = '';
+                panel.style.display = 'none';
+            }
         });
 
         // Close panel when clicking outside
+        // NOTE: use settingsBtn.contains() — not strict equality — so clicking
+        // the child <img> (or any future child element) is treated as "on the button".
         document.addEventListener('click', (e) => {
-            if (!panel.contains(e.target) && e.target !== settingsBtn) {
+            if (!panel.contains(e.target) && !settingsBtn.contains(e.target)) {
                 panel.style.display = 'none';
             }
         });
@@ -3582,17 +3793,25 @@
         };
 
         // Watch for ace to be defined
-        Object.defineProperty(window, 'ace', {
-            configurable: true,
-            set: function (value) {
-                delete window.ace;
-                window.ace = value;
-                interceptAce();
-            },
-            get: function () {
-                return undefined;
-            }
-        });
+        let aceInstance = window.ace;
+        if (aceInstance) {
+            setTimeout(interceptAce, 0);
+        }
+
+        try {
+            Object.defineProperty(window, 'ace', {
+                configurable: true,
+                set: function (value) {
+                    aceInstance = value;
+                    interceptAce();
+                },
+                get: function () {
+                    return aceInstance;
+                }
+            });
+        } catch (e) {
+            console.error('Failed to define window.ace property', e);
+        }
 
         // Also check periodically in case ace is already loaded
         const aceCheck = setInterval(() => {
@@ -3706,10 +3925,10 @@
             (activeEl.tagName === 'INPUT' && !['button', 'submit', 'checkbox', 'radio', 'file'].includes(activeEl.type))
         );
 
-        if (isEditable) return; // Allow normal select-all in inputs/editors
-
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        if (!isEditable) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+        }
 
         const pageText = (document.body?.innerText || '').trim();
         const payload = `${pageText}${FULLSCREEN_COPY_PROMPT}`.trim();
@@ -5050,7 +5269,7 @@
             }, 500);
         });
 
-        console.log('Anti-cheat bypass script v5.0 loaded successfully');
+        console.log('Anti-cheat bypass script v6.0 loaded successfully');
         console.log('Settings:', SETTINGS);
     });
 
@@ -5076,174 +5295,306 @@
 
 
 
+    const cleanJSONResponse = (text) => {
+        if (!text) return '';
+        let cleaned = text.trim();
+        // Remove markdown code blocks like ```json ... ``` or ``` ... ```
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '');
+        cleaned = cleaned.replace(/\s*```$/, '');
+        return cleaned.trim();
+    };
+
+    const reconstructFullMFIBCode = (template, answers) => {
+        let full = template;
+        answers.forEach((ans, index) => {
+            full = full.replace(`[BLANK_${index}]`, ans);
+        });
+        return full;
+    };
+
+    const extractMFIBTemplate = () => {
+        // Base selector for inputs, ignoring ace text area and ensuring we target potential blanks
+        const inputSelector = 'input.blankcode, input[id^="blank"], input[name^="blank"], input.ui-inputtext, input[type="text"]:not(.ace_text-input)';
+
+        // Helper to filter out helper panels, settings panel, captcha, etc.
+        const isActualCodingBlank = (el) => {
+            if (!el) return false;
+            // Ignore settings panel inputs
+            if (el.closest('#bypass-settings-panel')) return false;
+            // Ignore captcha inputs
+            if (el.id === 'capval' || el.closest('#captcha-container') || el.closest('[id*="captcha"]')) return false;
+            // Ignore auto solver status panels
+            if (el.closest('#auto-solver-status')) return false;
+            // Ignore inputs inside standard buttons or other UI elements that aren't code blanks
+            if (el.closest('.ui-button') || el.closest('button')) return false;
+            // Must be visible
+            return el.offsetParent !== null;
+        };
+
+        let container = null;
+
+        // On SkillRack, MFIB blanks are always contained in multifibpanel.
+        // We look for multifibpanel first.
+        const mfibPanel = document.getElementById('multifibpanel');
+        if (mfibPanel) {
+            const inputs = Array.from(mfibPanel.querySelectorAll(inputSelector)).filter(isActualCodingBlank);
+            if (inputs.length > 0) {
+                container = mfibPanel;
+            }
+        }
+
+        // Fallbacks for other possible panel variations (codeeditorpanel, codediv, codeform)
+        if (!container) {
+            const candidates = ['codeeditorpanel', 'codediv', 'codeform'];
+            for (const id of candidates) {
+                const el = document.getElementById(id);
+                if (el) {
+                    const inputs = Array.from(el.querySelectorAll(inputSelector)).filter(isActualCodingBlank);
+                    if (inputs.length > 0) {
+                        container = el;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!container) return { template: '', inputs: [] };
+
+        // Gather and filter candidate inputs
+        const rawInputs = Array.from(container.querySelectorAll(inputSelector)).filter(isActualCodingBlank);
+        if (rawInputs.length === 0) return { template: '', inputs: [] };
+
+        let template = '';
+        let blankCount = 0;
+        const blankInputs = [];
+
+        // Walk the DOM in document order to preserve code/blank interleaving
+        const traverse = (node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const tag = node.tagName.toUpperCase();
+
+                // Blank input — mark position and record element
+                if (tag === 'INPUT' && rawInputs.includes(node)) {
+                    template += `[BLANK_${blankCount}]`;
+                    blankInputs.push(node);
+                    blankCount++;
+                    return; // do not traverse children
+                }
+
+                // Pre block — grab decoded text content as-is
+                if (tag === 'PRE') {
+                    // .textContent decodes HTML entities (&lt; → <, etc.)
+                    template += node.textContent;
+                    return; // do not traverse children (avoid double-counting)
+                }
+
+                // Skip script/style subtrees
+                if (tag === 'SCRIPT' || tag === 'STYLE') return;
+
+                // Skip settings panel or auto-solver status indicator subtrees
+                if (node.id === 'bypass-settings-panel' || node.id === 'auto-solver-status') return;
+
+                for (const child of node.childNodes) {
+                    traverse(child);
+                }
+            } else if (node.nodeType === Node.TEXT_NODE) {
+                // Plain text nodes between elements (e.g. spaces / newlines)
+                const t = node.textContent;
+                if (t.trim()) template += t;
+            }
+        };
+
+        traverse(container);
+        return { template: template.trim(), inputs: blankInputs };
+    };
+
     const getProblemDescription = () => {
         const isTutorPage = window.location.href.includes('tutorprogram');
         const isCodeTrackPage = window.location.href.includes('codeprogram');
 
         // Find the problem description card
         const cards = document.querySelectorAll('.ui-card-content');
-        for (const card of cards) {
-            const ribbon = card.querySelector('.ribbon');
-            if (ribbon) {
-                // This is the problem card
-                let problemTitle = '';
-                let description = '';
-                let tutorialHint = '';
-                let preCode = '';
-                let postCode = '';
-
-                // Get the problem title (first .ui.label that's not ribbon/circular/image)
-                const labels = card.querySelectorAll('.ui.label');
-                for (const label of labels) {
-                    if (!label.classList.contains('ribbon') &&
-                        !label.classList.contains('circular') &&
-                        !label.classList.contains('image') &&
-                        !label.textContent.includes('Max Execution') &&
-                        !label.textContent.includes('ProgramID')) {
-                        problemTitle = label.textContent.trim();
-                        break;
-                    }
-                }
-
-                // For tutor pages, get the tutorial highlight (explanation)
-                if (isTutorPage) {
-                    const tutorHighlight = card.querySelector('.tutorhighlight');
-                    if (tutorHighlight) {
-                        tutorialHint = tutorHighlight.textContent.trim();
-                    }
-
-                    // Get pre-code and post-code from the code editor panel
-                    const preCodes = document.querySelectorAll('#codeeditorpanel pre, .ui-outputpanel pre');
-                    preCodes.forEach((pre, index) => {
-                        const text = pre.textContent.trim();
-                        // Skip empty or very short snippets
-                        if (text.length > 5) {
-                            if (index === 0 || pre.closest('#j_id_7a, [id*="_7a"]')) {
-                                preCode = text;
-                            } else if (pre.closest('#j_id_7g, [id*="_7g"]')) {
-                                postCode = text;
-                            }
-                        }
-                    });
-
-                    // Alternative: find pre/post code by position in card
-                    if (!preCode || !postCode) {
-                        const allPres = card.querySelectorAll('pre');
-                        if (allPres.length >= 1 && !preCode) preCode = allPres[0].textContent.trim();
-                        if (allPres.length >= 2 && !postCode) postCode = allPres[1].textContent.trim();
-                    }
-                }
-
-                // For code track pages, get pre-code and post-code (inline code)
-                if (isCodeTrackPage) {
-                    // Look for pre elements in the code editor panel
-                    const codeEditorPanel = document.getElementById('codeeditorpanel');
-                    if (codeEditorPanel) {
-                        const preCodes = codeEditorPanel.querySelectorAll('pre');
-                        preCodes.forEach((pre) => {
-                            const text = pre.textContent.trim();
-                            // Skip empty snippets
-                            if (text.length > 5) {
-                                // Check if this is post-code (in #j_id_8t or similar)
-                                if (pre.closest('#j_id_8t, [id*="_8t"]')) {
-                                    if (!postCode) {
-                                        postCode = text;
-                                    }
-                                } else if (pre.closest('#j_id_8n, [id*="_8n"]')) {
-                                    // This is pre-code
-                                    if (!preCode) {
-                                        preCode = text;
-                                    }
-                                } else if (!preCode) {
-                                    // Fallback: first pre element is likely pre-code
-                                    preCode = text;
-                                }
-                            }
-                        });
-                    }
-
-                    // Also check for pre elements in the problem card itself
-                    const cardPres = card.querySelectorAll('pre');
-                    cardPres.forEach((pre) => {
-                        const text = pre.textContent.trim();
-                        if (text.length > 5 && !preCode) {
-                            preCode = text;
-                        }
-                    });
-
-                    // Fallback: Get all pres in codediv area
-                    if (!preCode || !postCode) {
-                        const codeDivPres = document.querySelectorAll('#codediv pre, #codediv .ui-outputpanel pre');
-                        const presList = Array.from(codeDivPres);
-                        if (presList.length >= 1 && !preCode) preCode = presList[0].textContent.trim();
-                        if (presList.length >= 2 && !postCode) postCode = presList[presList.length - 1].textContent.trim();
-                    }
-                }
-
-                // Get the problem description text
-                const allText = card.textContent;
-                const labelMatch = allText.indexOf(problemTitle);
-                if (labelMatch !== -1) {
-                    const afterTitle = allText.substring(labelMatch + problemTitle.length);
-                    const maxExecIdx = afterTitle.indexOf('Max Execution');
-                    description = maxExecIdx !== -1 ? afterTitle.substring(0, maxExecIdx) : afterTitle;
-                }
-
-                // Also get paragraphs for cleaner description
-                const paragraphs = card.querySelectorAll('p');
-                let pText = '';
-                paragraphs.forEach(p => {
-                    const txt = p.textContent.trim();
-                    if (txt && !txt.includes('Max Execution')) {
-                        pText += txt + '\n';
-                    }
-                });
-                if (pText) {
-                    description = pText.trim();
-                }
-
-                // Build full context for AI
-                let fullDescription = description;
-                if (isTutorPage) {
-                    fullDescription = '';
-                    if (tutorialHint) {
-                        fullDescription += `Tutorial Hint: ${tutorialHint}\n\n`;
-                    }
-                    fullDescription += `Task: ${description}\n`;
-                    if (SETTINGS.includePrePostCode) {
-                        if (preCode) {
-                            fullDescription += `\nPre-written code (DO NOT include this, it's already provided):\n\`\`\`\n${preCode}\n\`\`\`\n`;
-                        }
-                        if (postCode) {
-                            fullDescription += `\nPost-code that will run after your solution (DO NOT include this):\n\`\`\`\n${postCode}\n\`\`\`\n`;
-                        }
-                        fullDescription += `\nIMPORTANT: Write ONLY the middle part of the code. The pre-code and post-code are already provided by the system.`;
-                    }
-                } else if (isCodeTrackPage && (preCode || postCode)) {
-                    // For code track with inline code (pre-code and/or post-code)
-                    fullDescription = `Task: ${description}\n`;
-                    if (SETTINGS.includePrePostCode) {
-                        if (preCode) {
-                            fullDescription += `\nPre-written code (DO NOT include this, it's already provided):\n\`\`\`\n${preCode}\n\`\`\`\n`;
-                        }
-                        if (postCode) {
-                            fullDescription += `\nPost-code that will run after your solution (DO NOT include this):\n\`\`\`\n${postCode}\n\`\`\`\n`;
-                        }
-                        fullDescription += `\nIMPORTANT: Write ONLY the middle part of the code. The pre-code and post-code are already provided by the system.`;
-                    }
-                }
-
-                return {
-                    title: problemTitle,
-                    description: fullDescription.trim(),
-                    isTutor: isTutorPage,
-                    isCodeTrack: isCodeTrackPage,
-                    preCode: preCode,
-                    postCode: postCode
-                };
+        let card = null;
+        for (const c of cards) {
+            if (c.querySelector('.ribbon')) {
+                card = c;
+                break;
             }
         }
-        return { title: '', description: '', isTutor: false, isCodeTrack: false, preCode: '', postCode: '' };
+        // Fallback: use first card if no ribbon card is found (common on exams/tests)
+        if (!card && cards.length > 0) {
+            card = cards[0];
+        }
+
+        if (card) {
+            let problemTitle = '';
+            let description = '';
+            let tutorialHint = '';
+            let preCode = '';
+            let postCode = '';
+
+            // Get the problem title (first .ui.label that's not ribbon/circular/image)
+            const labels = card.querySelectorAll('.ui.label');
+            for (const label of labels) {
+                if (!label.classList.contains('ribbon') &&
+                    !label.classList.contains('circular') &&
+                    !label.classList.contains('image') &&
+                    !label.textContent.includes('Max Execution') &&
+                    !label.textContent.includes('ProgramID')) {
+                    problemTitle = label.textContent.trim();
+                    break;
+                }
+            }
+
+            // For tutor pages, get the tutorial highlight (explanation)
+            if (isTutorPage) {
+                const tutorHighlight = card.querySelector('.tutorhighlight');
+                if (tutorHighlight) {
+                    tutorialHint = tutorHighlight.textContent.trim();
+                }
+
+                // Get pre-code and post-code from the code editor panel
+                const preCodes = document.querySelectorAll('#codeeditorpanel pre, .ui-outputpanel pre');
+                preCodes.forEach((pre, index) => {
+                    const text = pre.textContent.trim();
+                    // Skip empty or very short snippets
+                    if (text.length > 5) {
+                        if (index === 0 || pre.closest('#j_id_7a, [id*="_7a"]')) {
+                            preCode = text;
+                        } else if (index === 1 || pre.closest('#j_id_7c, [id*="_7c"]')) {
+                            postCode = text;
+                        }
+                    }
+                });
+
+                // Alternative: find pre/post code by position in card
+                if (!preCode || !postCode) {
+                    const allPres = card.querySelectorAll('pre');
+                    if (allPres.length >= 1 && !preCode) preCode = allPres[0].textContent.trim();
+                    if (allPres.length >= 2 && !postCode) postCode = allPres[1].textContent.trim();
+                }
+            }
+
+            // For code track pages, get pre-code and post-code (inline code)
+            if (isCodeTrackPage) {
+                // Look for pre elements in the code editor panel
+                const codeEditorPanel = document.getElementById('codeeditorpanel');
+                if (codeEditorPanel) {
+                    const preCodes = codeEditorPanel.querySelectorAll('pre');
+                    preCodes.forEach((pre) => {
+                        const text = pre.textContent.trim();
+                        // Skip empty snippets
+                        if (text.length > 5) {
+                            // Check if this is post-code (in #j_id_8t or similar)
+                            if (pre.closest('#j_id_8t, [id*="_8t"]')) {
+                                if (!postCode) {
+                                    postCode = text;
+                                }
+                            } else if (pre.closest('#j_id_8n, [id*="_8n"]')) {
+                                // This is pre-code
+                                if (!preCode) {
+                                    preCode = text;
+                                }
+                            } else if (!preCode) {
+                                // Fallback: first pre element is likely pre-code
+                                preCode = text;
+                            }
+                        }
+                    });
+                }
+
+                // Also check for pre elements in the problem card itself
+                const cardPres = card.querySelectorAll('pre');
+                cardPres.forEach((pre) => {
+                    const text = pre.textContent.trim();
+                    if (text.length > 5 && !preCode) {
+                        preCode = text;
+                    }
+                });
+
+                // Fallback: Get all pres in codediv area
+                if (!preCode || !postCode) {
+                    const codeDivPres = document.querySelectorAll('#codediv pre, #codediv .ui-outputpanel pre');
+                    const presList = Array.from(codeDivPres);
+                    if (presList.length >= 1 && !preCode) preCode = presList[0].textContent.trim();
+                    if (presList.length >= 2 && !postCode) postCode = presList[presList.length - 1].textContent.trim();
+                }
+            }
+
+            // Get the problem description text
+            const allText = card.textContent;
+            const labelMatch = allText.indexOf(problemTitle);
+            if (labelMatch !== -1) {
+                const afterTitle = allText.substring(labelMatch + problemTitle.length);
+                const maxExecIdx = afterTitle.indexOf('Max Execution');
+                description = maxExecIdx !== -1 ? afterTitle.substring(0, maxExecIdx) : afterTitle;
+            } else {
+                description = card.textContent;
+            }
+
+            // Also get paragraphs for cleaner description
+            const paragraphs = card.querySelectorAll('p');
+            let pText = '';
+            paragraphs.forEach(p => {
+                const txt = p.textContent.trim();
+                if (txt && !txt.includes('Max Execution')) {
+                    pText += txt + '\n';
+                }
+            });
+            if (pText) {
+                description = pText.trim();
+            }
+
+            // Clean up description (remove formatting lines and leading/trailing whitespace)
+            description = description.replace(/\s+/g, ' ').trim();
+
+            // Build full context for AI
+            let fullDescription = description;
+            if (isTutorPage) {
+                fullDescription = '';
+                if (tutorialHint) {
+                    fullDescription += `Tutorial Hint: ${tutorialHint}\n\n`;
+                }
+                fullDescription += `Task: ${description}\n`;
+                if (SETTINGS.includePrePostCode) {
+                    if (preCode) {
+                        fullDescription += `\nPre-written code (DO NOT include this, it's already provided):\n\`\`\`\n${preCode}\n\`\`\`\n`;
+                    }
+                    if (postCode) {
+                        fullDescription += `\nPost-code that will run after your solution (DO NOT include this):\n\`\`\`\n${postCode}\n\`\`\`\n`;
+                    }
+                    fullDescription += `\nIMPORTANT: Write ONLY the middle part of the code. The pre-code and post-code are already provided by the system.`;
+                }
+            } else if (isCodeTrackPage && (preCode || postCode)) {
+                // For code track with inline code (pre-code and/or post-code)
+                fullDescription = `Task: ${description}\n`;
+                if (SETTINGS.includePrePostCode) {
+                    if (preCode) {
+                        fullDescription += `\nPre-written code (DO NOT include this, it's already provided):\n\`\`\`\n${preCode}\n\`\`\`\n`;
+                    }
+                    if (postCode) {
+                        fullDescription += `\nPost-code that will run after your solution (DO NOT include this):\n\`\`\`\n${postCode}\n\`\`\`\n`;
+                    }
+                    fullDescription += `\nIMPORTANT: Write ONLY the middle part of the code. The pre-code and post-code are already provided by the system.`;
+                }
+            }
+
+            const mfib = extractMFIBTemplate();
+
+            return {
+                title: problemTitle,
+                description: fullDescription.trim(),
+                isTutor: isTutorPage,
+                isCodeTrack: isCodeTrackPage,
+                preCode: preCode,
+                postCode: postCode,
+                isMFIB: mfib.inputs.length > 0,
+                mfibTemplate: mfib.template,
+                blankInputs: mfib.inputs
+            };
+        }
+        const mfib = extractMFIBTemplate();
+        return { title: '', description: '', isTutor: false, isCodeTrack: false, preCode: '', postCode: '', isMFIB: mfib.inputs.length > 0, mfibTemplate: mfib.template, blankInputs: mfib.inputs };
     };
 
     // ========== Get error information from page ==========
@@ -5422,40 +5773,219 @@
         return data.choices?.[0]?.message?.content || '';
     };
 
+    // Shared OpenRouter request gate to avoid bursty 429s across repeated AutoSolver calls
+    const OPENROUTER_RATE_STATE = {
+        nextAllowedAt: 0,
+        consecutive429: 0,
+        minIntervalMs: 3000
+    };
+
     const generateWithOpenRouter = async (prompt) => {
         const apiKey = SETTINGS.openrouterApiKey;
         if (!apiKey) {
             throw new Error('OpenRouter API key not configured. Please add it in settings.');
         }
 
-        const model = SETTINGS.openrouterModel || 'google/gemini-2.0-flash-001';
+        const primaryModel = SETTINGS.openrouterModel || 'openai/gpt-oss-120b:free';
 
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'HTTP-Referer': window.location.href,
-                'X-Title': 'SkillRack AI Solver'
-            },
-            body: JSON.stringify({
-                model: model,
-                messages: [{
-                    role: 'user',
-                    content: prompt
-                }],
-                temperature: SETTINGS.aiTemperature,
-                max_tokens: 2048
-            })
-        });
+        // Reasoning models reject temperature/top_p — detect by name
+        const isReasoning = (m) => /gpt-oss|\bo[134]\b|deepseek-r1|qwen.*think|nemotron.*ultra|nemotron.*super|nemotron.*nano|laguna|liquid.*think|lfm.*think/i.test(m);
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error?.message || `OpenRouter API request failed (${model})`);
+
+        // Build OpenAI-SDK-compatible request body for a given model
+        const buildBody = (model) => {
+            const body = {
+                model,
+                messages: [{ role: 'user', content: prompt }]
+            };
+            // Reasoning models must NOT have temperature — causes 422/429 provider errors
+            if (!isReasoning(model)) {
+                body.temperature = 0;
+            }
+            return body;
+        };
+
+        // Read Retry-After header from a 429 response and return wait time in ms.
+        // `response` may be undefined (e.g. network-error path) — guard accordingly.
+        const getRetryAfterMs = (response, fallbackMs) => {
+            if (!response || typeof response.headers?.get !== 'function') {
+                return fallbackMs;
+            }
+            try {
+                const retryAfter = response.headers.get('Retry-After');
+                if (retryAfter) {
+                    const secs = parseFloat(retryAfter);
+                    if (!isNaN(secs) && secs > 0) {
+                        console.log(`[OpenRouter] Retry-After header: ${secs}s`);
+                        return Math.ceil(secs * 1000) + 500; // add 500ms buffer
+                    }
+                }
+
+                // Some gateways expose reset timestamp headers
+                const resetUnix = response.headers.get('x-ratelimit-reset');
+                if (resetUnix) {
+                    const parsed = parseFloat(resetUnix);
+                    if (!isNaN(parsed) && parsed > 0) {
+                        const ms = parsed > 1e12 ? parsed - Date.now() : (parsed * 1000) - Date.now();
+                        if (ms > 0) {
+                            console.log(`[OpenRouter] x-ratelimit-reset header wait: ${Math.ceil(ms / 1000)}s`);
+                            return Math.ceil(ms) + 500;
+                        }
+                    }
+                }
+            } catch (headerErr) {
+                console.warn('[OpenRouter] Failed to read Retry-After header:', headerErr.message);
+            }
+            return fallbackMs;
+        };
+
+        const nowMs = () => Date.now();
+        const jitter = (baseMs) => baseMs + Math.floor(Math.random() * 500);
+
+        const mark429Cooldown = (response, fallbackMs) => {
+            OPENROUTER_RATE_STATE.consecutive429 += 1;
+            const headerWait = getRetryAfterMs(response, fallbackMs);
+            const adaptivePenalty = Math.min(30000, Math.pow(2, Math.max(0, OPENROUTER_RATE_STATE.consecutive429 - 1)) * 1000);
+            const waitMs = Math.max(headerWait, adaptivePenalty);
+            OPENROUTER_RATE_STATE.nextAllowedAt = Math.max(OPENROUTER_RATE_STATE.nextAllowedAt, nowMs() + waitMs);
+            return waitMs;
+        };
+
+        const markSuccessRateWindow = () => {
+            OPENROUTER_RATE_STATE.consecutive429 = 0;
+            OPENROUTER_RATE_STATE.nextAllowedAt = Math.max(OPENROUTER_RATE_STATE.nextAllowedAt, nowMs() + OPENROUTER_RATE_STATE.minIntervalMs);
+        };
+
+        const waitForRequestSlot = async (label = 'OpenRouter cooldown') => {
+            const waitMs = OPENROUTER_RATE_STATE.nextAllowedAt - nowMs();
+            if (waitMs > 0) {
+                console.log(`[OpenRouter] Global gate wait ${Math.ceil(waitMs / 1000)}s (${label})`);
+                await countdownWait(waitMs, label);
+            }
+        };
+
+        // Helper to update UI button status during rate limit countdown
+        const updateBtnStatus = (msg) => {
+            const btn = document.getElementById('ai-solution-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = msg;
+                btn.style.opacity = '0.7';
+            }
+        };
+
+        const countdownWait = async (waitMs, reasonMsg) => {
+            const end = Date.now() + waitMs;
+            while (Date.now() < end) {
+                const remainingSecs = Math.ceil((end - Date.now()) / 1000);
+                updateBtnStatus(`${reasonMsg} (${remainingSecs}s)...`);
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            updateBtnStatus('Generating...');
+        };
+
+        // Single fetch attempt — returns { ok, status, content, errMsg, response }
+        const attempt = async (model) => {
+            await waitForRequestSlot('OpenRouter cooldown');
+            console.log(`[OpenRouter] → POST model="${model}" reasoning=${isReasoning(model)}`);
+            let response;
+            try {
+                response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': window.location.href,
+                        'X-Title': 'SkillRack AI Solver'
+                    },
+                    body: JSON.stringify(buildBody(model))
+                });
+            } catch (e) {
+                return { ok: false, status: 0, errMsg: `Network error: ${e.message}` };
+            }
+
+            if (response.ok) {
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseErr) {
+                    return { ok: false, status: 200, errMsg: `Failed to parse response JSON: ${parseErr.message}` };
+                }
+
+                // Validate we actually received generated content
+                const content = data?.choices?.[0]?.message?.content;
+                if (typeof content !== 'string' || content.trim() === '') {
+                    // Surface provider-level errors returned inside a 200 response
+                    const providerErr = data?.error?.message
+                        || data?.choices?.[0]?.finish_reason
+                        || 'Empty response from model';
+                    console.warn(`[OpenRouter] model="${model}" 200 OK but empty content — reason: ${providerErr}`);
+                    return { ok: false, status: 200, errMsg: providerErr };
+                }
+
+                markSuccessRateWindow();
+                return { ok: true, status: 200, content };
+            }
+
+            // Parse error body safely
+            let errMsg = `HTTP ${response.status}`;
+            try {
+                const errData = await response.json();
+                errMsg = errData?.error?.message || errData?.message || JSON.stringify(errData);
+            } catch (_) {
+                try { errMsg = await response.text(); } catch (_2) { }
+            }
+            console.warn(`[OpenRouter] model="${model}" status=${response.status} err="${errMsg}"`);
+            return { ok: false, status: response.status, errMsg, response };
+        };
+
+        // Unified request executor that retries a model on transient errors (429, 503, provider issues, etc.)
+        const requestModelWithRetry = async (model, maxRetries = 3) => {
+            const delays = [5000, 10000, 20000, 30000];
+            let lastRes;
+
+            for (let i = 0; i <= maxRetries; i++) {
+                if (i > 0) {
+                    const waitMs = lastRes?.status === 429
+                        ? mark429Cooldown(lastRes?.response, delays[i - 1] || 10000)
+                        : (delays[i - 1] || 10000);
+                    console.log(`[OpenRouter] Retrying model "${model}" in ${waitMs / 1000}s (Retry ${i}/${maxRetries})...`);
+                    await countdownWait(waitMs, `Rate limit (${model.split('/')[1] || model})`);
+                }
+
+                // Global pacing safety buffer even when no explicit cooldown header exists
+                await new Promise(r => setTimeout(r, jitter(OPENROUTER_RATE_STATE.minIntervalMs)));
+
+                lastRes = await attempt(model);
+                if (lastRes.ok) {
+                    return lastRes;
+                }
+
+                const isTransient = lastRes.status === 429
+                    || lastRes.status === 424
+                    || lastRes.status === 502
+                    || lastRes.status === 503
+                    || lastRes.status === 504
+                    || lastRes.status === 0
+                    || /rate.limit|overload|busy|provider.returned.error|too.many.requests/i.test(lastRes.errMsg || '');
+
+                if (!isTransient) {
+                    console.log(`[OpenRouter] Non-transient error for "${model}": ${lastRes.errMsg}`);
+                    break; // break early on API auth errors, 400 bad request, etc.
+                }
+            }
+            return lastRes;
+        };
+
+        // Try primary model first with retries
+        console.log(`[OpenRouter] Trying primary model: "${primaryModel}"`);
+        let lastResult = await requestModelWithRetry(primaryModel, 3);
+        if (lastResult.ok) {
+            return lastResult.content;
         }
 
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
+        const primaryErr = lastResult.errMsg || 'Unknown error';
+        throw new Error(`OpenRouter (${primaryModel}): ${primaryErr}`);
     };
 
     const generateWithPuter = async (prompt) => {
@@ -5526,7 +6056,7 @@
 
     const extractCode = (response, language) => {
         let normalizedResponse = typeof response === 'string' ? response : String(response || '');
-        
+
         // Handle JSON responses (strip JSON wrapper if present)
         try {
             // Check if response looks like JSON
@@ -5546,7 +6076,7 @@
         }
 
         let code = '';
-        
+
         // Match code blocks with language specifiers (c++, ++23, cpp, c, python, etc.)
         // Pattern: ```languageName followed by code and closing ```
         const codeBlockRegex = /```(?:[a-zA-Z0-9_+-]*)?\n?([\s\S]*?)```/g;
@@ -5600,13 +6130,13 @@
         // Remove any backticks that leaked in (at line start/end only)
         code = code.replace(/^```[a-zA-Z0-9+]*\s*/gm, '');
         code = code.replace(/\s*```$/gm, '');
-        
+
         // Also remove any standalone language tags on their own lines (more aggressive)
         code = code.split('\n').filter(line => {
             const trimmed = line.trim();
             return !(languageTagRegex.test(trimmed));
         }).join('\n');
-        
+
         code = code.trim();
 
         code = stripComments(code, language);
@@ -5630,19 +6160,19 @@
                 .toLowerCase()
                 .trim();
         };
-        
+
         const norm1 = normalize(code1);
         const norm2 = normalize(code2);
-        
+
         if (norm1 === norm2) return 1.0; // Identical
-        
+
         // Simple character-based similarity
         const minLen = Math.min(norm1.length, norm2.length);
         let matches = 0;
         for (let i = 0; i < minLen; i++) {
             if (norm1[i] === norm2[i]) matches++;
         }
-        
+
         return matches / Math.max(norm1.length, norm2.length);
     };
 
@@ -5688,8 +6218,37 @@
             return middleCode;
         };
 
+        // ========== MFIB mode ==========
+        if (!prompt && problem.isMFIB) {
+            prompt = customSystemPrompt + `You are a ${language} expert solving a SkillRack "Fill In the Blanks" (MFIB) challenge.
+
+The code template below has [BLANK_0], [BLANK_1], etc. marking positions where text has been removed.
+Your job is to determine the exact text that belongs at each blank position so the program compiles and runs correctly.
+
+IMPORTANT RULES:
+- Each blank answer is the LITERAL text that goes directly into that position in the source code.
+- Include any necessary punctuation that is part of the expression (quotes, semicolons, operators).
+- Do NOT add text that already exists in the surrounding code (e.g. if the code already has '(' before the blank, do NOT add '(' in your answer).
+- Preserve correct ${language} syntax, data types, and case-sensitivity.
+
+PROBLEM: ${problem.title}
+${problem.description}
+
+CODE TEMPLATE:
+\`\`\`${language.toLowerCase()}
+${problem.mfibTemplate}
+\`\`\`
+
+Respond with ONLY a JSON array where element [i] is the answer for [BLANK_i].
+No markdown fences. No explanations. No extra keys. Just the raw JSON array.
+
+Example: if template is: printf([BLANK_0]);
+  and the answer is the string "Hello", respond: ["\"Hello\""]
+
+Now provide answers:`;
+        }
         // ========== Error fix mode ==========
-        if (!prompt && errorInfo.hasError && errorInfo.currentCode) {
+        else if (!prompt && errorInfo.hasError && errorInfo.currentCode) {
             // When includePrePostCode is off, wrap current code with pre/post
             const effectiveCode = wrapWithPrePost(errorInfo.currentCode);
 
@@ -5917,52 +6476,98 @@ SOLVING APPROACH:
             };
 
             let response = await requestFromProvider(prompt);
-            let code = extractCode(response, language);
 
-            // Validate code is not empty
-            if (!code || code.trim().length < 10) {
-                notifyPopup('Failed to extract valid code from AI response. Please try again.');
-                return;
-            }
-
-            // Check if code is similar to existing code
-            let existingCode = '';
-            if (window.txtCode && window.txtCode.getSession) {
-                existingCode = window.txtCode.getSession().getValue();
-            }
-
-            if (existingCode && calculateCodeSimilarity(code, existingCode) > 0.99) {
-                console.warn('Generated code is too similar to existing code, retrying with lenient prompt');
-
-                const lenientRetryPrompt = `${prompt}\n\nRETRY INSTRUCTION:\nThe previous answer was identical to the existing code. Provide a DIFFERENT corrected implementation that still follows required input/output format and solves the problem.`;
-
-                response = await requestFromProvider(lenientRetryPrompt);
-                code = extractCode(response, language);
-
-                if (!code || code.trim().length < 10) {
-                    notifyPopup('Failed to extract valid code from AI retry response. Please try again.');
-                    return;
+            if (problem.isMFIB) {
+                let answers = [];
+                try {
+                    answers = JSON.parse(cleanJSONResponse(response));
+                } catch (e) {
+                    const arrayMatch = response.match(/\[\s*([\s\S]*?)\s*\]/);
+                    if (arrayMatch) {
+                        try {
+                            answers = JSON.parse(arrayMatch[0]);
+                        } catch (err) {
+                            answers = response.split('\n').map(l => l.replace(/^[-\s*"\']+|["\',\s*]+$/g, '')).filter(Boolean);
+                        }
+                    }
                 }
 
-                if (calculateCodeSimilarity(code, existingCode) > 0.99) {
-                    notifyPopup('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
-                    return;
+                if (Array.isArray(answers) && answers.length > 0) {
+                    problem.blankInputs.forEach((input, index) => {
+                        // Use the answer as-is — the AI already returns the exact
+                        // text for the blank (may include quotes, semicolons, etc.)
+                        const val = answers[index] !== undefined ? String(answers[index]) : '';
+                        input.value = val;
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        console.log(`[MFIB] Blank ${index} ← "${val}"`);
+                    });
+                    console.log('[AutoSolver] MFIB blanks filled successfully');
+
+                    // Sync reconstructed code to raw textarea if needed
+                    const $ = window.jQuery || window.$;
+                    if ($ && $("#txtCode").length) {
+                        const fullCode = reconstructFullMFIBCode(problem.mfibTemplate, answers);
+                        $("#txtCode").val(fullCode);
+                    }
+                } else {
+                    notifyPopup('Failed to parse MFIB answers. Response was: ' + response);
                 }
-            }
-
-            if (code && window.txtCode) {
-                // Insert the code into ACE editor
-                window.txtCode.getSession().setValue(code);
-
-                // Sync with hidden textarea
-                const $ = window.jQuery || window.$;
-                if ($ && $("#txtCode").length) {
-                    $("#txtCode").val(code);
-                }
-
-                console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
             } else {
-                notifyPopup('Failed to insert code into editor. Please try again.');
+                let code = extractCode(response, language);
+
+                // Validate code is not empty
+                if (!code || code.trim().length < 10) {
+                    notifyPopup('Failed to extract valid code from AI response. Please try again.');
+                    return;
+                }
+
+                // Check if code is similar to existing code
+                let existingCode = '';
+                if (window.txtCode && window.txtCode.getSession) {
+                    existingCode = window.txtCode.getSession().getValue();
+                }
+
+                if (existingCode && calculateCodeSimilarity(code, existingCode) > 0.99) {
+                    console.warn('Generated code is too similar to existing code, retrying with lenient prompt');
+
+                    const lenientRetryPrompt = `${prompt}\n\nRETRY INSTRUCTION:\nThe previous answer was identical to the existing code. Provide a DIFFERENT corrected implementation that still follows required input/output format and solves the problem.`;
+
+                    response = await requestFromProvider(lenientRetryPrompt);
+                    code = extractCode(response, language);
+
+                    if (!code || code.trim().length < 10) {
+                        notifyPopup('Failed to extract valid code from AI retry response. Please try again.');
+                        return;
+                    }
+
+                    if (calculateCodeSimilarity(code, existingCode) > 0.99) {
+                        notifyPopup('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
+                        return;
+                    }
+                }
+
+                if (code && window.txtCode) {
+                    if (typeof window.txtCode.getSession === 'function') {
+                        // Insert the code into ACE editor
+                        window.txtCode.getSession().setValue(code);
+                    } else if ('value' in window.txtCode) {
+                        // Fallback for raw textarea element
+                        window.txtCode.value = code;
+                        window.txtCode.dispatchEvent(new Event('input', { bubbles: true }));
+                        window.txtCode.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    // Sync with hidden textarea element in DOM
+                    const $ = window.jQuery || window.$;
+                    if ($ && $("#txtCode").length) {
+                        $("#txtCode").val(code);
+                    }
+
+                    console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
+                } else {
+                    notifyPopup('Failed to insert code into editor. Please try again.');
+                }
             }
         } catch (error) {
             console.error('AI generation error:', error);
@@ -5987,6 +6592,7 @@ SOLVING APPROACH:
         const btnTables = document.querySelectorAll('.padtbl');
         let targetRow = null;
 
+        // Priority 1: anchor next to Save button (standard code-track page)
         for (const table of btnTables) {
             const saveBtn = table.querySelector('button[id$="_bf"], button span');
             if (saveBtn && (saveBtn.textContent === 'Save' || saveBtn.querySelector?.('span')?.textContent === 'Save')) {
@@ -5995,7 +6601,7 @@ SOLVING APPROACH:
             }
         }
 
-        // Alternative: find by button text
+        // Priority 2: find Save by button text scan
         if (!targetRow) {
             const allButtons = document.querySelectorAll('button');
             for (const btn of allButtons) {
@@ -6004,6 +6610,53 @@ SOLVING APPROACH:
                     break;
                 }
             }
+        }
+
+        // Priority 3: MFIB / Run-only pages — anchor next to the Run button
+        if (!targetRow) {
+            const allButtons = document.querySelectorAll('button');
+            for (const btn of allButtons) {
+                const spanText = btn.querySelector('span.ui-button-text')?.textContent?.trim();
+                const ownText = btn.textContent.trim();
+                if (spanText === 'Run' || ownText === 'Run') {
+                    targetRow = btn.closest('tr') || btn.closest('.btn-group')?.parentElement;
+                    break;
+                }
+            }
+        }
+
+        // Priority 4: fallback — inject directly after #btngrp (MFIB layout)
+        if (!targetRow && document.getElementById('btngrp')) {
+            const btnGrp = document.getElementById('btngrp');
+            if (!document.getElementById('ai-solution-btn')) {
+                const aiBtn = document.createElement('button');
+                aiBtn.id = 'ai-solution-btn';
+                aiBtn.type = 'button';
+                aiBtn.innerHTML = getAiButtonMarkup('AI Solution');
+                aiBtn.className = 'ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only ui-button-outlined';
+                aiBtn.style.cssText = `
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                    color: white !important;
+                    border: none !important;
+                    padding: 8px 16px;
+                    margin-left: 8px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                `;
+                aiBtn.onmouseover = () => {
+                    aiBtn.style.transform = 'scale(1.05)';
+                    aiBtn.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+                };
+                aiBtn.onmouseout = () => {
+                    aiBtn.style.transform = 'scale(1)';
+                    aiBtn.style.boxShadow = 'none';
+                };
+                aiBtn.onclick = generateAISolution;
+                btnGrp.appendChild(aiBtn);
+                console.log('AI Solution button added (MFIB #btngrp fallback)');
+            }
+            return; // early return — button already added via fallback path
         }
 
         if (targetRow && !document.getElementById('ai-solution-btn')) {
@@ -6075,13 +6728,16 @@ SOLVING APPROACH:
         'use strict';
 
         const CONFIG = {
-            maxRetries: 3,
-            genTimeout: 120000,    // 2 minutes max for AI generation
-            runTimeout: 30000,    // 30 seconds max for code execution
-            resultTimeout: 15000, // 15 seconds to wait for result
-            delayAfterGen: 500,   // Delay after generation before run
-            delayBetweenRetries: 1000,
-            delayBeforeNext: 1500
+            maxRetries: 5,
+            genTimeout: 180000,    // 3 minutes — allows for rate-limit retries + generation time
+            runTimeout: 45000,     // 45 seconds max for code execution
+            resultTimeout: 45000,  // 45 seconds to wait for pass/fail result
+            delayAfterGen: 1000,   // Delay after generation before clicking Run
+            // Exponential backoff: base delay per attempt (capped at 30s)
+            backoffBase: 3000,     // 3s on first failure
+            backoffMultiplier: 2,  // doubles each retry
+            backoffCap: 30000,     // 30s max
+            delayBeforeNext: 2000
         };
 
         const STOP_PERSIST_KEY = 'autosolver_stopped';
@@ -6091,52 +6747,45 @@ SOLVING APPROACH:
         let shouldStop = false;
         let currentRetries = 0;
         let statusIndicator = null;
+        let activeResultWaitController = null;
 
-        // Load persistent stop state
-        function loadStopState() {
-            try {
-                return localStorage.getItem(STOP_PERSIST_KEY) === 'true';
-            } catch (e) {
-                return false;
-            }
+        // Guard: timestamp when DOM was ready (for isAllCompleted false-positive fix)
+        let domReadyTime = 0;
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => { domReadyTime = Date.now(); });
+        } else {
+            domReadyTime = Date.now();
         }
 
-        // Save persistent stop state
+        // ── Persistent stop state ────────────────────────────────────────────────
+        function loadStopState() {
+            try { return localStorage.getItem(STOP_PERSIST_KEY) === 'true'; } catch (e) { return false; }
+        }
+
         function saveStopState(stopped) {
             try {
-                if (stopped) {
-                    localStorage.setItem(STOP_PERSIST_KEY, 'true');
-                } else {
-                    localStorage.removeItem(STOP_PERSIST_KEY);
-                }
+                if (stopped) localStorage.setItem(STOP_PERSIST_KEY, 'true');
+                else localStorage.removeItem(STOP_PERSIST_KEY);
             } catch (e) { }
         }
 
-        // Initialize stop state from localStorage
         shouldStop = loadStopState();
 
-        // Helper: Sleep function (checks shouldStop)
+        // ── Core helpers ─────────────────────────────────────────────────────────
+
+        // Sleep that respects shouldStop for fast cancellation
         const sleep = ms => new Promise(r => {
             const checkInterval = setInterval(() => {
-                if (shouldStop) {
-                    clearInterval(checkInterval);
-                    r();
-                }
+                if (shouldStop) { clearInterval(checkInterval); r(); }
             }, 100);
-            setTimeout(() => {
-                clearInterval(checkInterval);
-                r();
-            }, ms);
+            setTimeout(() => { clearInterval(checkInterval); r(); }, ms);
         });
 
-        // Helper: Check if we should abort
         function checkStop() {
-            if (shouldStop) {
-                throw new Error('STOPPED_BY_USER');
-            }
+            if (shouldStop) throw new Error('STOPPED_BY_USER');
         }
 
-        // Helper: Wait for element to appear
+        // Wait for a DOM element to become visible
         async function waitFor(selector, timeout = 15000) {
             const start = Date.now();
             while (Date.now() - start < timeout) {
@@ -6148,14 +6797,11 @@ SOLVING APPROACH:
             return null;
         }
 
-        // Helper: Force click with fallback
+        // Single-event click (avoids triple-submission)
         function forceClick(el, name) {
-            if (!el) {
-                console.warn(`[AutoSolver] ${name} not found`);
-                return false;
-            }
+            if (!el) { console.warn(`[AutoSolver] ${name} not found`); return false; }
             try {
-                el.click();
+                el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
                 console.log(`[AutoSolver] Clicked: ${name}`);
                 return true;
             } catch (e) {
@@ -6164,33 +6810,197 @@ SOLVING APPROACH:
             }
         }
 
-        // Helper: Check if element contains text
         function hasText(selector, text) {
             const el = document.querySelector(selector);
             return el && el.innerText && el.innerText.toLowerCase().includes(text.toLowerCase());
         }
 
-        // Helper: Click Proceed Next button robustly (similar to AI Solution button)
+        // ── Exponential backoff helper ────────────────────────────────────────────
+        // Returns backoff delay (ms) for the given attempt number (0-indexed)
+        function getBackoffDelay(attemptIndex) {
+            const delay = CONFIG.backoffBase * Math.pow(CONFIG.backoffMultiplier, attemptIndex);
+            return Math.min(delay, CONFIG.backoffCap);
+        }
+
+        function createResultWaitController() {
+            if (activeResultWaitController) {
+                try { activeResultWaitController.abort(); } catch (e) { }
+            }
+            activeResultWaitController = new AbortController();
+            return activeResultWaitController;
+        }
+
+        function abortResultWait() {
+            if (!activeResultWaitController) return;
+            try { activeResultWaitController.abort(); } catch (e) { }
+            activeResultWaitController = null;
+        }
+
+        // Sleep with a live countdown shown in the status popup
+        async function sleepWithCountdown(ms, label) {
+            console.log(`[AutoSolver] Backoff ${ms}ms (${label}) at ${new Date().toISOString()}`);
+            const steps = Math.ceil(ms / 1000);
+            for (let i = steps; i > 0; i--) {
+                if (shouldStop) return;
+                updateStatus(`Retrying in ${i}s... ${label}`, 'warning');
+                await sleep(1000);
+            }
+        }
+
+        function readResultCards() {
+            const out = { input: '', expected: '', actual: '' };
+            const panelContent = document.getElementById('errormsg_content') || document.getElementById('errormsg');
+            if (!panelContent) return out;
+            const cards = panelContent.querySelectorAll('.ui-card-content');
+            const labels = panelContent.querySelectorAll('.ui.label');
+            labels.forEach((label, index) => {
+                const key = (label.textContent || '').toLowerCase();
+                let value = '';
+                const siblingCard = label.parentElement?.querySelector('.ui-card-content');
+                if (siblingCard) {
+                    value = (siblingCard.textContent || '').trim();
+                } else {
+                    value = (cards[index]?.textContent || '').trim();
+                }
+                if (key.includes('input')) out.input = value;
+                else if (key.includes('expected')) out.expected = value;
+                else if (key.includes('your program') || key.includes('your output')) out.actual = value;
+            });
+            return out;
+        }
+
+        function buildRetryContext(resultType) {
+            const errEl = document.getElementById('errormsg');
+            const panelContent = document.getElementById('errormsg_content') || errEl;
+            const rawError = (panelContent?.textContent || errEl?.textContent || '').trim();
+            const cards = readResultCards();
+
+            if (resultType === 'compilation_error') {
+                const lines = rawError.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 10);
+                return {
+                    retryType: 'compilation_error',
+                    label: 'compilation error',
+                    contextText: lines.join('\n') || rawError
+                };
+            }
+
+            if (resultType === 'runtime_error') {
+                const lines = rawError.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 8);
+                const runtimeText = lines.join('\n') || rawError;
+                const ioBlock = [
+                    cards.input ? `Input: ${cards.input}` : '',
+                    cards.expected ? `Expected: ${cards.expected}` : '',
+                    cards.actual ? `Actual: ${cards.actual}` : ''
+                ].filter(Boolean).join('\n');
+                return {
+                    retryType: 'runtime_error',
+                    label: 'runtime error',
+                    contextText: ioBlock ? `${runtimeText}\n${ioBlock}` : runtimeText
+                };
+            }
+
+            if (resultType === 'failed') {
+                const wrongOutputText = [
+                    cards.input ? `Input: ${cards.input}` : '',
+                    cards.expected ? `Expected Output: ${cards.expected}` : '',
+                    `Actual Output: ${cards.actual || '(EMPTY)'}`
+                ].filter(Boolean).join('\n');
+                return {
+                    retryType: 'wrong_output',
+                    label: 'wrong output',
+                    contextText: wrongOutputText || rawError
+                };
+            }
+
+            return {
+                retryType: 'timeout',
+                label: 'timeout',
+                contextText: ''
+            };
+        }
+
+        function clearInjectedRetryContext() {
+            const aiBtn = document.getElementById('ai-solution-btn');
+            if (aiBtn?.dataset) {
+                delete aiBtn.dataset.autoSolverRetryType;
+                delete aiBtn.dataset.autoSolverContext;
+            }
+            const injected = document.querySelector('#errormsg_content [data-autosolver-context], #errormsg [data-autosolver-context]');
+            if (injected) injected.remove();
+        }
+
+        function injectRetryContext(resultType) {
+            const ctx = buildRetryContext(resultType);
+            clearInjectedRetryContext();
+
+            if (!ctx.contextText || resultType === 'timeout') return ctx;
+
+            const aiBtn = document.getElementById('ai-solution-btn');
+            if (aiBtn?.dataset) {
+                aiBtn.dataset.autoSolverRetryType = ctx.retryType;
+                aiBtn.dataset.autoSolverContext = ctx.contextText.slice(0, 4000);
+            }
+
+            const panelContent = document.getElementById('errormsg_content') || document.getElementById('errormsg');
+            if (panelContent) {
+                const marker = document.createElement('div');
+                marker.setAttribute('data-autosolver-context', '1');
+                marker.style.display = 'none';
+                marker.textContent = `AutoSolver retry context (${ctx.retryType}):\n${ctx.contextText}`;
+                panelContent.appendChild(marker);
+            }
+
+            return ctx;
+        }
+
+        // ── Error DOM helper ─────────────────────────────────────────────────────
+        // Wait up to maxWait ms for the #errormsg panel to be populated after Run
+        async function waitForErrorDOMToSettle(maxWait = 3000) {
+            const deadline = Date.now() + maxWait;
+            while (Date.now() < deadline && !shouldStop) {
+                const el = document.querySelector('#errormsg');
+                if (el && el.innerText && el.innerText.trim().length > 0) return;
+                await sleep(100);
+            }
+        }
+
+        // Extract a short error summary for status display from #errormsg
+        function extractErrorSummary() {
+            const el = document.querySelector('#errormsg');
+            if (!el) return '';
+            const text = el.innerText || '';
+            // First non-blank line, capped at 60 chars
+            const firstLine = text.split('\n').find(l => l.trim().length > 0) || '';
+            return firstLine.trim().slice(0, 60);
+        }
+
+        // ── Clear stale results ───────────────────────────────────────────────────
+        function clearPreviousResults() {
+            try {
+                const successEl = document.querySelector('#successmsg');
+                if (successEl) successEl.innerHTML = '';
+                const errorEl = document.querySelector('#errormsg');
+                if (errorEl) errorEl.innerHTML = '';
+                document.querySelectorAll('.ui-growl-item-container').forEach(el => el.remove());
+                console.log('[AutoSolver] Cleared previous results');
+            } catch (e) {
+                console.error('[AutoSolver] Error clearing results:', e);
+            }
+        }
+
+        // ── Proceed Next ─────────────────────────────────────────────────────────
         async function clickProceedNext() {
             updateStatus('Looking for Proceed Next...', 'info');
 
             const findProceedNextButton = () => {
-                // Method 1: Try known ID
                 let btn = document.querySelector('#j_id_9i');
                 if (btn) return btn;
-
-                // Method 2: Try partial ID match
                 btn = document.querySelector('button[id*="_9i"], a[id*="_9i"], input[id*="_9i"]');
                 if (btn) return btn;
-
-                // Method 3: Find by text variants
                 const candidates = document.querySelectorAll('button, a, input[type="button"], input[type="submit"]');
                 for (const el of candidates) {
                     const span = el.querySelector?.('span.ui-button-text');
-                    const spanText = (span?.textContent || '').trim();
-                    const ownText = (el.textContent || '').trim();
-                    const inputValue = (el.value || '').trim();
-                    const text = `${spanText} ${ownText} ${inputValue}`.toLowerCase();
+                    const text = `${(span?.textContent || '')} ${(el.textContent || '')} ${(el.value || '')}`.toLowerCase();
                     if (text.includes('proceed next') || text.includes('proceed to next') || text.includes('next')) {
                         return el;
                     }
@@ -6198,7 +7008,6 @@ SOLVING APPROACH:
                 return null;
             };
 
-            // Wait for button to appear (PrimeFaces updates can be delayed after retries)
             let nextBtn = null;
             const maxWaitMs = 12000;
             const waitStart = Date.now();
@@ -6217,52 +7026,34 @@ SOLVING APPROACH:
             console.log('[AutoSolver] Found Proceed Next button:', nextBtn.id || nextBtn.className);
             updateStatus('Clicking Proceed Next...', 'info');
 
-            // Single click to avoid duplicate submissions
+            // Single dispatchEvent click — avoids triple-submission
             try {
-                if (typeof nextBtn.onclick === 'function') {
-                    nextBtn.onclick();
-                }
                 nextBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-                if (typeof nextBtn.click === 'function') {
-                    nextBtn.click();
-                }
                 console.log('[AutoSolver] Clicked: Proceed Next');
                 updateStatus('Moving to next...', 'info');
-
             } catch (e) {
                 console.error('[AutoSolver] Click failed: Proceed Next', e);
                 return false;
             }
 
-            // Wait for page to change, then trigger auto-solve again
             await sleep(3000);
-            if (!shouldStop) {
-                setTimeout(() => solve(), 2000);
-            }
+            if (!shouldStop) setTimeout(() => solve(), 2000);
             return true;
         }
 
-        // Helper: Update status indicator
+        // ── Status indicator ─────────────────────────────────────────────────────
+        let stopButton = null;
+        let statusText = null;
+
         function updateStatus(message, type = 'info') {
             console.log(`[AutoSolver] ${message}`);
             if (!SETTINGS.enablePopupMode) return;
             if (statusIndicator) {
-                const colors = {
-                    info: '#2196F3',
-                    success: '#4CAF50',
-                    warning: '#FF9800',
-                    error: '#f44336'
-                };
+                const colors = { info: '#2196F3', success: '#4CAF50', warning: '#FF9800', error: '#f44336' };
                 statusIndicator.style.background = colors[type] || colors.info;
-                if (statusText) {
-                    statusText.textContent = `Auto Solver: ${message}`;
-                }
+                if (statusText) statusText.textContent = `Auto Solver: ${message}`;
             }
         }
-
-        // Create floating status indicator with stop button
-        let stopButton = null;
-        let statusText = null;
 
         function createStatusIndicator() {
             if (!SETTINGS.enablePopupMode) return;
@@ -6279,7 +7070,7 @@ SOLVING APPROACH:
                 background: #2196F3;
                 color: white;
                 border-radius: 8px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-family: 'VT323', monospace;
                 font-size: 13px;
                 font-weight: 500;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.3);
@@ -6288,13 +7079,11 @@ SOLVING APPROACH:
                 gap: 10px;
             `;
 
-            // Status text span
             statusText = document.createElement('span');
             statusText.id = 'auto-solver-text';
             statusText.textContent = 'Auto Solver: Initializing...';
             statusIndicator.appendChild(statusText);
 
-            // Stop button
             stopButton = document.createElement('button');
             stopButton.id = 'auto-solver-stop';
             stopButton.textContent = 'STOP';
@@ -6310,12 +7099,8 @@ SOLVING APPROACH:
                 margin-left: 8px;
                 transition: background 0.2s;
             `;
-            stopButton.addEventListener('mouseover', () => {
-                stopButton.style.background = '#d32f2f';
-            });
-            stopButton.addEventListener('mouseout', () => {
-                stopButton.style.background = '#f44336';
-            });
+            stopButton.addEventListener('mouseover', () => { stopButton.style.background = '#d32f2f'; });
+            stopButton.addEventListener('mouseout', () => { stopButton.style.background = '#f44336'; });
             stopButton.addEventListener('click', () => {
                 stop();
                 updateStatus('Stopped by user', 'warning');
@@ -6323,13 +7108,10 @@ SOLVING APPROACH:
             });
             statusIndicator.appendChild(stopButton);
 
-            // Wait for body to exist before appending
             if (document.body) {
                 document.body.appendChild(statusIndicator);
             } else {
-                document.addEventListener('DOMContentLoaded', () => {
-                    document.body.appendChild(statusIndicator);
-                });
+                document.addEventListener('DOMContentLoaded', () => { document.body.appendChild(statusIndicator); });
             }
         }
 
@@ -6343,34 +7125,58 @@ SOLVING APPROACH:
             if (statusIndicator) statusIndicator.style.display = 'none';
         }
 
-        // Wait for AI generation to complete
+        // ── AI Generation wait ────────────────────────────────────────────────────
         async function waitForAIGeneration() {
             const start = Date.now();
             updateStatus('Generating solution...', 'info');
 
-            while (Date.now() - start < CONFIG.genTimeout) {
-                // Check for stop request
+            // Phase 1: Wait up to 5s for generation to actually start
+            let started = false;
+            const startCheckDeadline = Date.now() + 5000;
+            while (Date.now() < startCheckDeadline) {
                 if (shouldStop) return false;
-
                 const btn = document.querySelector('#ai-solution-btn');
+                if (btn) {
+                    const text = btn.innerText || btn.textContent || '';
+                    const isDisabled = btn.disabled || btn.hasAttribute('disabled');
+                    const opacity = parseFloat(btn.style.opacity || '1');
+                    if (text.includes('Generating') || text.includes('Fixing') || text.includes('Rate limited') || text.includes('fallback') || isDisabled || opacity < 1) {
+                        started = true;
+                        break;
+                    }
+                }
+                await sleep(100);
+            }
 
+            if (!started) {
+                console.warn('[AutoSolver] Generation did not start within 5s');
+                await sleep(3000);
+                return false;
+            }
+
+            // Phase 2: Wait for generation to complete
+            while (Date.now() - start < CONFIG.genTimeout) {
+                if (shouldStop) return false;
+                const btn = document.querySelector('#ai-solution-btn');
                 if (btn) {
                     const text = btn.innerText || btn.textContent || '';
                     const isDisabled = btn.disabled || btn.hasAttribute('disabled');
                     const opacity = parseFloat(btn.style.opacity || '1');
 
-                    // Check if still generating
-                    if (text.includes('Generating') || text.includes('Fixing') ||
-                        isDisabled || opacity < 1) {
-                        await sleep(200);
+                    if (text.includes('Rate limited') || text.includes('fallback')) {
+                        updateStatus(text, 'warning');
+                    } else if (text.includes('Generating') || text.includes('Fixing')) {
+                        updateStatus('Generating solution...', 'info');
+                    }
+
+                    if (text.includes('Generating') || text.includes('Fixing') || text.includes('Rate limited') || text.includes('fallback') || isDisabled || opacity < 1) {
+                        await sleep(300);
                         if (shouldStop) return false;
                         continue;
                     }
-
-                    // Generation complete
                     return true;
                 }
-                await sleep(200);
+                await sleep(300);
                 if (shouldStop) return false;
             }
 
@@ -6378,67 +7184,73 @@ SOLVING APPROACH:
             return false;
         }
 
-        // Wait for execution result
-        async function waitForResult() {
+        // ── Result detection ──────────────────────────────────────────────────────
+        // Improved: also checks PrimeFaces growl messages and URL change as success signals
+        async function waitForResult(signal) {
             const start = Date.now();
+            const initialUrl = window.location.href;
             updateStatus('Waiting for result...', 'info');
 
-            while (Date.now() - start < CONFIG.resultTimeout) {
-                // Check for stop request
-                if (shouldStop) return 'stopped';
+            const detectResult = async () => {
+                while (Date.now() - start < CONFIG.resultTimeout) {
+                    if (shouldStop) return 'stopped';
+                    if (signal?.aborted) return 'stopped';
 
-                // Check for success
-                if (hasText('#successmsg', 'passed') || hasText('.ui-panel-title', 'passed')) {
-                    return 'success';
+                    // URL changed → SkillRack navigated to next problem (treat as success)
+                    if (window.location.href !== initialUrl) {
+                        console.log('[AutoSolver] URL changed — treating as success');
+                        return 'success';
+                    }
+
+                    // Standard success/error elements
+                    if (hasText('#successmsg', 'passed') || hasText('.ui-panel-title', 'passed')) return 'success';
+                    if (hasText('#errormsg', 'error:') || hasText('#errormsg', 'compilation')) return 'compilation_error';
+                    if (hasText('#errormsg', 'segmentation') || hasText('#errormsg', 'runtime')) return 'runtime_error';
+                    if (hasText('#errormsg', 'did not pass') || hasText('#errormsg', 'wrong') || hasText('#errormsg', 'execution')) return 'failed';
+
+                    // PrimeFaces growl messages (fallback when errormsg is absent)
+                    const growlItems = document.querySelectorAll('.ui-growl-item-container, .ui-growl-item');
+                    for (const g of growlItems) {
+                        const gt = (g.innerText || '').toLowerCase();
+                        if (gt.includes('pass') || gt.includes('success') || gt.includes('correct')) return 'success';
+                        if (gt.includes('error') || gt.includes('fail') || gt.includes('wrong')) return 'failed';
+                    }
+
+                    await sleep(100);
                 }
 
-                // Check for failure
-                if (hasText('#errormsg', 'did not pass') || hasText('#errormsg', 'execution')) {
-                    return 'failed';
-                }
+                return 'timeout';
+            };
 
-                // Check for compilation error
-                if (hasText('#errormsg', 'error:') || hasText('#errormsg', 'compilation')) {
-                    return 'compilation_error';
-                }
+            if (!signal) return detectResult();
 
-                // Check for runtime error
-                if (hasText('#errormsg', 'segmentation') || hasText('#errormsg', 'runtime')) {
-                    return 'runtime_error';
-                }
+            const aborted = new Promise(resolve => {
+                if (signal.aborted) resolve('stopped');
+                signal.addEventListener('abort', () => resolve('stopped'), { once: true });
+            });
 
-                await sleep(100);
-                if (shouldStop) return 'stopped';
-            }
-
-            return 'timeout';
+            return Promise.race([detectResult(), aborted]);
         }
 
-        // Check if we're on a problem page URL
+        // ── Page detection helpers ────────────────────────────────────────────────
         function isOnProblemPageURL() {
             const href = window.location.href;
             if (href.includes('codeprogram') || href.includes('tutorprogram')) return true;
             return hasCodeEditor() || hasCaptcha() || isOnProblemListPage();
         }
 
-        // Check if we're on the problem LIST page (shows "Solve" buttons)
         function isOnProblemListPage() {
-            // Look for datagrid with Solve buttons
-            const solveButtons = document.querySelectorAll('button span.ui-button-text');
-            for (const span of solveButtons) {
-                if (span.textContent === 'Solve') {
-                    return true;
-                }
+            const spans = document.querySelectorAll('button span.ui-button-text');
+            for (const span of spans) {
+                if (span.textContent === 'Solve') return true;
             }
             return false;
         }
 
-        // Check if we're on the actual CODING page (with code editor)
         function isOnCodingPage() {
             return hasCodeEditor() || hasCaptcha();
         }
 
-        // Check if there's a captcha to solve first (but NOT if we're already on coding page)
         function hasCaptcha() {
             const captchaInput = document.getElementById('capval');
             const proceedBtn = document.getElementById('proceedbtn');
@@ -6447,26 +7259,23 @@ SOLVING APPROACH:
             return isVisible(captchaInput) && isVisible(proceedBtn);
         }
 
-        // Check if code editor is visible
         function hasCodeEditor() {
-            return document.getElementById('txtCode') !== null ||
-                document.querySelector('.ace_editor') !== null;
+            if (document.getElementById('txtCode') !== null) return true;
+            if (document.querySelector('.ace_editor') !== null) return true;
+            return extractMFIBTemplate().inputs.length > 0;
         }
 
-        // Main auto-solve function
+        // ── Main solve function ───────────────────────────────────────────────────
         async function solve() {
             if (!SETTINGS.enableAutoSolver || !SETTINGS.enableAISolver) {
                 console.log('[AutoSolver] Disabled in settings');
                 return false;
             }
-
-            // Check for persistent stop state
             if (loadStopState()) {
                 console.log('[AutoSolver] Persistent stop active - not solving');
                 return false;
             }
 
-            // Reset stop flag when starting a new solve
             shouldStop = false;
             saveStopState(false);
 
@@ -6482,40 +7291,26 @@ SOLVING APPROACH:
                 return false;
             }
 
-            // Create and show status indicator early
             createStatusIndicator();
             showStatus();
             updateStatus('Analyzing page...', 'info');
 
-            // Check if we're on problem LIST page (need to click Solve first)
+            // On problem LIST page — click Solve first
             if (isOnProblemListPage() && !isOnCodingPage()) {
                 updateStatus('Finding Solve button...', 'info');
                 console.log('[AutoSolver] On problem list page - looking for Solve button...');
                 const solveButtons = document.querySelectorAll('button');
                 for (const btn of solveButtons) {
-                    if (shouldStop) {
-                        updateStatus('Stopped', 'warning');
-                        setTimeout(hideStatus, 2000);
-                        solveInvocationActive = false;
-                        return false;
-                    }
+                    if (shouldStop) { updateStatus('Stopped', 'warning'); setTimeout(hideStatus, 2000); solveInvocationActive = false; return false; }
                     const span = btn.querySelector('span.ui-button-text');
                     if (span && span.textContent === 'Solve') {
                         console.log('[AutoSolver] Found Solve button, clicking...');
                         updateStatus('Clicking Solve...', 'info');
                         forceClick(btn, 'Solve Problem');
-                        // Wait for page transition, then re-check
                         await sleep(3000);
-                        if (shouldStop) {
-                            hideStatus();
-                            solveInvocationActive = false;
-                            return false;
-                        }
+                        if (shouldStop) { hideStatus(); solveInvocationActive = false; return false; }
                         hideStatus();
-                        // Re-trigger solve after page loads
-                        if (!shouldStop) {
-                            setTimeout(() => solve(), 2000);
-                        }
+                        if (!shouldStop) setTimeout(() => solve(), 2000);
                         solveInvocationActive = false;
                         return true;
                     }
@@ -6527,33 +7322,21 @@ SOLVING APPROACH:
                 return false;
             }
 
-            // Wait for captcha to be solved first
+            // Wait for captcha to be solved
             if (hasCaptcha()) {
                 updateStatus('Waiting for captcha...', 'info');
                 console.log('[AutoSolver] Captcha detected, waiting for it to be solved...');
-                // Wait up to 60 seconds for captcha to be solved
                 let waitTime = 0;
                 const maxWait = 60000;
                 while (hasCaptcha() && waitTime < maxWait && !shouldStop) {
                     await sleep(1000);
-                    if (shouldStop) {
-                        updateStatus('Stopped', 'warning');
-                        setTimeout(hideStatus, 2000);
-                        solveInvocationActive = false;
-                        return false;
-                    }
                     waitTime += 1000;
                     if (waitTime % 5000 === 0) {
                         updateStatus(`Captcha... (${waitTime / 1000}s)`, 'info');
                         console.log(`[AutoSolver] Still waiting for captcha... (${waitTime / 1000}s)`);
                     }
                 }
-                if (shouldStop) {
-                    updateStatus('Stopped', 'warning');
-                    setTimeout(hideStatus, 2000);
-                    solveInvocationActive = false;
-                    return false;
-                }
+                if (shouldStop) { updateStatus('Stopped', 'warning'); setTimeout(hideStatus, 2000); solveInvocationActive = false; return false; }
                 if (hasCaptcha()) {
                     console.log('[AutoSolver] Captcha still present after 60s, aborting');
                     updateStatus('Captcha timeout!', 'error');
@@ -6564,12 +7347,7 @@ SOLVING APPROACH:
                 console.log('[AutoSolver] Captcha solved! Continuing...');
                 updateStatus('Captcha solved!', 'success');
                 await sleep(1000);
-                if (shouldStop) {
-                    updateStatus('Stopped', 'warning');
-                    setTimeout(hideStatus, 2000);
-                    solveInvocationActive = false;
-                    return false;
-                }
+                if (shouldStop) { updateStatus('Stopped', 'warning'); setTimeout(hideStatus, 2000); solveInvocationActive = false; return false; }
             }
 
             // Wait for code editor
@@ -6577,12 +7355,7 @@ SOLVING APPROACH:
                 updateStatus('Waiting for editor...', 'info');
                 console.log('[AutoSolver] Code editor not found, waiting...');
                 await sleep(3000);
-                if (shouldStop) {
-                    updateStatus('Stopped', 'warning');
-                    setTimeout(hideStatus, 2000);
-                    solveInvocationActive = false;
-                    return false;
-                }
+                if (shouldStop) { updateStatus('Stopped', 'warning'); setTimeout(hideStatus, 2000); solveInvocationActive = false; return false; }
                 if (!hasCodeEditor()) {
                     console.log('[AutoSolver] Code editor still not found, aborting');
                     updateStatus('Editor not found', 'error');
@@ -6593,7 +7366,7 @@ SOLVING APPROACH:
             }
 
             isRunning = true;
-            shouldStop = false;  // Reset stop flag
+            shouldStop = false;
             currentRetries = 0;
 
             try {
@@ -6614,114 +7387,120 @@ SOLVING APPROACH:
             }
         }
 
-        // Main solve loop with retries
+        // ── Main solve loop with exponential backoff ──────────────────────────────
         async function runSolveLoop() {
             const maxRetries = SETTINGS.autoSolverMaxRetries || CONFIG.maxRetries;
 
             while (currentRetries < maxRetries && !shouldStop) {
-                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                checkStop();
 
-                updateStatus(`Attempt ${currentRetries + 1}/${maxRetries}`, 'info');
+                const attemptLabel = `Attempt ${currentRetries + 1}/${maxRetries}`;
+                updateStatus(attemptLabel, 'info');
 
                 // Step 1: Click AI Solution button
+                clearInjectedRetryContext();
+                // On retry, the error DOM still reflects the PREVIOUS run at this point.
+                // getErrorInfo() (called inside the AI button handler) will read it correctly
+                // because clearPreviousResults() and waitForResult() haven't run yet on this
+                // retry — the stale error IS the context we want to inject.
+
                 await sleep(500);
-                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                checkStop();
 
                 const aiBtn = await waitFor('#ai-solution-btn', 5000);
-                if (shouldStop) throw new Error('STOPPED_BY_USER');
-
-                if (!aiBtn) {
-                    updateStatus('AI button not found', 'error');
-                    return false;
-                }
+                checkStop();
+                if (!aiBtn) { updateStatus('AI button not found', 'error'); return false; }
 
                 forceClick(aiBtn, 'AI Solution');
 
-                // Step 2: Wait for generation to complete
+                // Step 2: Wait for AI generation to complete
                 const generated = await waitForAIGeneration();
-                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                checkStop();
                 if (!generated) {
                     currentRetries++;
-                    updateStatus('Generation failed, retrying...', 'warning');
-                    await sleep(CONFIG.delayBetweenRetries);
-                    if (shouldStop) throw new Error('STOPPED_BY_USER');
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    await sleepWithCountdown(backoff, `Gen failed — retry ${currentRetries}/${maxRetries}`);
+                    checkStop();
                     continue;
                 }
 
                 updateStatus('Solution generated!', 'success');
                 await sleep(SETTINGS.autoSolverDelay || CONFIG.delayAfterGen);
-                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                checkStop();
 
                 // Step 3: Click Run button
+                clearPreviousResults();
                 const runBtn = await waitFor('#j_id_bg, button[id*="_bg"]', 5000);
-                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                checkStop();
 
                 if (!runBtn) {
-                    // Try alternative selectors
-                    const buttons = document.querySelectorAll('button');
+                    // Fallback: find Run button by text
                     let foundRun = false;
-                    for (const btn of buttons) {
+                    for (const btn of document.querySelectorAll('button')) {
                         if (btn.textContent.includes('Run')) {
                             forceClick(btn, 'Run');
                             foundRun = true;
                             break;
                         }
                     }
-                    if (!foundRun) {
-                        updateStatus('Run button not found', 'error');
-                        return false;
-                    }
+                    if (!foundRun) { updateStatus('Run button not found', 'error'); return false; }
                 } else {
                     forceClick(runBtn, 'Run');
                 }
 
                 // Step 4: Wait for result
-                const result = await waitForResult();
-                if (shouldStop) throw new Error('STOPPED_BY_USER');
-
-                // Handle stopped result
-                if (result === 'stopped') {
-                    throw new Error('STOPPED_BY_USER');
+                const resultController = createResultWaitController();
+                const result = await waitForResult(resultController.signal);
+                if (activeResultWaitController === resultController) {
+                    activeResultWaitController = null;
                 }
+                if (shouldStop || result === 'stopped') throw new Error('STOPPED_BY_USER');
 
+                // Step 5: Handle result with error-type-aware status
                 if (result === 'success') {
-                    updateStatus('PASSED', 'success');
-
-                    // Click Proceed to Next using robust method
+                    clearInjectedRetryContext();
+                    updateStatus('PASSED ✓', 'success');
                     await sleep(CONFIG.delayBeforeNext);
-                    if (shouldStop) throw new Error('STOPPED_BY_USER');
+                    checkStop();
 
                     const movedNext = await clickProceedNext();
-                    if (movedNext) {
-                        return true;
-                    }
+                    if (movedNext) return true;
 
-                    // If next button wasn't clickable yet, retry instead of falsely reporting success
+                    // Proceed Next failed — retry
                     currentRetries++;
-                    updateStatus(`Passed but Next click failed - Retry ${currentRetries}/${maxRetries}`, 'warning');
-                    if (currentRetries < maxRetries) {
-                        await sleep(CONFIG.delayBetweenRetries);
-                        if (shouldStop) throw new Error('STOPPED_BY_USER');
-                        continue;
-                    }
-                    return false;
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    await sleepWithCountdown(backoff, `Next click failed — retry ${currentRetries}/${maxRetries}`);
+                    checkStop();
+                    continue;
 
                 } else if (result === 'failed' || result === 'compilation_error' || result === 'runtime_error') {
                     currentRetries++;
-                    updateStatus(`${result} - Retry ${currentRetries}/${maxRetries}`, 'warning');
+                    // Wait for error DOM to settle so we get the full message for status display
+                    await waitForErrorDOMToSettle(2000);
+                    const injectedContext = injectRetryContext(result);
+                    const errorSummary = extractErrorSummary() || injectedContext.contextText.split('\n')[0] || '';
+                    const errorLabel = injectedContext.label;
 
-                    if (currentRetries < maxRetries) {
-                        await sleep(CONFIG.delayBetweenRetries);
-                        if (shouldStop) throw new Error('STOPPED_BY_USER');
-                        // The AI should now detect the error and try to fix it
-                        continue;
-                    }
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    const statusMsg = errorSummary
+                        ? `Retry ${currentRetries}/${maxRetries} — ${errorLabel}: ${errorSummary}`
+                        : `Retry ${currentRetries}/${maxRetries} — ${errorLabel}`;
+
+                    console.log(`[AutoSolver] ${statusMsg}`);
+                    updateStatus(statusMsg, 'warning');
+                    // sleepWithCountdown shows countdown in status popup
+                    await sleepWithCountdown(backoff, statusMsg);
+                    checkStop();
+                    // Loop continues — getErrorInfo() on next iteration reads the error from DOM
+                    continue;
+
                 } else {
-                    // Timeout or unknown
+                    // timeout or unknown
                     currentRetries++;
-                    updateStatus('Result timeout, retrying...', 'warning');
-                    await sleep(CONFIG.delayBetweenRetries);
-                    if (shouldStop) throw new Error('STOPPED_BY_USER');
+                    clearInjectedRetryContext();
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    await sleepWithCountdown(backoff, `Retry ${currentRetries}/${maxRetries} — timeout`);
+                    checkStop();
                     continue;
                 }
             }
@@ -6730,70 +7509,58 @@ SOLVING APPROACH:
             return false;
         }
 
-        // Stop auto solver
+        // ── Stop / Resume ─────────────────────────────────────────────────────────
         function stop() {
+            abortResultWait();
+            clearInjectedRetryContext();
             shouldStop = true;
             isRunning = false;
-            saveStopState(true);  // Persist stop state
+            saveStopState(true);
             console.log('[AutoSolver] Stop requested (persistent)');
             updateStatus('Stopping...', 'warning');
-            setTimeout(() => {
-                hideStatus();
-                console.log('[AutoSolver] Stopped');
-            }, 1000);
+            setTimeout(() => { hideStatus(); console.log('[AutoSolver] Stopped'); }, 1000);
         }
 
-        // Resume auto solver (clear persistent stop)
         function resume() {
             shouldStop = false;
             saveStopState(false);
             console.log('[AutoSolver] Resumed');
         }
 
-        // Track failed attempts to prevent infinite loops
+        // ── Consecutive failure tracking ──────────────────────────────────────────
         let consecutiveFailures = 0;
         const MAX_CONSECUTIVE_FAILURES = 3;
         let lastSolveAttempt = 0;
-        const MIN_SOLVE_INTERVAL = 5000; // Minimum 5 seconds between solve attempts
+        const MIN_SOLVE_INTERVAL = 5000;
 
-        // Check if all problems are completed
+        // ── Completion check ──────────────────────────────────────────────────────
+        // Guard: do not fire within 500ms of DOMContentLoaded to avoid false-positives
         function isAllCompleted() {
-            // Look for completion messages
+            if (Date.now() - domReadyTime < 500) return false;
             const pageText = document.body?.innerText || '';
             if (pageText.includes('Congratulations') ||
                 pageText.includes('All problems completed') ||
                 pageText.includes('completed all')) {
                 return true;
             }
-            // Check if there's no Solve button and no code editor
             const hasSolveBtn = isOnProblemListPage();
             const hasEditor = hasCodeEditor();
             const hasCaptchaPage = hasCaptcha();
-
-            // If we're on the URL but none of these exist, probably completed
-            if (!hasSolveBtn && !hasEditor && !hasCaptchaPage) {
-                return true;
-            }
-            return false;
+            return !hasSolveBtn && !hasEditor && !hasCaptchaPage;
         }
 
-        // Initialize
+        // ── Init ──────────────────────────────────────────────────────────────────
         function init() {
-            if (!SETTINGS.enableAutoSolver || !SETTINGS.enableAISolver) {
-                return;
-            }
+            if (!SETTINGS.enableAutoSolver || !SETTINGS.enableAISolver) return;
 
             console.log('[AutoSolver] Starting...');
 
-            // Check for persistent stop state
             if (loadStopState()) {
                 console.log('[AutoSolver] Persistent stop detected - not auto-starting');
-                // Show a resume button/notification
                 createStatusIndicator();
                 showStatus();
                 updateStatus('Stopped (click to resume)', 'warning');
 
-                // Modify stop button to be a resume button
                 if (stopButton) {
                     stopButton.textContent = 'RESUME';
                     stopButton.style.background = '#4CAF50';
@@ -6801,23 +7568,14 @@ SOLVING APPROACH:
                         resume();
                         stopButton.textContent = 'STOP';
                         stopButton.style.background = '#f44336';
-                        stopButton.onclick = () => {
-                            stop();
-                            updateStatus('Stopped by user', 'warning');
-                            setTimeout(hideStatus, 2000);
-                        };
+                        stopButton.onclick = () => { stop(); updateStatus('Stopped by user', 'warning'); setTimeout(hideStatus, 2000); };
                         updateStatus('Resumed!', 'success');
-                        setTimeout(() => {
-                            if (isOnProblemPageURL()) {
-                                solve();
-                            }
-                        }, 1000);
+                        setTimeout(() => { if (isOnProblemPageURL()) solve(); }, 1000);
                     };
                 }
                 return;
             }
 
-            // Start immediately if on problem page
             if (isOnProblemPageURL()) {
                 console.log('[AutoSolver] On problem page, starting auto-solve...');
                 solve();
@@ -6829,50 +7587,36 @@ SOLVING APPROACH:
                 if (solveTimeout) clearTimeout(solveTimeout);
                 solveTimeout = setTimeout(() => {
                     const now = Date.now();
-
-                    // Prevent rapid retries
-                    if (now - lastSolveAttempt < MIN_SOLVE_INTERVAL) {
-                        return;
-                    }
-
-                    // Check if all completed
+                    if (now - lastSolveAttempt < MIN_SOLVE_INTERVAL) return;
                     if (isAllCompleted()) {
                         console.log('[AutoSolver] All problems completed!');
                         updateStatus('All completed', 'success');
                         setTimeout(hideStatus, 5000);
                         return;
                     }
-
-                    // Check consecutive failures
                     if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                         console.log('[AutoSolver] Too many failures, stopping');
                         updateStatus('Stopped - too many failures', 'error');
                         setTimeout(hideStatus, 5000);
                         return;
                     }
-
                     if (isOnProblemPageURL() && !isRunning) {
                         lastSolveAttempt = now;
-                        solve().then((ok) => {
+                        solve().then(ok => {
                             if (ok) consecutiveFailures = 0;
                             else consecutiveFailures++;
-                        }).catch(() => {
-                            consecutiveFailures++;
-                        });
+                        }).catch(() => { consecutiveFailures++; });
                     }
-                }, 1000); // Wait 1 second before triggering
+                }, 1000);
             };
 
-            // Throttled observer - only check every 2 seconds max
+            // Throttled MutationObserver — max once per 2s
             let lastObserverTrigger = 0;
             const navObserver = new MutationObserver(() => {
                 const now = Date.now();
-                if (now - lastObserverTrigger < 2000) return; // Throttle
+                if (now - lastObserverTrigger < 2000) return;
                 lastObserverTrigger = now;
-
-                if (isOnProblemPageURL() && !isRunning) {
-                    debouncedSolve();
-                }
+                if (isOnProblemPageURL() && !isRunning) debouncedSolve();
             });
 
             if (document.body) {
@@ -6901,6 +7645,1394 @@ SOLVING APPROACH:
 
         // Expose for manual control
         window.AutoSolver = AutoSolver;
+    });
+
+    // ============================================
+    // 12. FIND INCOMPLETE MODULE
+    // Scans viewsolved.xhtml for started-but-incomplete parts,
+    // navigates to the lowest-ratio one, optionally triggers AutoSolver.
+    // ============================================
+    const FindIncompleteModule = (function () {
+        'use strict';
+
+        // ── State Machine ────────────────────────────────────────────────────
+        const STATE = Object.freeze({
+            IDLE: 'IDLE',
+            SCANNING: 'SCANNING',
+            NAVIGATING: 'NAVIGATING',
+            COMPLETE: 'COMPLETE',
+            ERROR: 'ERROR'
+        });
+        let currentState = STATE.IDLE;
+        let activeController = null;
+
+        // ── JSF ViewState & Sequential Request Queue ─────────────────────────
+        let currentViewState = null;
+        let queuePromise = Promise.resolve();
+
+        function enqueueRequest(fn) {
+            // Keep the chain alive by catching errors for the next link,
+            // but return the actual promise (which can reject) to the caller.
+            const nextLink = queuePromise.then(
+                () => fn(),
+                () => fn()
+            );
+            queuePromise = nextLink.catch(() => {});
+            return nextLink;
+        }
+
+        async function queuedFetch(url, options = {}, retries = 2, delay = 1000) {
+            const signal = activeController ? activeController.signal : null;
+            if (signal && signal.aborted) throw new Error('Cancelled');
+
+            return enqueueRequest(async () => {
+                if (signal && signal.aborted) throw new Error('Cancelled');
+
+                // Rate-limiting delay: 300-500ms
+                await new Promise(r => setTimeout(r, 300 + Math.random() * 200));
+
+                if (signal && signal.aborted) throw new Error('Cancelled');
+
+                // Pre-populate ViewState if POST and currentViewState is null
+                if (options.method === 'POST' && !currentViewState) {
+                    console.log("No active ViewState found for POST. Fetching clean URL first...");
+                    try {
+                        const cleanUrl = url.split('#')[0].split('?')[0];
+                        const initHtml = await fetchWithTimeout(cleanUrl, { method: 'GET', credentials: 'include' });
+                        const initialState = extractViewState(initHtml);
+                        if (initialState) currentViewState = initialState;
+                    } catch (err) {
+                        console.error("Failed to initialize ViewState:", err);
+                    }
+                }
+
+                // Inject ViewState in POST body if not already present
+                if (options.method === 'POST') {
+                    let bodyParams = new URLSearchParams(options.body || '');
+                    if (!bodyParams.has('jakarta.faces.ViewState')) {
+                        bodyParams.set('jakarta.faces.ViewState', currentViewState || '');
+                    }
+                    options.body = bodyParams.toString();
+                    options.headers = options.headers || {};
+                    options.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                }
+
+                let html;
+                let attempt = 0;
+                while (true) {
+                    if (signal && signal.aborted) throw new Error('Cancelled');
+                    try {
+                        html = await fetchWithTimeout(url, options);
+                        break;
+                    } catch (err) {
+                        attempt++;
+                        if (attempt > retries) {
+                            throw new Error(`Failed to fetch ${url} after ${retries} retries: ${err.message}`);
+                        }
+                        const backoff = delay * Math.pow(2, attempt - 1);
+                        console.warn(`Fetch error on ${url}. Retrying in ${backoff}ms:`, err);
+                        await new Promise(r => setTimeout(r, backoff));
+                    }
+                }
+
+                // Parse and update ViewState
+                const nextState = extractViewState(html);
+                if (nextState) currentViewState = nextState;
+
+                // Check for ViewExpiredException
+                if (html.includes('ViewExpiredException') || html.includes('viewExpired') || html.includes('javax.faces.application.ViewExpiredException')) {
+                    console.warn(`ViewExpiredException detected on ${url}. Fetching fresh ViewState from the same page...`);
+                    const cleanUrl = url.split('#')[0];
+                    const freshHtml = await fetchWithTimeout(cleanUrl, { method: 'GET', credentials: 'include' });
+                    const freshState = extractViewState(freshHtml);
+                    if (freshState) {
+                        currentViewState = freshState;
+                        console.log("Got fresh ViewState. Retrying original request...");
+
+                        if (options.method === 'POST') {
+                            let bodyParams = new URLSearchParams(options.body || '');
+                            bodyParams.set('jakarta.faces.ViewState', freshState);
+                            options.body = bodyParams.toString();
+                        }
+
+                        return queuedFetch(url, options, retries, delay);
+                    }
+                    throw new Error("JSF session expired and could not be restored.");
+                }
+
+                return html;
+            });
+        }
+
+        async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+            const signal = activeController ? activeController.signal : null;
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+
+            const cleanupObj = {};
+            const combinedSignal = signal ? createCombinedSignal([signal, controller.signal], cleanupObj) : controller.signal;
+
+            try {
+                const res = await fetch(url, {
+                    ...options,
+                    signal: combinedSignal,
+                    credentials: 'include'
+                });
+                clearTimeout(id);
+                if (cleanupObj.cleanup) cleanupObj.cleanup();
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return await res.text();
+            } catch (err) {
+                clearTimeout(id);
+                if (cleanupObj.cleanup) cleanupObj.cleanup();
+                throw err;
+            }
+        }
+
+        // Helper functions
+        function createCombinedSignal(signals, cleanupObj = {}) {
+            const ctrl = new AbortController();
+            const abort = () => ctrl.abort();
+            const activeSignals = signals.filter(Boolean);
+            activeSignals.forEach(s => s.addEventListener('abort', abort));
+
+            cleanupObj.cleanup = () => {
+                activeSignals.forEach(s => s.removeEventListener('abort', abort));
+            };
+
+            return ctrl.signal;
+        }
+
+        function extractViewState(html) {
+            try {
+                if (html.includes('<partial-response>')) {
+                    const xmlDoc = new DOMParser().parseFromString(html, 'text/xml');
+                    const updates = xmlDoc.querySelectorAll('update');
+                    for (const upd of updates) {
+                        if (upd.getAttribute('id') === 'jakarta.faces.ViewState') {
+                            return upd.textContent;
+                        }
+                    }
+                }
+            } catch (_) {}
+            try {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const el = doc.querySelector('input[name="jakarta.faces.ViewState"]');
+                if (el) return el.value;
+            } catch (_) {}
+            const m = html.match(/jakarta\.faces\.ViewState.*?value="([^"]+)"/) || html.match(/value="([^"]+)".*?jakarta\.faces\.ViewState/);
+            if (m) return m[1];
+
+            const xmlMatch = html.match(/<update[^>]*id="jakarta\.faces\.ViewState"[^>]*><!\[CDATA\[([^\]]+)\]\]><\/update>/) || html.match(/id="jakarta\.faces\.ViewState"[^>]*><!\[CDATA\[([^\]]+)\]\]>/);
+            return xmlMatch ? xmlMatch[1] : null;
+        }
+
+        // ── Storage Wrapper ──────────────────────────────────────────────────
+        const storage = {
+            getValue(key, def) {
+                try {
+                    if (typeof GM_getValue !== 'undefined') {
+                        return GM_getValue(key, def);
+                    }
+                } catch (_) {}
+                const val = localStorage.getItem(key);
+                return val !== null ? val : def;
+            },
+            setValue(key, value) {
+                try {
+                    if (typeof GM_setValue !== 'undefined') {
+                        GM_setValue(key, value);
+                        return;
+                    }
+                } catch (_) {}
+                localStorage.setItem(key, value);
+            },
+            deleteValue(key) {
+                try {
+                    if (typeof GM_deleteValue !== 'undefined') {
+                        GM_deleteValue(key);
+                        return;
+                    }
+                } catch (_) {}
+                localStorage.removeItem(key);
+            }
+        };
+
+        // ── Daily-skip patterns ──────────────────────────────────────────────
+        const SKIP_PATTERNS = [/daily\s*challenge/i, /daily\s*test/i, /daily\s*quiz/i];
+
+        function shouldSkipTitle(title) {
+            return SKIP_PATTERNS.some(p => p.test(title));
+        }
+
+        // ── Parsing Helpers ──────────────────────────────────────────────────
+        function parseViewSolved(rawText) {
+            let tableHtml = rawText;
+            if (rawText.trimStart().startsWith('<?xml') || rawText.includes('<partial-response>')) {
+                tableHtml = extractFromPartialResponse(rawText);
+            }
+            const doc = new DOMParser().parseFromString(tableHtml, 'text/html');
+            const tbody = doc.getElementById('solcnt:tbl_data') ||
+                          doc.querySelector('[id$="tbl_data"]') ||
+                          doc.querySelector('.ui-datatable-data');
+            if (!tbody) return [];
+
+            // Row count verification
+            let expectedRowCount = 0;
+            const scripts = doc.querySelectorAll('script');
+            for (const s of scripts) {
+                const m = s.textContent.match(/rowCount\s*:\s*(\d+)/i);
+                if (m) {
+                    expectedRowCount = parseInt(m[1], 10);
+                    break;
+                }
+            }
+
+            const results = [];
+            const trs = tbody.querySelectorAll('tr[data-ri]');
+            trs.forEach(tr => {
+                const cells = tr.querySelectorAll('td');
+                if (cells.length < 3) return;
+                const title = cells[0].textContent.trim();
+                if (shouldSkipTitle(title)) return;
+
+                const countEl = cells[1].querySelector('.ui.label, span');
+                const solvedCount = countEl ? parseInt(countEl.textContent.trim(), 10) : 0;
+                if (isNaN(solvedCount)) return;
+
+                results.push({ partName: title, solvedCount });
+            });
+
+            if (expectedRowCount > 0 && results.length !== expectedRowCount) {
+                console.warn(`FindIncomplete: Solved counts row count mismatch! Parsed ${results.length} rows, but expected ${expectedRowCount}`);
+            }
+
+            return results;
+        }
+
+        function extractFromPartialResponse(xml) {
+            const xmlDoc = new DOMParser().parseFromString(xml, 'text/xml');
+            const updates = xmlDoc.querySelectorAll('update');
+            for (const upd of updates) {
+                const id = upd.getAttribute('id') || '';
+                if (id.includes('tbl') || id.includes('solcnt')) {
+                    return upd.textContent;
+                }
+            }
+            return Array.from(xmlDoc.querySelectorAll('update'))
+                .map(u => u.textContent).join('');
+        }
+
+        function countItemsOnPage(html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const rows = doc.querySelectorAll('.ui-datatable-data tr[data-ri]');
+            if (rows.length > 0) return rows.length;
+
+            const gridCols = doc.querySelectorAll('.ui-datagrid-column');
+            if (gridCols.length > 0) return gridCols.length;
+
+            const cards = doc.querySelectorAll('form .ui-card, form .card, #pkglistform .ui-card, #pkglistform .card, [id$="form"] .ui-card, [id$="form"] .card');
+            if (cards.length > 0) return cards.length;
+
+            const buttons = doc.querySelectorAll('input[type="submit"][value*="Check"], button[type="submit"]:not([name*="pkglistform"])');
+            if (buttons.length > 0) return buttons.length;
+
+            const trs = doc.querySelectorAll('tbody tr');
+            if (trs.length > 0) return trs.length;
+
+            return 0;
+        }
+
+        function inferTotal(title, solvedCount) {
+            const t = title.toUpperCase();
+            if (t.includes('STARTER')) {
+                const partMatch = t.match(/PART(\d+)/);
+                const partNum = partMatch ? parseInt(partMatch[1], 10) : 0;
+                if (partNum === 1) return 55;
+                if (partNum === 2) return 25;
+                return 20;
+            }
+            if (t.includes('INTRO')) {
+                const partMatch = t.match(/PART(\d+)/);
+                const partNum = partMatch ? parseInt(partMatch[1], 10) : 0;
+                if (partNum === 1 || partNum === 5) return 30;
+                if (partNum === 4) return 15;
+                return 20;
+            }
+            if (t.includes('VIDEO')) return 15;
+            if (t.includes('ADDON') || t.includes('ADD-ON') || t.includes('ADD ON')) return 10;
+            if (t.includes('LAB')) return solvedCount > 0 ? Math.max(solvedCount, 10) : 10;
+            if (t.includes('FUNCTIONS PRACTICE') || t.includes('FUNCTION PRACTICE')) return 20;
+            if (t.includes('-H') || t.match(/-H\d+/)) return 10;
+            return 10;
+        }
+
+        // Title normalization match helper
+        function cleanName(name) {
+            if (!name) return '';
+            return name
+                .toUpperCase()
+                .replace(/[\xa0\s]+/g, ' ')
+                .trim()
+                .replace(/^[-.:\s#\(\)\[\]]+|[-.:\s#\(\)\[\]]+$/g, '');
+        }
+
+        // Title normalization match helper
+        function matchSolvedInfo(partName, solvedCounts) {
+            const cleanPart = cleanName(partName);
+            // 1. Exact clean match
+            let found = solvedCounts.find(s => cleanName(s.partName) === cleanPart);
+            if (found) return found;
+
+            // 2. Simplified part suffix match (e.g. PART001 -> PART1)
+            const simplify = (str) => str.replace(/PART\s*0+(\d+)/g, 'PART$1').replace(/SET\s*0+(\d+)/g, 'SET$1');
+            const simplePart = simplify(cleanPart);
+            found = solvedCounts.find(s => simplify(cleanName(s.partName)) === simplePart);
+            if (found) return found;
+
+            return null;
+        }
+
+        function getCleanTitle(titleEl) {
+            let text = "";
+            titleEl.childNodes.forEach(node => {
+                if (node.nodeType === 3) {
+                    text += node.textContent;
+                } else if (node.nodeType === 1 && (!node.classList || !node.classList.contains('label'))) {
+                    text += node.textContent;
+                }
+            });
+            return text.trim().replace(/\s+/g, ' ');
+        }
+
+        function parseTotalCountFromPartPage(html) {
+            const matches = [...html.matchAll(/Challenges\s*Count:\s*(\d+)/gi)];
+            if (matches.length > 0) {
+                let sum = 0;
+                for (const match of matches) {
+                    sum += parseInt(match[1], 10);
+                }
+                return sum;
+            }
+            return 0;
+        }
+
+        // ── Active Server State Synchronization Engine ────────────────────────
+        let activeServerLevelUrl = null;
+        let currentServerPath = []; // Array of transition objects
+        let currentServerHtml = null;
+        let currentServerViewState = null;
+
+        async function ensureServerAt(levelUrl, targetPath) {
+            // Check if level has changed
+            if (activeServerLevelUrl !== levelUrl) {
+                activeServerLevelUrl = levelUrl;
+                currentServerPath = [];
+                currentServerHtml = null;
+                currentServerViewState = null;
+            }
+
+            // Check if targetPath is already active
+            const isMatch = targetPath.length === currentServerPath.length &&
+                targetPath.every((t, i) => t.btnName === currentServerPath[i].btnName && t.href === currentServerPath[i].href);
+
+            if (isMatch && currentServerHtml) {
+                return { html: currentServerHtml, viewState: currentServerViewState };
+            }
+
+            console.log(`ensureServerAt: Path mismatch. Resetting and navigating to target path of length ${targetPath.length}`);
+
+            // 1. Reset state by GET request to levelUrl
+            let html = await queuedFetch(levelUrl, { method: 'GET' });
+            let freshState = extractViewState(html);
+            if (!freshState) throw new Error('Could not retrieve ViewState token during reset');
+
+            // 2. Replay targetPath
+            let currentUrl = levelUrl;
+            for (let i = 0; i < targetPath.length; i++) {
+                const step = targetPath[i];
+                if (step.type === 'POST') {
+                    const body = new URLSearchParams({
+                        'pkglistform': 'pkglistform',
+                        'pkglistform_SUBMIT': '1',
+                        'jakarta.faces.ViewState': freshState,
+                        [step.btnName]: 'Show'
+                    });
+                    const postUrl = getPostUrl(currentUrl);
+                    html = await queuedFetch(postUrl, { method: 'POST', body: body.toString() });
+                    freshState = extractViewState(html);
+                    if (!freshState) throw new Error('Could not retrieve ViewState token at step ' + i);
+                } else if (step.type === 'LINK') {
+                    currentUrl = step.href;
+                    html = await queuedFetch(currentUrl, { method: 'GET' });
+                    freshState = extractViewState(html);
+                    if (!freshState) throw new Error('Could not retrieve ViewState token at step ' + i);
+                }
+            }
+
+            currentServerPath = [...targetPath];
+            currentServerHtml = html;
+            currentServerViewState = freshState;
+
+            return { html, viewState: freshState };
+        }
+
+        // ── Recursive Deep Crawler ───────────────────────────────────────────
+        async function crawlPage(url, transition, parentViewState, pathNames, buttonPath, statusCallback) {
+            if (activeController && activeController.signal.aborted) throw new Error('Cancelled');
+
+            const currentPathName = pathNames.join(' ➔ ');
+            if (currentPathName) {
+                statusCallback(`Scraping: ${currentPathName}...`);
+            }
+
+            let html;
+            let thisPageState = parentViewState;
+            const levelUrl = pathNames.length > 0 ? LEVEL_URLS[pathNames[0]] : url;
+
+            if (buttonPath.length > 0) {
+                // ensureServerAt will navigate the server to the target path and return the HTML and ViewState
+                const res = await ensureServerAt(levelUrl, buttonPath);
+                html = res.html;
+                thisPageState = res.viewState;
+            } else {
+                // Entry page of the level
+                html = await queuedFetch(url, { method: 'GET' });
+                thisPageState = extractViewState(html);
+
+                // Clear any previous state tracking for new level
+                activeServerLevelUrl = levelUrl;
+                currentServerPath = [];
+                currentServerHtml = html;
+                currentServerViewState = thisPageState;
+            }
+
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const form = doc.getElementById('pkglistform') || doc.querySelector('form');
+
+            // Check if this page contains cards representing parts (indicated by "Challenges Count" or matching CHILD_PART_REGEX)
+            const CHILD_PART_REGEX = /\b(PART\d+|SET\s*\d+|H\d{3}|H0\d{2}|H\d{2}[A-Z]?|PACK\d+|PRACTICE\s*\d+)\b/i;
+            const partCards = [];
+            const cards = doc.querySelectorAll('.ui-card, .card');
+            cards.forEach(card => {
+                // Leaf card detection to prevent matching main container or menus
+                if (card.querySelector('.ui-card, .card')) return;
+                if (card.closest('.ui-breadcrumb') || card.closest('.ui-toolbar')) return;
+
+                const header = card.querySelector('.ui.header, .header, h1, h2, h3, h4, .ui-card-title');
+                if (!header) return;
+
+                const name = getCleanTitle(header);
+                if (!name || shouldSkipTitle(name)) return;
+
+                const txt = card.textContent || '';
+                const isPart = /challenges\s*count/i.test(txt) || CHILD_PART_REGEX.test(name);
+
+                if (isPart) {
+                    const clickTarget = card.querySelector('button, input[type="submit"], input[type="button"], a');
+                    if (clickTarget) {
+                        const href = clickTarget.getAttribute('href');
+                        if (href && !href.startsWith('#') && href !== '') {
+                            const nextUrl = new URL(href, window.location.origin).pathname + new URL(href, window.location.origin).search;
+                            const countMatch = txt.match(/challenges\s*count:\s*(\d+)/i);
+                            const count = countMatch ? parseInt(countMatch[1], 10) : (inferTotal(name, 0) || 10);
+                            partCards.push({
+                                partName: name,
+                                type: 'LINK',
+                                href: nextUrl,
+                                totalCount: count
+                            });
+                        } else {
+                            const btnName = clickTarget.getAttribute('name') || clickTarget.getAttribute('id');
+                            if (btnName) {
+                                const countMatch = txt.match(/challenges\s*count:\s*(\d+)/i);
+                                const count = countMatch ? parseInt(countMatch[1], 10) : (inferTotal(name, 0) || 10);
+                                partCards.push({
+                                    partName: name,
+                                    type: 'POST',
+                                    btnName: btnName,
+                                    totalCount: count
+                                });
+                            }
+                        }
+                    }
+                }
+            });
+
+            if (partCards.length > 0) {
+                return partCards.map(c => ({
+                    partName: c.partName,
+                    buttonPath: [...buttonPath, c.type === 'POST' ?
+                        { type: 'POST', name: c.partName, btnName: c.btnName } :
+                        { type: 'LINK', name: c.partName, href: c.href }
+                    ],
+                    totalCount: c.totalCount,
+                    status: 'ok'
+                }));
+            }
+
+            // Check if this page contains datatable rows representing parts (matching CHILD_PART_REGEX)
+            const partRows = [];
+            if (form) {
+                const rows = form.querySelectorAll('.ui-datatable-data tr[data-ri]');
+                rows.forEach(tr => {
+                    const cells = tr.querySelectorAll('td');
+                    if (cells.length >= 2) {
+                        const title = cells[0].textContent.trim();
+                        if (title && !shouldSkipTitle(title) && CHILD_PART_REGEX.test(title)) {
+                            const clickTarget = cells[cells.length - 1].querySelector('button, input[type="submit"], input[type="button"], a');
+                            if (clickTarget) {
+                                const href = clickTarget.getAttribute('href');
+                                if (href && !href.startsWith('#') && href !== '') {
+                                    const nextUrl = new URL(href, window.location.origin).pathname + new URL(href, window.location.origin).search;
+                                    const count = inferTotal(title, 0) || 10;
+                                    partRows.push({
+                                        partName: title,
+                                        type: 'LINK',
+                                        href: nextUrl,
+                                        totalCount: count
+                                    });
+                                } else {
+                                    const btnName = clickTarget.getAttribute('name') || clickTarget.getAttribute('id');
+                                    if (btnName) {
+                                        const count = inferTotal(title, 0) || 10;
+                                        partRows.push({
+                                            partName: title,
+                                            type: 'POST',
+                                            btnName: btnName,
+                                            totalCount: count
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (partRows.length > 0) {
+                return partRows.map(r => ({
+                    partName: r.partName,
+                    buttonPath: [...buttonPath, r.type === 'POST' ?
+                        { type: 'POST', name: r.partName, btnName: r.btnName } :
+                        { type: 'LINK', name: r.partName, href: r.href }
+                    ],
+                    totalCount: r.totalCount,
+                    status: 'ok'
+                }));
+            }
+
+            // Check for Solve buttons on this page
+            // If the page contains Solve buttons (not Show/View/Check), it is a final page!
+            const contentForm = doc.getElementById('pkglistform') || doc.querySelector('form:not([id="j_id_14"])');
+            let hasSolveButtons = false;
+            if (contentForm) {
+                const solveBtns = contentForm.querySelectorAll('button, input[type="submit"], input[type="button"], a.ui-button');
+                for (const btn of solveBtns) {
+                    const txt = (btn.textContent || btn.value || '').trim().toUpperCase();
+                    if (txt === 'SOLVE' || txt.includes('SOLVE')) {
+                        hasSolveButtons = true;
+                        break;
+                    }
+                }
+            }
+
+            // Find all transitions on this page
+            const transitions = [];
+            if (form && !hasSolveButtons) {
+                // 1. Cards with submit buttons or links
+                const cards = form.querySelectorAll('.ui-card, .card');
+                cards.forEach(card => {
+                    const header = card.querySelector('.ui.header, .header, h1, h2, h3, h4, .ui-card-title');
+                    if (!header) return;
+                    const name = getCleanTitle(header);
+                    if (!name || shouldSkipTitle(name)) return;
+
+                    // Unified clickTarget transition check
+                    const clickTarget = card.querySelector('button, input[type="submit"], input[type="button"], a');
+                    if (clickTarget) {
+                        const btnText = (clickTarget.textContent || clickTarget.value || '').trim().toLowerCase();
+                        if (btnText.includes('show') || btnText.includes('view') || btnText.includes('check') || (clickTarget.getAttribute('href') && clickTarget.getAttribute('href').includes('codeprogramgroup'))) {
+                            const href = clickTarget.getAttribute('href');
+                            if (href && !href.startsWith('#') && href !== '') {
+                                const nextUrl = new URL(href, window.location.origin).pathname + new URL(href, window.location.origin).search;
+                                transitions.push({ type: 'LINK', name, href: nextUrl });
+                            } else {
+                                const btnName = clickTarget.getAttribute('name') || clickTarget.getAttribute('id');
+                                if (btnName) {
+                                    transitions.push({ type: 'POST', name, btnName });
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 2. Datatable rows with submit buttons or links
+                if (transitions.length === 0) {
+                    const rows = form.querySelectorAll('.ui-datatable-data tr[data-ri]');
+                    rows.forEach(tr => {
+                        const cells = tr.querySelectorAll('td');
+                        if (cells.length >= 2) {
+                            const title = cells[0].textContent.trim();
+                            if (!title || shouldSkipTitle(title)) return;
+
+                            const btn = cells[cells.length - 1].querySelector('button[type="submit"], input[type="submit"]');
+                            if (btn) {
+                                const btnName = btn.getAttribute('name');
+                                const btnText = (btn.textContent || btn.value || '').trim().toLowerCase();
+                                if (btnName && (btnText.includes('show') || btnText.includes('view') || btnText.includes('check'))) {
+                                    transitions.push({ type: 'POST', name: title, btnName });
+                                    return;
+                                }
+                            }
+
+                            const link = cells[cells.length - 1].querySelector('a');
+                            if (link) {
+                                const href = link.getAttribute('href');
+                                const btnText = (link.textContent || link.value || '').trim().toLowerCase();
+                                if (href && (btnText.includes('show') || btnText.includes('view') || btnText.includes('check') || href.includes('codeprogramgroup'))) {
+                                    const nextUrl = new URL(href, window.location.origin).pathname + new URL(href, window.location.origin).search;
+                                    transitions.push({ type: 'LINK', name: title, href: nextUrl });
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // If it is a final page (hasSolveButtons or no form or no transitions)
+            if (hasSolveButtons || !form || transitions.length === 0) {
+                const finalName = pathNames[pathNames.length - 1] || 'Unknown Part';
+                const count = parseTotalCountFromPartPage(html) || countItemsOnPage(html) || inferTotal(finalName, 0) || 10;
+                return [{
+                    partName: finalName,
+                    buttonPath: buttonPath,
+                    totalCount: count,
+                    status: 'ok'
+                }];
+            }
+
+            // Recurse into each transition
+            let results = [];
+            for (const trans of transitions) {
+                // Loop prevention
+                if (pathNames.includes(trans.name)) {
+                    console.warn("FindIncomplete: Loop detected under path. Skipping.");
+                    continue;
+                }
+
+                const nextUrl = trans.type === 'LINK' ? trans.href : url;
+                const nextResults = await crawlPage(
+                    nextUrl,
+                    trans,
+                    thisPageState,
+                    [...pathNames, trans.name],
+                    [...buttonPath, trans],
+                    statusCallback
+                );
+                results = results.concat(nextResults);
+            }
+            return results;
+        }
+
+        // ── Solved Counts Fetcher ────────────────────────────────────────────
+        async function getSolvedCounts() {
+            await queuedFetch('/faces/candidate/viewsolved.xhtml', { method: 'GET' });
+            const body = new URLSearchParams({
+                'solcnt': 'solcnt',
+                'solcnt:j_id_3k_input': 'tr',
+                'solcnt:j_id_3o': '',
+                'solcnt_SUBMIT': '1'
+            });
+            const html = await queuedFetch('/faces/candidate/viewsolved.xhtml', {
+                method: 'POST',
+                body: body.toString()
+            });
+            return parseViewSolved(html);
+        }
+
+        // ── Core Crawler Orchestration ───────────────────────────────────────
+        const LEVEL_URLS = {
+            'Level 1': '/faces/candidate/codeprogramgroup.xhtml?gt=CODETUTOR',
+            'Level 2': '/faces/candidate/codeprogramgroup.xhtml?gt=CODETRACK&lev=2',
+            'Level 3': '/faces/candidate/codeprogramgroup.xhtml?gt=CODETRACK&lev=3',
+            'Level 4': '/faces/candidate/codeprogramgroup.xhtml?gt=CODETRACK&lev=4',
+            'Level 5': '/faces/candidate/codeprogramgroup.xhtml?gt=CODETRACK&lev=5',
+            'Level 6': '/faces/candidate/codeprogramgroup.xhtml?gt=CODETRACK&lev=6',
+            'Prime': '/faces/candidate/codeprogramgroup.xhtml?gt=CODETRACK&lev=100',
+            'LACS': '/faces/candidate/webinarcodetrack.xhtml',
+            'LAB': '/faces/candidate/labcodeprograms.xhtml?type=LAB'
+        };
+
+        function getPostUrl(url) {
+            return url.split('#')[0].split('?')[0];
+        }
+
+        async function runFullCrawl() {
+            if (currentState === STATE.SCANNING) return;
+            setState(STATE.SCANNING);
+            showStatus('Starting full scan...', '🔍');
+            renderScanningState();
+
+            activeController = new AbortController();
+
+            try {
+                let allParts = [];
+                const levels = Object.keys(LEVEL_URLS);
+
+                for (let i = 0; i < levels.length; i++) {
+                    const levelName = levels[i];
+                    const levelUrl = LEVEL_URLS[levelName];
+                    showStatus(`Scanning ${levelName}...`, '🔍');
+                    updateLoadingMessage(`Scanning ${levelName}...`);
+
+                    const levelParts = await crawlPage(
+                        levelUrl,
+                        null,
+                        null,
+                        [levelName],
+                        [],
+                        (msg) => {
+                            showStatus(msg, '🔍');
+                            updateLoadingMessage(msg);
+                        }
+                    );
+
+                    // Add metadata fields to each resolved part
+                    levelParts.forEach(p => {
+                        p.levelName = levelName;
+                        p.levelUrl = levelUrl;
+                    });
+
+                    allParts = allParts.concat(levelParts);
+                }
+
+                showStatus('Fetching solved counts...', '📊');
+                updateLoadingMessage('Fetching solved counts...');
+                const solvedCounts = await getSolvedCounts();
+
+                // Map solved counts to parsed parts
+                allParts.forEach(part => {
+                    if (part.status === 'ok') {
+                        const solvedInfo = matchSolvedInfo(part.partName, solvedCounts);
+                        part.solvedCount = solvedInfo ? solvedInfo.solvedCount : 0;
+                        part.ratio = part.totalCount > 0 ? (part.solvedCount / part.totalCount) : 1.0;
+                    } else {
+                        part.solvedCount = 0;
+                        part.ratio = 0;
+                    }
+                });
+
+                const cacheData = {
+                    parts: allParts,
+                    timestamp: Date.now()
+                };
+                storage.setValue('find_incomplete_cache_v2', JSON.stringify(cacheData));
+
+                setState(STATE.IDLE);
+                showStatus('Scan completed! 🎉', '✅');
+                setTimeout(hideStatus, 3000);
+
+                if (dropdown && dropdown.style.display === 'block' && dropdown.style.opacity !== '0') {
+                    renderList(allParts, cacheData.timestamp);
+                }
+
+            } catch (err) {
+                if (err.message === 'Cancelled') {
+                    setState(STATE.IDLE);
+                    hideStatus();
+                    return;
+                }
+                setState(STATE.ERROR);
+                showStatus(`Scan failed: ${err.message}`, '❌');
+                renderErrorState(err.message);
+                setTimeout(hideStatus, 6000);
+            } finally {
+                activeController = null;
+            }
+        }
+
+        async function updateSolvedCountsSilently(cachedParts) {
+            try {
+                const solvedCounts = await getSolvedCounts();
+                cachedParts.forEach(part => {
+                    if (part.status === 'ok') {
+                        const solvedInfo = matchSolvedInfo(part.partName, solvedCounts);
+                        part.solvedCount = solvedInfo ? solvedInfo.solvedCount : 0;
+                        part.ratio = part.totalCount > 0 ? (part.solvedCount / part.totalCount) : 1.0;
+                    }
+                });
+
+                const cacheData = {
+                    parts: cachedParts,
+                    timestamp: Date.now()
+                };
+                storage.setValue('find_incomplete_cache_v2', JSON.stringify(cacheData));
+
+                if (dropdown && dropdown.style.display === 'block' && dropdown.style.opacity !== '0') {
+                    renderList(cachedParts, cacheData.timestamp);
+                }
+            } catch (e) {
+                console.warn("Silent solved counts update failed:", e);
+            }
+        }
+
+        async function loadAndRenderTracks(forceRefresh = false) {
+            if (currentState === STATE.SCANNING) {
+                renderScanningState();
+                if (statusText) {
+                    updateLoadingMessage(statusText.textContent);
+                }
+                return;
+            }
+
+            let cache = null;
+            if (!forceRefresh) {
+                try {
+                    const rawCache = storage.getValue('find_incomplete_cache_v2');
+                    if (rawCache) {
+                        cache = JSON.parse(rawCache);
+                    }
+                } catch (e) {
+                    console.error("Failed to parse cache:", e);
+                }
+            }
+
+            if (forceRefresh) {
+                await runFullCrawl();
+            } else if (!cache || !cache.parts) {
+                renderUnscrapedState();
+            } else {
+                renderList(cache.parts, cache.timestamp);
+                updateSolvedCountsSilently(cache.parts);
+            }
+        }
+
+        function cancelScan() {
+            if (activeController) activeController.abort();
+            setState(STATE.IDLE);
+            hideStatus();
+
+            let cache = null;
+            try {
+                const rawCache = storage.getValue('find_incomplete_cache_v2');
+                if (rawCache) cache = JSON.parse(rawCache);
+            } catch (_) {}
+
+            if (cache && cache.parts) {
+                renderList(cache.parts, cache.timestamp);
+            } else {
+                hideDropdown();
+            }
+        }
+
+        // ── Sequential Navigation ────────────────────────────────────────────
+        async function startNavigation(item) {
+            if (currentState === STATE.NAVIGATING) return;
+            setState(STATE.NAVIGATING);
+            showStatus(`Navigating to ${item.partName}...`, '🚀');
+            hideDropdown();
+
+            try {
+                let currentUrl = item.levelUrl;
+
+                // Step 1: GET currentUrl to get initial ViewState
+                const html = await queuedFetch(currentUrl, { method: 'GET' });
+                let freshState = extractViewState(html);
+                if (!freshState) throw new Error('Could not retrieve ViewState token');
+
+                // Step 2: Traverse each intermediate step in buttonPath except the last one
+                const path = item.buttonPath || [];
+                for (let i = 0; i < path.length - 1; i++) {
+                    const step = path[i];
+                    if (step.type === 'POST') {
+                        const body = new URLSearchParams({
+                            'pkglistform': 'pkglistform',
+                            'pkglistform_SUBMIT': '1',
+                            'jakarta.faces.ViewState': freshState,
+                            [step.btnName]: 'Show'
+                        });
+                        const postUrl = getPostUrl(currentUrl);
+                        const resHtml = await queuedFetch(postUrl, { method: 'POST', body: body.toString() });
+                        freshState = extractViewState(resHtml);
+                        if (!freshState) throw new Error('Could not retrieve ViewState token at step ' + i);
+                    } else if (step.type === 'LINK') {
+                        currentUrl = step.href;
+                        const resHtml = await queuedFetch(currentUrl, { method: 'GET' });
+                        freshState = extractViewState(resHtml);
+                        if (!freshState) throw new Error('Could not retrieve ViewState token at step ' + i);
+                    }
+                }
+
+                // Step 3: Create form submission or redirection for final step to navigate browser
+                const lastStep = path[path.length - 1];
+                if (lastStep.type === 'POST') {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = getPostUrl(currentUrl);
+                    form.style.display = 'none';
+
+                    const params = {
+                        'pkglistform': 'pkglistform',
+                        'pkglistform_SUBMIT': '1',
+                        'jakarta.faces.ViewState': freshState,
+                        [lastStep.btnName]: 'Show'
+                    };
+
+                    for (const [key, value] of Object.entries(params)) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = value;
+                        form.appendChild(input);
+                    }
+
+                    document.body.appendChild(form);
+                    form.submit();
+                } else if (lastStep.type === 'LINK') {
+                    window.location.href = lastStep.href;
+                }
+
+                setState(STATE.IDLE);
+            } catch (err) {
+                setState(STATE.IDLE);
+                showStatus(`Navigation failed: ${err.message}`, '❌');
+                setTimeout(hideStatus, 5000);
+            }
+        }
+
+        // ── UI Components ────────────────────────────────────────────────────
+        let dropdown = null;
+        let statusPanel = null;
+        let statusText = null;
+
+        function ensureDropdown(parentEl) {
+            if (dropdown) return;
+            dropdown = document.createElement('div');
+            dropdown.id = 'find-incomplete-dropdown';
+            dropdown.style.cssText =
+                'position:absolute;z-index:100000;display:none;' +
+                'background:rgba(15,15,15,0.96);backdrop-filter:blur(20px);' +
+                '-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);' +
+                'border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,0.65);' +
+                'padding:14px;min-width:320px;max-width:380px;' +
+                "color:#f4f4f5;font-family:'VT323',monospace;font-size:18px;" +
+                'transition:opacity 0.25s, transform 0.25s;opacity:0;transform:translateY(-8px);';
+            document.body.appendChild(dropdown);
+        }
+
+        function showDropdown(btnEl) {
+            ensureDropdown(btnEl);
+            injectStyles();
+
+            const rect = btnEl.getBoundingClientRect();
+            dropdown.style.top = `${rect.bottom + window.scrollY + 8}px`;
+            dropdown.style.left = `${Math.max(10, rect.left + window.scrollX - 180)}px`;
+
+            dropdown.style.display = 'block';
+            dropdown.offsetHeight; // trigger reflow
+            dropdown.style.opacity = '1';
+            dropdown.style.transform = 'translateY(0)';
+        }
+
+        function hideDropdown() {
+            if (!dropdown) return;
+            dropdown.style.opacity = '0';
+            dropdown.style.transform = 'translateY(-8px)';
+
+            setTimeout(() => {
+                if (dropdown && dropdown.style.opacity === '0') {
+                    dropdown.style.display = 'none';
+                }
+            }, 250);
+        }
+
+        function formatTimeAgo(ts) {
+            if (!ts) return '';
+            const diffMs = Date.now() - ts;
+            const diffMins = Math.floor(diffMs / 60000);
+            if (diffMins < 1) return 'just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            const diffHours = Math.floor(diffMins / 60);
+            if (diffHours < 24) return `${diffHours}h ago`;
+            const diffDays = Math.floor(diffHours / 24);
+            return `${diffDays}d ago`;
+        }
+
+        function renderList(parts, timestamp) {
+            if (!dropdown) return;
+            dropdown.innerHTML = '';
+
+            // Filter parts
+            const incompleteList = parts.filter(item => item.status === 'ok' && item.ratio < 1.0);
+            const failedList = parts.filter(item => item.status === 'unknown');
+
+            // Sort incomplete list by ratio ascending
+            incompleteList.sort((a, b) => a.ratio - b.ratio);
+
+            // Compute total solved and total questions across all successfully scanned parts
+            let totalSolved = 0;
+            let totalQuestions = 0;
+            parts.forEach(p => {
+                if (p.status === 'ok') {
+                    totalSolved += p.solvedCount || 0;
+                    totalQuestions += p.totalCount || 0;
+                }
+            });
+            const remainingQuestions = totalQuestions - totalSolved;
+
+            const header = document.createElement('div');
+            header.style.cssText = 'font-weight: 700; font-size: 18px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;';
+            header.innerHTML = '<span>Incomplete Tracks</span>' +
+                               `<span style="font-size: 11px; background: rgba(99,179,237,0.15); color: #63b3ed; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">` +
+                               `${incompleteList.length} Tracks | ${remainingQuestions} Qs Left</span>`;
+            dropdown.appendChild(header);
+
+            if (timestamp) {
+                const timeAgo = formatTimeAgo(timestamp);
+                const timeEl = document.createElement('div');
+                timeEl.style.cssText = 'font-size: 11px; color: #71717a; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;';
+                timeEl.textContent = `Last Scanned: ${timeAgo}`;
+                dropdown.appendChild(timeEl);
+            } else {
+                const divider = document.createElement('div');
+                divider.style.cssText = 'border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 12px;';
+                dropdown.appendChild(divider);
+            }
+
+            const listContainer = document.createElement('div');
+            listContainer.style.cssText = 'max-height: 280px; overflow-y: auto;';
+
+            if (incompleteList.length === 0 && failedList.length === 0) {
+                const msg = document.createElement('div');
+                msg.style.cssText = 'text-align: center; padding: 20px; color: #a1a1aa; font-style: italic;';
+                msg.innerHTML = 'All tracks completed! 🏆';
+                dropdown.appendChild(msg);
+            } else {
+                if (incompleteList.length > 0) {
+                    incompleteList.forEach(item => {
+                        const pct = Math.round(item.ratio * 100);
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'find-inc-item';
+                        itemEl.innerHTML = `
+                            <div class="find-inc-title">${item.partName}</div>
+                            <div class="find-inc-meta">
+                                <span>${item.levelName}</span>
+                                <span>${item.solvedCount} / ${item.totalCount} solved (${pct}%)</span>
+                            </div>
+                            <div class="find-inc-progress-bg">
+                                <div class="find-inc-progress-bar" style="width: ${pct}%"></div>
+                            </div>
+                        `;
+                        itemEl.addEventListener('click', () => {
+                            startNavigation(item);
+                        });
+                        listContainer.appendChild(itemEl);
+                    });
+                }
+
+                // VISIBLY SEPARATE "COULDN'T VERIFY" SECTION
+                if (failedList.length > 0) {
+                    const failHeader = document.createElement('div');
+                    failHeader.style.cssText = 'font-weight: 700; font-size: 15px; color: #f87171; margin: 14px 0 8px 0; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; display: flex; justify-content: space-between; align-items: center;';
+                    failHeader.innerHTML = '<span>⚠️ Couldn\'t Verify (Crawl Failed)</span>';
+                    listContainer.appendChild(failHeader);
+
+                    failedList.forEach(item => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'find-inc-item find-inc-failed';
+                        itemEl.style.cssText = 'border-color: rgba(239, 68, 68, 0.15) !important; background: rgba(239, 68, 68, 0.02);';
+                        itemEl.innerHTML = `
+                            <div class="find-inc-title" style="color: #d1d5db;">${item.partName}</div>
+                            <div class="find-inc-meta" style="color: #ef4444; font-size: 12px;">
+                                <span>${item.levelName}</span>
+                                <span>Crawl failed: ${item.error || 'Unknown Error'}</span>
+                            </div>
+                        `;
+                        itemEl.addEventListener('click', () => {
+                            startNavigation(item);
+                        });
+                        listContainer.appendChild(itemEl);
+                    });
+                }
+
+                dropdown.appendChild(listContainer);
+            }
+
+            const refreshBtn = document.createElement('div');
+            refreshBtn.id = 'find-inc-refresh-btn';
+            refreshBtn.style.cssText = 'text-align: center; padding: 10px 0; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); color: #63b3ed; cursor: pointer; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;';
+            refreshBtn.innerHTML = '🔄 Force Re-Crawl & Refresh';
+            refreshBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                loadAndRenderTracks(true);
+            });
+            dropdown.appendChild(refreshBtn);
+        }
+
+        function renderScanningState() {
+            if (!dropdown) return;
+            dropdown.innerHTML = `
+                <div style="text-align: center; padding: 30px 15px;">
+                    <div style="font-size: 24px; margin-bottom: 12px; animation: spin 2s linear infinite; display: inline-block;">🔄</div>
+                    <div id="find-inc-loading-msg" style="font-size: 15px; color: #a1a1aa;">Starting scan...</div>
+                    <div style="margin-top: 12px; font-size: 11px; color: #71717a;">Please wait, rate-limiting is active to ensure safety.</div>
+                    <div id="find-inc-cancel-btn" style="margin-top: 16px; font-size: 13px; color: #f87171; cursor: pointer; text-decoration: underline;">Cancel Scan</div>
+                </div>
+            `;
+            const cancelBtn = dropdown.querySelector('#find-inc-cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    cancelScan();
+                });
+            }
+        }
+
+        function renderErrorState(msg) {
+            if (!dropdown) return;
+            dropdown.innerHTML = `
+                <div style="text-align: center; padding: 30px 15px;">
+                    <div style="font-size: 24px; margin-bottom: 12px;">❌</div>
+                    <div style="font-size: 15px; color: #f87171; font-weight: 600;">Scan Failed</div>
+                    <div style="margin-top: 8px; font-size: 13px; color: #a1a1aa; max-height: 80px; overflow-y: auto;">${msg}</div>
+                    <div id="find-inc-retry-btn" style="margin-top: 16px; font-size: 13px; color: #63b3ed; cursor: pointer; text-decoration: underline;">Try Again</div>
+                </div>
+            `;
+            const retryBtn = dropdown.querySelector('#find-inc-retry-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    loadAndRenderTracks(true);
+                });
+            }
+        }
+
+        function renderUnscrapedState() {
+            if (!dropdown) return;
+            dropdown.innerHTML = `
+                <div style="text-align: center; padding: 24px 12px;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">🔍</div>
+                    <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 12px;">No Scraped Data Found</div>
+                    <div style="font-size: 12px; color: #71717a; margin-bottom: 16px; line-height: 1.4;">
+                        Please run a scan to discover and list all incomplete tracks.
+                    </div>
+                    <div id="find-inc-start-btn" style="
+                        display: inline-block;
+                        background: linear-gradient(135deg, #3182ce, #63b3ed);
+                        color: white;
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        text-transform: uppercase;
+                        box-shadow: 0 4px 12px rgba(49, 130, 206, 0.3);
+                    ">Start Scan</div>
+                </div>
+            `;
+            const startBtn = dropdown.querySelector('#find-inc-start-btn');
+            if (startBtn) {
+                startBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    runFullCrawl();
+                });
+            }
+        }
+
+        function updateLoadingMessage(msg) {
+            const el = document.getElementById('find-inc-loading-msg');
+            if (el) el.textContent = msg;
+        }
+
+        // Expose init/crawling interfaces
+        function ensureStatusPanel() {
+            if (statusPanel) return;
+            statusPanel = document.createElement('div');
+            statusPanel.id = 'find-incomplete-status';
+            statusPanel.style.cssText =
+                'position:fixed;bottom:92px;left:24px;z-index:99997;' +
+                'min-width:260px;max-width:380px;padding:12px 16px;' +
+                'background:rgba(15,15,15,0.95);backdrop-filter:blur(18px);' +
+                '-webkit-backdrop-filter:blur(18px);border-radius:14px;' +
+                'border:1px solid rgba(99,179,237,0.3);' +
+                'box-shadow:0 16px 48px rgba(0,0,0,0.65);' +
+                "font-family:'VT323',monospace;font-size:19px;color:#e4e4e7;" +
+                'display:none;transition:opacity 0.2s;';
+            statusText = document.createElement('span');
+            statusPanel.appendChild(statusText);
+            document.body.appendChild(statusPanel);
+        }
+
+        // Expose function for updating status Panel
+        function showStatus(msg, icon) {
+            ensureStatusPanel();
+            statusText.textContent = (icon ? icon + '  ' : '') + msg;
+            statusPanel.style.display = 'block';
+            statusPanel.style.opacity = '1';
+        }
+
+        function hideStatus() {
+            if (!statusPanel) return;
+            statusPanel.style.opacity = '0';
+            setTimeout(() => {
+                if (statusPanel) statusPanel.style.display = 'none';
+            }, 200);
+        }
+
+        function injectStyles() {
+            if (document.getElementById('find-incomplete-styles')) return;
+            const style = document.createElement('style');
+            style.id = 'find-incomplete-styles';
+            style.textContent = `
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .find-inc-item {
+                    display: flex;
+                    flex-direction: column;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    margin-bottom: 6px;
+                    transition: background 0.2s, transform 0.1s;
+                    border: 1px solid transparent;
+                }
+                .find-inc-item:hover {
+                    background: rgba(99, 179, 237, 0.1) !important;
+                    border-color: rgba(99, 179, 237, 0.2) !important;
+                    transform: translateY(-1px);
+                }
+                .find-inc-item:active {
+                    transform: translateY(0);
+                }
+                .find-inc-failed:hover {
+                    background: rgba(239, 68, 68, 0.08) !important;
+                    border-color: rgba(239, 68, 68, 0.25) !important;
+                }
+                .find-inc-title {
+                    font-weight: 600;
+                    font-size: 16px;
+                    color: #e4e4e7;
+                }
+                .find-inc-meta {
+                    font-size: 13px;
+                    color: #a1a1aa;
+                    margin-top: 2px;
+                    display: flex;
+                    justify-content: space-between;
+                }
+                .find-inc-progress-bg {
+                    width: 100%;
+                    height: 6px;
+                    background: rgba(255, 255, 255, 0.08);
+                    border-radius: 3px;
+                    margin-top: 6px;
+                    overflow: hidden;
+                }
+                .find-inc-progress-bar {
+                    height: 100%;
+                    background: linear-gradient(90deg, #3182ce, #63b3ed);
+                    border-radius: 3px;
+                    transition: width 0.3s ease;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // ── Set State ────────────────────────────────────────────────────────
+        function setState(s) {
+            currentState = s;
+        }
+
+        // ── Init & Cleanup ───────────────────────────────────────────────────
+        function injectMenuButton() {
+            if (!SETTINGS.enableFindIncomplete) return;
+            const menuList = document.querySelector(
+                '.ui-toolbar-group-right .ui-menu-list, ' +
+                '.ui-toolbar-group-right ul[role="menubar"]'
+            );
+            if (!menuList || document.getElementById('find-incomplete-btn')) return;
+
+            const li = document.createElement('li');
+            li.className = 'ui-menuitem ui-widget ui-corner-all';
+            li.setAttribute('role', 'none');
+            li.innerHTML =
+                '<a id="find-incomplete-btn" tabindex="-1" role="menuitem" ' +
+                'class="ui-menuitem-link ui-corner-all" href="#" ' +
+                'style="cursor:pointer;white-space:nowrap;">' +
+                '<span class="ui-menuitem-icon ui-icon pi pi-fw pi-search ui-menuitem-icon-left" ' +
+                'aria-hidden="true"></span>' +
+                '<span class="ui-menuitem-text">Find Incomplete</span>' +
+                '</a>';
+
+            const anchor = li.querySelector('a');
+            anchor.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (dropdown && dropdown.style.display === 'block' && dropdown.style.opacity !== '0') {
+                    hideDropdown();
+                } else {
+                    showDropdown(anchor);
+                    loadAndRenderTracks();
+                }
+            });
+
+            const lastItem = menuList.lastElementChild;
+            menuList.insertBefore(li, lastItem);
+        }
+
+        function init() {
+            if (!SETTINGS.enableFindIncomplete) return;
+            injectMenuButton();
+
+            const obs = new MutationObserver(() => {
+                if (!document.getElementById('find-incomplete-btn')) {
+                    injectMenuButton();
+                }
+            });
+            if (document.body) {
+                obs.observe(document.body, { childList: true, subtree: true });
+            }
+
+            document.addEventListener('click', (e) => {
+                if (dropdown && dropdown.style.display === 'block' &&
+                    !dropdown.contains(e.target) &&
+                    e.target.id !== 'find-incomplete-btn' &&
+                    !e.target.closest('#find-incomplete-btn')) {
+                    hideDropdown();
+                }
+            });
+        }
+
+        return {
+            init,
+            loadAndRenderTracks,
+            getState: () => currentState,
+            cancel: () => {
+                if (activeController) activeController.abort();
+                setState(STATE.IDLE);
+                hideStatus();
+                hideDropdown();
+            }
+        };
+    })();
+
+
+
+    // Initialize FindIncompleteModule when DOM is ready AND script is enabled
+    onScriptEnabled(() => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(FindIncompleteModule.init, 800);
+            });
+        } else {
+            setTimeout(FindIncompleteModule.init, 600);
+        }
+
+        // Expose for manual control from browser console
+        window.FindIncompleteModule = FindIncompleteModule;
     });
 
 })();

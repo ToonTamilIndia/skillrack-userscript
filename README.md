@@ -10,7 +10,16 @@ A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanism
 
 ---
 
-## Version 5.0 Features (Latest)
+## Version 6.0 Features (Latest)
+
+### New in v6.0
+
+- Added AI-assisted multi-fill-in-the-blank problem detection and answer insertion
+- Added an incomplete-track scanner with cached progress, retry handling, and navigation
+- Added settings for enabling the incomplete-track workflow
+- Improved AI provider model handling and settings controls
+
+Contribution by **[Aron-2005](https://github.com/Aron-2005)** and **[Vishnu-tppr](https://github.com/Vishnu-tppr)**.
 
 ### 🆕 New in v5.0 - Major Bug Fixes & Improvements
 
@@ -490,6 +499,13 @@ This is used for:
 
 ## Changelog
 
+### v6.0
+- Added multi-fill-in-the-blank AI solving support
+- Added incomplete-track scanning and navigation
+- Improved AI model and settings handling
+- Preserved the project kill-switch endpoint
+- Contribution by [Aron-2005](https://github.com/Aron-2005) and [Vishnu-tppr](https://github.com/Vishnu-tppr)
+
 ### v4.6
 - ✨ Mandatory update check with dialog
 - ✨ First-time disclaimer acceptance
@@ -532,4 +548,5 @@ MIT License
 ## Credits
 
 - **ToonTamilIndia** - Main development
+- **[Aron-2005](https://github.com/Aron-2005)** and **[Vishnu-tppr](https://github.com/Vishnu-tppr)** - Multi-fill-in-the-blank support, incomplete-track scanner, and AI/settings improvements
 - **[adithyagenie](https://github.com/adithyagenie/skillrack-captcha-solver)** - Captcha solver implementation
