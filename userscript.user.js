@@ -1571,10 +1571,17 @@
                 _cachedModels = _cachedModels || [
                     { id: 'gpt-4o-mini', name: 'GPT-4o Mini', owned_by: 'openai' },
                     { id: 'gpt-5-mini', name: 'GPT-5 Mini', owned_by: 'openai', reasoning: true },
-                    { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owned_by: 'openai', reasoning: true },
+                    { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owned_by: 'tinfoil', reasoning: true },
                     { id: 'llama-4-scout', name: 'Llama 4 Scout', owned_by: 'meta' },
-                    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owned_by: 'anthropic', reasoning: true },
-                    { id: 'mistral-small-3', name: 'Mistral Small 3', owned_by: 'mistral' }
+                    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owned_by: 'anthropic' },
+                    { id: 'mistral-small-3', name: 'Mistral Small 3', owned_by: 'mistral' },
+                    { id: 'mixtral-small-3', name: 'Mistral Small 3', owned_by: 'mistral' },
+                    { id: 'mistral-small-4', name: 'Mistral Small 4', owned_by: 'mistral' },
+                    { id: 'mistral-small-2603', name: 'Mistral Small 2603', owned_by: 'mistral' },
+                    { id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owned_by: 'anthropic' },
+                    { id: 'gpt-5-4-mini', name: 'GPT-5.4 Mini', owned_by: 'openai', reasoning: true },
+                    { id: 'gpt-5-4-nano', name: 'GPT-5.4 Nano', owned_by: 'openai', reasoning: true },
+                    { id: 'gemma-4-31b', name: 'Gemma 4 31B', owned_by: 'google' }
                 ];
                 _cachedReasoningModels = new Set(
                     _cachedModels.filter(m => m.reasoning).map(m => m.id)

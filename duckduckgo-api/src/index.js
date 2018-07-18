@@ -1,27 +1,29 @@
 const MODEL_MAP = {
 	'gpt-4o-mini': 'gpt-4o-mini',
 	'gpt-5-mini': 'gpt-5-mini',
-	'gpt-oss-120b': 'openai/gpt-oss-120b',
+	'gpt-oss-120b': 'tinfoil/gpt-oss-120b',
 	'llama-4-scout': 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
 	'claude-haiku-4-5': 'claude-haiku-4-5',
 	'mistral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501',
 	'mixtral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501',
-	'mistral-small-4': 'mistralai/Mistral-Small-24B-Instruct-2501',
+	'mistral-small-4': 'mistral-small-2603',
+	'mistral-small-2603': 'mistral-small-2603',
 	'claude-4-5-haiku': 'claude-4-5-haiku',
 	'gpt-5-4-mini': 'gpt-5-4-mini',
 	'gpt-5-4-nano': 'gpt-5-4-nano',
-	'gemma-4-31b': 'tinfoil/Gemma-4-31B'
+	'gemma-4-31b': 'tinfoil/gemma4-31b'
 };
 
 const AVAILABLE_MODELS = [
 	{ id: 'gpt-4o-mini', name: 'GPT-4o Mini', owner: 'OpenAI' },
 	{ id: 'gpt-5-mini', name: 'GPT-5 Mini', owner: 'OpenAI' },
-	{ id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'OpenAI' },
+	{ id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'Tinfoil' },
 	{ id: 'llama-4-scout', name: 'Llama 4 Scout', owner: 'Meta' },
 	{ id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owner: 'Anthropic' },
 	{ id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI' },
 	{ id: 'mixtral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI' },
 	{ id: 'mistral-small-4', name: 'Mistral Small 4', owner: 'Mistral AI' },
+	{ id: 'mistral-small-2603', name: 'Mistral Small 2603', owner: 'Mistral AI' },
 	{ id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owner: 'Anthropic' },
 	{ id: 'gpt-5-4-mini', name: 'GPT-5.4 Mini', owner: 'OpenAI' },
 	{ id: 'gpt-5-4-nano', name: 'GPT-5.4 Nano', owner: 'OpenAI' },
@@ -32,7 +34,7 @@ const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const ORIGIN_API = 'https://duck.ai';
 const STATUS_URL = 'https://duck.ai/duckchat/v1/status';
 const CHAT_URL = 'https://duck.ai/duckchat/v1/chat';
-const GPT_OSS_MODEL = 'openai/gpt-oss-120b';
+const GPT_OSS_MODEL = 'tinfoil/gpt-oss-120b';
 const GPT_5_MINI_MODEL = 'gpt-5-mini';
 const GPT_OSS_TOOL_CHOICE = {
 	NewsSearch: false,
@@ -40,7 +42,7 @@ const GPT_OSS_TOOL_CHOICE = {
 	LocalSearch: false,
 	WeatherForecast: false
 };
-const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL]);
+const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL, 'gpt-5-4-mini', 'gpt-5-4-nano']);
 const CHAT_MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 900;
 
