@@ -6251,6 +6251,12 @@
         const solnDiv = document.getElementById('solndiv');
         const solutionAvailable = (showBtn && showBtn.style.display !== 'none') || (hideBtn && hideBtn.style.display !== 'none');
         if (solutionAvailable) {
+            const aiBtn = document.getElementById('ai-solution-btn');
+            if (aiBtn) {
+                aiBtn.disabled = true;
+                aiBtn.innerHTML = 'Generating...';
+                aiBtn.style.opacity = '0.7';
+            }
             if (showBtn && showBtn.style.display !== 'none') showBtn.click();
             await new Promise(r => setTimeout(r, 100));
             const langMap = { 'Java': 'Java', 'Python': 'Python', 'C++': 'CPP', 'C++23': 'CPP', 'C': 'C' };
@@ -6267,9 +6273,19 @@
                     }
                     const $ = window.jQuery || window.$;
                     if ($ && $('#txtCode').length) $('#txtCode').val(code);
+                    if (aiBtn) {
+                        aiBtn.disabled = false;
+                        aiBtn.innerHTML = getAiButtonMarkup('AI Solution');
+                        aiBtn.style.opacity = '1';
+                    }
                     isAiGenerationInProgress = false;
                     return;
                 }
+            }
+            if (aiBtn) {
+                aiBtn.disabled = false;
+                aiBtn.innerHTML = getAiButtonMarkup('AI Solution');
+                aiBtn.style.opacity = '1';
             }
         }
 
