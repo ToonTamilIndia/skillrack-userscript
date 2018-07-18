@@ -1302,11 +1302,11 @@
             { id: 'gpt-5-mini', name: 'GPT-5 Mini (Beta)', owner: 'OpenAI', desc: 'Reasoning AI' },
             { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'OpenAI', desc: 'Open source, Reasoning AI' },
             { id: 'llama-4-scout', name: 'Llama 4 Scout', owner: 'Meta', desc: 'Open source' },
-            { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owner: 'Anthropic', desc: 'General-purpose AI' },
+            { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owner: 'Anthropic', desc: 'General-purpose + Reasoning AI' },
             { id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI', desc: 'Open source' }
         ];
-        const REASONING_MODELS = new Set(['gpt-5-mini', 'gpt-oss-120b']);
-        const REASONING_EFFORTS = new Set(['low', 'medium', 'high']);
+        const REASONING_MODELS = new Set(['gpt-5-mini', 'gpt-oss-120b', 'claude-haiku-4-5']);
+        const REASONING_EFFORTS = new Set(['minimal', 'low', 'medium', 'high', 'none']);
 
         function getApiUrl() {
             return SETTINGS.duckduckgoApiUrl || CONFIG.DEFAULT_API_URL;
@@ -1322,6 +1322,7 @@
 
         function normalizeReasoningEffort(value) {
             const effort = `${value || ''}`.toLowerCase();
+            if (effort === 'none') return undefined;
             return REASONING_EFFORTS.has(effort) ? effort : 'low';
         }
 
@@ -1351,7 +1352,7 @@
             };
             if (requestReasoning) {
                 payload.include_reasoning = true;
-                payload.reasoning_effort = reasoningEffort;
+                if (reasoningEffort) payload.reasoning_effort = reasoningEffort;
             }
 
             const response = await fetch(`${apiUrl}/chat`, {
@@ -2676,7 +2677,7 @@
                     </select>
                 </div>
                 <div style="margin: 8px 0 6px 0; padding: 8px; border: 1px solid #333; border-radius: 6px; background: #232323;">
-                    <div style="color: #fff; font-size: 11px; margin-bottom: 6px;">Reasoning (GPT-5 / GPT-OSS)</div>
+                    <div style="color: #fff; font-size: 11px; margin-bottom: 6px;">Reasoning (GPT-5 / GPT-OSS / Claude)</div>
                     <label style="display: flex; align-items: center; gap: 8px; color: #aaa; font-size: 11px; margin-bottom: 6px; cursor: pointer;">
                         <input type="checkbox" id="ddgIncludeReasoning" ${currentIncludeReasoning ? 'checked' : ''}>
                         Include reasoning in output
@@ -2692,9 +2693,11 @@
                         font-size: 11px;
                         box-sizing: border-box;
                     ">
+                        <option value="minimal" ${currentReasoningEffort === 'minimal' ? 'selected' : ''}>Minimal</option>
                         <option value="low" ${currentReasoningEffort === 'low' ? 'selected' : ''}>Low</option>
                         <option value="medium" ${currentReasoningEffort === 'medium' ? 'selected' : ''}>Medium</option>
                         <option value="high" ${currentReasoningEffort === 'high' ? 'selected' : ''}>High</option>
+                        <option value="none" ${currentReasoningEffort === 'none' ? 'selected' : ''}>None (omit)</option>
                     </select>
                     <div id="ddgReasoningHint" style="color: #777; font-size: 10px; margin-top: 6px;"></div>
                 </div>
@@ -2707,11 +2710,11 @@
                 const includeReasoningToggle = document.getElementById('ddgIncludeReasoning');
                 const reasoningEffortSelect = document.getElementById('ddgReasoningEffort');
                 const reasoningHint = document.getElementById('ddgReasoningHint');
-                const validReasoningEfforts = new Set(['low', 'medium', 'high']);
+                const validReasoningEfforts = new Set(['minimal', 'low', 'medium', 'high', 'none']);
 
                 const updateReasoningControls = () => {
                     const selectedModel = select ? select.value : currentModel;
-                    const supportsReasoning = selectedModel === 'gpt-5-mini' || selectedModel === 'gpt-oss-120b';
+                    const supportsReasoning = selectedModel === 'gpt-5-mini' || selectedModel === 'gpt-oss-120b' || selectedModel === 'claude-haiku-4-5';
                     const isEnabled = Boolean(includeReasoningToggle && includeReasoningToggle.checked);
 
                     if (includeReasoningToggle) {
@@ -2723,7 +2726,7 @@
                     if (reasoningHint) {
                         reasoningHint.textContent = supportsReasoning
                             ? 'Reasoning is requested from the proxy and prepended before the answer.'
-                            : 'Reasoning is available only for GPT-5 Mini and GPT-OSS 120B.';
+                            : 'Reasoning is available only for GPT-5 Mini, GPT-OSS 120B, and Claude Haiku 4.5.';
                     }
                 };
 
@@ -5071,12 +5074,13 @@
 
         // CRITICAL FIX: Remove language specifiers that might have leaked in
         // Remove lines that only contain language tags like "c++", "++23", "cpp", etc.
+        const languageTagRegex = /^(?:c|c\+\+|cpp|cpp11|cpp14|cpp17|cpp20|cpp23|\+\+|\+\+11|\+\+14|\+\+17|\+\+20|\+\+23|python|py|java|javascript|js|typescript|ts|go|rust|ruby|php|kotlin|swift)$/i;
         const lines = code.split('\n');
         code = lines.filter(line => {
             const trimmed = line.trim();
             // Skip lines that are ONLY language tags (case-insensitive, support c++, cpp, cpp23, ++, ++23, etc.)
             // Language tags: c, c++, cpp, cpp23, ++, ++23, python, java, javascript, typescript, etc.
-            if (/^(c\+\+|cpp\d*|\+\+\d*|[a-z]+\d*|[a-z]+\+\+)$/i.test(trimmed)) {
+            if (languageTagRegex.test(trimmed)) {
                 return false; // This is likely a language tag, skip it
             }
             return true;
@@ -5089,7 +5093,7 @@
         // Also remove any standalone language tags on their own lines (more aggressive)
         code = code.split('\n').filter(line => {
             const trimmed = line.trim();
-            return !(/^(c\+\+|cpp\d*|\+\+\d*|[a-z]+\d*|[a-z]+\+\+)$/i.test(trimmed));
+            return !(languageTagRegex.test(trimmed));
         }).join('\n');
         
         code = code.trim();
@@ -5189,8 +5193,8 @@ COMPILATION ERROR:
 ${errorInfo.compilationError}
 
 FIXING RULES:
-1. Fix ONLY the syntax/type/declaration error causing compilation failure.
-2. Do NOT change the program logic.
+1. Fix the compilation error and return a working program.
+2. Keep input/output behavior compatible with the problem requirements.
 3. Do NOT add extra output or debug statements.
 ${language.toLowerCase() === 'python' ? '4. If a function is defined (e.g. solve/main), make sure it is CALLED at the very end.' : ''}
 
@@ -5375,32 +5379,27 @@ SOLVING APPROACH:
         }
 
         try {
-            let response;
+            const requestFromProvider = async (promptText) => {
+                switch (SETTINGS.aiProvider) {
+                    case 'gemini':
+                        return await generateWithGemini(promptText);
+                    case 'openrouter':
+                        return await generateWithOpenRouter(promptText);
+                    case 'openai':
+                        return await generateWithOpenAI(promptText);
+                    case 'g4f':
+                        return await generateWithG4F(promptText);
+                    case 'duckduckgo':
+                        return await generateWithDuckDuckGo(promptText);
+                    case 'yuppbridge':
+                        return await generateWithYuppBridge(promptText);
+                    default:
+                        throw new Error(`Unknown AI provider: ${SETTINGS.aiProvider}`);
+                }
+            };
 
-            switch (SETTINGS.aiProvider) {
-                case 'gemini':
-                    response = await generateWithGemini(prompt);
-                    break;
-                case 'openrouter':
-                    response = await generateWithOpenRouter(prompt);
-                    break;
-                case 'openai':
-                    response = await generateWithOpenAI(prompt);
-                    break;
-                case 'g4f':
-                    response = await generateWithG4F(prompt);
-                    break;
-                case 'duckduckgo':
-                    response = await generateWithDuckDuckGo(prompt);
-                    break;
-                case 'yuppbridge':
-                    response = await generateWithYuppBridge(prompt);
-                    break;
-                default:
-                    throw new Error(`Unknown AI provider: ${SETTINGS.aiProvider}`);
-            }
-
-            const code = extractCode(response, language);
+            let response = await requestFromProvider(prompt);
+            let code = extractCode(response, language);
 
             // Validate code is not empty
             if (!code || code.trim().length < 10) {
@@ -5414,10 +5413,23 @@ SOLVING APPROACH:
                 existingCode = window.txtCode.getSession().getValue();
             }
 
-            if (existingCode && calculateCodeSimilarity(code, existingCode) > 0.95) {
-                console.warn('Generated code is too similar to existing code, skipping insertion');
-                alert('⚠️ Generated code is identical or too similar to the existing code. AI returned the same solution. Try again or modify your prompt.');
-                return;
+            if (existingCode && calculateCodeSimilarity(code, existingCode) > 0.99) {
+                console.warn('Generated code is too similar to existing code, retrying with lenient prompt');
+
+                const lenientRetryPrompt = `${prompt}\n\nRETRY INSTRUCTION:\nThe previous answer was identical to the existing code. Provide a DIFFERENT corrected implementation that still follows required input/output format and solves the problem.`;
+
+                response = await requestFromProvider(lenientRetryPrompt);
+                code = extractCode(response, language);
+
+                if (!code || code.trim().length < 10) {
+                    alert('Failed to extract valid code from AI retry response. Please try again.');
+                    return;
+                }
+
+                if (calculateCodeSimilarity(code, existingCode) > 0.99) {
+                    alert('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
+                    return;
+                }
             }
 
             if (code && window.txtCode) {

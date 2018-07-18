@@ -1,7 +1,7 @@
 const MODEL_MAP = {
 	'gpt-4o-mini': 'gpt-4o-mini',
 	'gpt-5-mini': 'gpt-5-mini',
-	'gpt-oss-120b': 'openai/gpt-oss-120b',
+	'gpt-oss-120b': 'tinfoil/gpt-oss-120b',
 	'llama-4-scout': 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
 	'claude-haiku-4-5': 'claude-haiku-4-5',
 	'mistral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501'
@@ -20,15 +20,17 @@ const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const ORIGIN_API = 'https://duck.ai';
 const STATUS_URL = 'https://duck.ai/duckchat/v1/status';
 const CHAT_URL = 'https://duck.ai/duckchat/v1/chat';
-const GPT_OSS_MODEL = 'openai/gpt-oss-120b';
+const FE_VERSION = 'serp_20260410_130311_ET-b0ef3e01af034d9f7df515329a260728eea94525';
+const GPT_OSS_MODEL = 'tinfoil/gpt-oss-120b';
 const GPT_5_MINI_MODEL = 'gpt-5-mini';
+const CLAUDE_HAIKU_MODEL = 'claude-haiku-4-5';
 const GPT_OSS_TOOL_CHOICE = {
 	NewsSearch: false,
 	VideosSearch: false,
 	LocalSearch: false,
 	WeatherForecast: false
 };
-const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL]);
+const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL, CLAUDE_HAIKU_MODEL]);
 const CHAT_MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 900;
 
@@ -307,7 +309,8 @@ function supportsReasoning(modelId) {
 
 function normalizeReasoningEffort(value) {
 	const effort = `${value || ''}`.toLowerCase();
-	if (effort === 'medium' || effort === 'high') return effort;
+	if (effort === 'none') return undefined;
+	if (effort === 'minimal' || effort === 'low' || effort === 'medium' || effort === 'high') return effort;
 	return 'low';
 }
 
@@ -319,7 +322,8 @@ function buildPayload(modelId, messages, options = {}) {
 			? options.metadata
 			: { toolChoice: { ...GPT_OSS_TOOL_CHOICE } };
 		payload.canUseTools = typeof options.canUseTools === 'boolean' ? options.canUseTools : true;
-		payload.reasoningEffort = normalizeReasoningEffort(options.reasoningEffort);
+		const effort = normalizeReasoningEffort(options.reasoningEffort);
+		if (effort) payload.reasoningEffort = effort;
 		payload.canUseApproxLocation = options.canUseApproxLocation ?? null;
 	}
 
@@ -337,6 +341,7 @@ function buildChatHeaders(modelId, token) {
 		'Origin': ORIGIN_API,
 		'Referer': `${ORIGIN_API}/`,
 		'User-Agent': USER_AGENT,
+		'x-fe-version': FE_VERSION,
 		'x-vqd-hash-1': token
 	};
 
@@ -360,6 +365,7 @@ function extractChunkText(parsed) {
 
 function extractChunkReasoning(parsed) {
 	return (
+		((parsed?.role === 'reasoning') ? (reasoningFromValue(parsed?.text) || reasoningFromValue(parsed?.summaryText)) : '') ||
 		reasoningFromValue(parsed?.reasoning) ||
 		reasoningFromValue(parsed?.parts) ||
 		reasoningFromValue(parsed?.message?.parts) ||
@@ -504,6 +510,7 @@ async function handleChat(request, env) {
 
 	const modelName = model || 'gpt-4o-mini';
 	const modelId = MODEL_MAP[modelName] || modelName;
+	const includeReasoningForModel = includeReasoning && supportsReasoning(modelId);
 
 	const normalizedMessages = normalizeMessages(messages);
 	if (normalizedMessages.length === 0) {
@@ -585,7 +592,7 @@ async function handleChat(request, env) {
 	}
 
 	const outputMessage = { role: 'assistant', content: fullMessage };
-	if (includeReasoning && reasoningMessage) {
+	if (includeReasoningForModel && reasoningMessage) {
 		outputMessage.reasoning = reasoningMessage;
 	}
 
@@ -597,7 +604,7 @@ async function handleChat(request, env) {
 		choices: [{ 
 			index: 0,
 			message: outputMessage,
-			reasoning: includeReasoning && reasoningMessage ? reasoningMessage : undefined,
+			reasoning: includeReasoningForModel && reasoningMessage ? reasoningMessage : undefined,
 			finish_reason: 'stop'
 		}],
 		usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
