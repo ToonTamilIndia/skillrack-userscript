@@ -4014,7 +4014,7 @@
         }
     }, true);
 
-    // 1. BLOCK TAB SWITCH DETECTION (Page Visibility API)
+    // 1. BLOCK TAB SWITCH DETECTION (Page Visibility API + window.onblur)
     if (SETTINGS.bypassTabDetection) {
         Object.defineProperty(document, 'visibilityState', {
             get: function () {
@@ -4030,15 +4030,93 @@
             configurable: true
         });
 
-        // Override addEventListener to block visibilitychange events
+        // Override addEventListener to block visibilitychange and blur events
         // But allow other events to pass through normally
         EventTarget.prototype.addEventListener = function (type, listener, options) {
             if (type === 'visibilitychange' || type === 'webkitvisibilitychange') {
                 console.log('Blocked visibilitychange event listener');
                 return; // Don't add the listener
             }
+            // Block blur event listeners on the window object only
+            // (this prevents addEventListener-based blur detection)
+            if (type === 'blur' && this === window) {
+                console.log('Blocked window blur event listener (addEventListener)');
+                return;
+            }
             return originalAddEventListener.call(this, type, listener, options);
         };
+
+        // ============================================
+        // CRITICAL: Intercept window.onblur property assignment
+        // SkillRack uses: window.onblur = function() { document.getElementById('mp1').click(); }
+        // This is the PRIMARY focus-loss detection mechanism.
+        // We must prevent the property from being set so the handler never fires.
+        // ============================================
+        Object.defineProperty(window, 'onblur', {
+            get: function () {
+                return null; // Always return null so SkillRack thinks no handler is set
+            },
+            set: function (handler) {
+                console.log('[SkillRack Bypass] Intercepted window.onblur assignment — handler suppressed');
+                // Silently discard the handler — never actually set it
+            },
+            configurable: true
+        });
+
+        // ============================================
+        // CRITICAL: Neutralize the hidden #mp1 submit button
+        // Even if onblur somehow fires, prevent #mp1 from submitting the form.
+        // The button is: <button id="mp1" name="mp1" style="display:none" type="submit">OnBlur</button>
+        // Clicking it performs a normal form POST with mp1=OnBlur to the server.
+        // ============================================
+        const neutralizeMp1Button = () => {
+            const mp1 = document.getElementById('mp1');
+            if (mp1) {
+                // Remove type="submit" so clicking it can't submit the form
+                mp1.type = 'button';
+                // Remove name so even if form submits, no mp1 parameter is sent
+                mp1.removeAttribute('name');
+                // Override click to be a no-op
+                mp1.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    console.log('[SkillRack Bypass] Blocked mp1 button click (anti-cheat trigger)');
+                    return false;
+                };
+                // Also override the click method directly
+                mp1.click = function () {
+                    console.log('[SkillRack Bypass] Blocked mp1.click() call');
+                };
+                console.log('[SkillRack Bypass] Neutralized #mp1 hidden submit button');
+            }
+        };
+
+        // Run immediately and also after DOM is ready (button may not exist yet)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', neutralizeMp1Button);
+        } else {
+            neutralizeMp1Button();
+        }
+        // Also watch for dynamic insertion via MutationObserver
+        const mp1Observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        if (node.id === 'mp1' || node.querySelector?.('#mp1')) {
+                            neutralizeMp1Button();
+                        }
+                    }
+                }
+            }
+        });
+        if (document.body) {
+            mp1Observer.observe(document.body, { childList: true, subtree: true });
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                neutralizeMp1Button();
+                mp1Observer.observe(document.body, { childList: true, subtree: true });
+            });
+        }
     }
 
     // 2. ENABLE COPY/PASTE FUNCTIONALITY
@@ -4431,6 +4509,32 @@
             return Promise.resolve();
         };
 
+        // Also override vendor-prefixed requestFullscreen methods
+        if (Element.prototype.webkitRequestFullscreen) {
+            Element.prototype.webkitRequestFullscreen = function () {
+                console.log('WebKit full-screen request intercepted');
+                return Promise.resolve();
+            };
+        }
+        if (Element.prototype.webkitRequestFullScreen) {
+            Element.prototype.webkitRequestFullScreen = function () {
+                console.log('WebKit full-screen request intercepted (legacy)');
+                return Promise.resolve();
+            };
+        }
+        if (Element.prototype.mozRequestFullScreen) {
+            Element.prototype.mozRequestFullScreen = function () {
+                console.log('Moz full-screen request intercepted');
+                return Promise.resolve();
+            };
+        }
+        if (Element.prototype.msRequestFullscreen) {
+            Element.prototype.msRequestFullscreen = function () {
+                console.log('MS full-screen request intercepted');
+                return Promise.resolve();
+            };
+        }
+
         document.exitFullscreen = function () {
             console.log('Exit full-screen intercepted');
             return Promise.resolve();
@@ -4447,13 +4551,167 @@
             return originalDocumentAddEventListener(type, listener, options);
         };
 
-        // Fake fullscreenElement
+        // Fake fullscreenElement (standard + vendor prefixed)
         Object.defineProperty(document, 'fullscreenElement', {
             get: function () {
                 return document.documentElement; // Always return something
             },
             configurable: true
         });
+        try {
+            Object.defineProperty(document, 'webkitFullscreenElement', {
+                get: function () { return document.documentElement; },
+                configurable: true
+            });
+        } catch (e) { /* may not exist */ }
+        try {
+            Object.defineProperty(document, 'mozFullScreenElement', {
+                get: function () { return document.documentElement; },
+                configurable: true
+            });
+        } catch (e) { /* may not exist */ }
+        try {
+            Object.defineProperty(document, 'msFullscreenElement', {
+                get: function () { return document.documentElement; },
+                configurable: true
+            });
+        } catch (e) { /* may not exist */ }
+
+        // Fake fullscreenEnabled
+        Object.defineProperty(document, 'fullscreenEnabled', {
+            get: function () { return true; },
+            configurable: true
+        });
+        try {
+            Object.defineProperty(document, 'webkitFullscreenEnabled', {
+                get: function () { return true; },
+                configurable: true
+            });
+        } catch (e) { /* may not exist */ }
+
+        // ============================================
+        // CRITICAL: Spoof the screenfull.js library
+        // SkillRack loads screenfull.js v5.1.0 which checks:
+        //   screenfull.isFullscreen → reads document[fullscreenElement]
+        //   screenfull.isEnabled → reads document[fullscreenEnabled]
+        // The $(window).resize handler does:
+        //   if (!screenfull.isFullscreen) { PF('fscrDlg').show(); }
+        // We must ensure screenfull.isFullscreen always returns true.
+        // Since screenfull defines isFullscreen as a getter on its own object
+        // reading document.fullscreenElement (which we already spoofed above),
+        // that should work. But we also intercept the screenfull global directly.
+        // ============================================
+        const spoofScreenfull = () => {
+            if (window.screenfull) {
+                try {
+                    Object.defineProperty(window.screenfull, 'isFullscreen', {
+                        get: function () { return true; },
+                        configurable: true
+                    });
+                    Object.defineProperty(window.screenfull, 'isEnabled', {
+                        get: function () { return true; },
+                        configurable: true
+                    });
+                    // Make request/exit/toggle no-ops
+                    window.screenfull.request = function () {
+                        console.log('[SkillRack Bypass] screenfull.request() intercepted');
+                        return Promise.resolve();
+                    };
+                    window.screenfull.exit = function () {
+                        console.log('[SkillRack Bypass] screenfull.exit() intercepted');
+                        return Promise.resolve();
+                    };
+                    window.screenfull.toggle = function () {
+                        console.log('[SkillRack Bypass] screenfull.toggle() intercepted');
+                        return Promise.resolve();
+                    };
+                    console.log('[SkillRack Bypass] Spoofed screenfull.js library');
+                } catch (e) {
+                    console.warn('[SkillRack Bypass] Could not spoof screenfull:', e);
+                }
+            }
+        };
+
+        // Spoof screenfull immediately if already loaded
+        spoofScreenfull();
+
+        // Also intercept when screenfull is assigned to window (it may load after us)
+        let _screenfullInstance = window.screenfull;
+        try {
+            Object.defineProperty(window, 'screenfull', {
+                get: function () { return _screenfullInstance; },
+                set: function (val) {
+                    _screenfullInstance = val;
+                    // Spoof it as soon as it's assigned
+                    if (val && typeof val === 'object') {
+                        setTimeout(() => spoofScreenfull(), 0);
+                    }
+                },
+                configurable: true
+            });
+        } catch (e) {
+            // Fallback: poll for screenfull
+            const sfCheck = setInterval(() => {
+                if (window.screenfull) {
+                    spoofScreenfull();
+                    clearInterval(sfCheck);
+                }
+            }, 50);
+            setTimeout(() => clearInterval(sfCheck), 15000);
+        }
+
+        // ============================================
+        // Override the global fscr() function
+        // SkillRack defines: function fscr() { screenfull.request(); }
+        // The "Proceed to Solve" button calls fscr() to enter fullscreen.
+        // We make it a no-op since we're spoofing fullscreen state.
+        // ============================================
+        const overrideFscr = () => {
+            window.fscr = function () {
+                console.log('[SkillRack Bypass] fscr() call intercepted — fullscreen already spoofed');
+            };
+        };
+        overrideFscr();
+        // Re-apply after DOM load in case it gets redefined
+        document.addEventListener('DOMContentLoaded', overrideFscr);
+
+        // ============================================
+        // Block the $(window).resize fullscreen check
+        // SkillRack uses: $(window).resize(function() { if (!screenfull.isFullscreen) { PF('fscrDlg').show(); } })
+        // Since we spoofed screenfull.isFullscreen to always return true,
+        // the condition !screenfull.isFullscreen will be false.
+        // As a belt-and-suspenders approach, also prevent the fscrDlg dialog from showing.
+        // ============================================
+        const blockFscrDlg = () => {
+            if (window.PF) {
+                const originalPF = window.PF;
+                window.PF = function (widgetVar) {
+                    if (widgetVar === 'fscrDlg') {
+                        // Return a fake widget that does nothing
+                        return {
+                            show: function () {
+                                console.log('[SkillRack Bypass] Blocked fscrDlg.show()');
+                            },
+                            hide: function () {
+                                console.log('[SkillRack Bypass] fscrDlg.hide() called');
+                            },
+                            isVisible: function () { return false; }
+                        };
+                    }
+                    return originalPF(widgetVar);
+                };
+                console.log('[SkillRack Bypass] PF() intercepted for fscrDlg blocking');
+            }
+        };
+
+        // Wait for PrimeFaces to load then intercept PF()
+        const pfDlgCheck = setInterval(() => {
+            if (window.PF) {
+                blockFscrDlg();
+                clearInterval(pfDlgCheck);
+            }
+        }, 100);
+        setTimeout(() => clearInterval(pfDlgCheck), 15000);
     }
 
     // 4. BLOCK MULTI-MONITOR DETECTION HEURISTICS
@@ -4565,6 +4823,11 @@
             EventTarget.prototype.addEventListener = function (type, listener, options) {
                 if (blockEvents.includes(type)) {
                     console.log(`Blocked ${type} event listener`);
+                    return;
+                }
+                // Continue blocking blur on window even after restore
+                if (type === 'blur' && this === window) {
+                    console.log('Blocked window blur event listener (post-restore)');
                     return;
                 }
                 return newAddEventListener.call(this, type, listener, options);
@@ -6248,7 +6511,6 @@
         // ========== Try View Solution first ==========
         const showBtn = document.getElementById('showbtn');
         const hideBtn = document.getElementById('hidebtn');
-        const solnDiv = document.getElementById('solndiv');
         const solutionAvailable = (showBtn && showBtn.style.display !== 'none') || (hideBtn && hideBtn.style.display !== 'none');
         if (solutionAvailable) {
             const aiBtn = document.getElementById('ai-solution-btn');
@@ -6257,13 +6519,28 @@
                 aiBtn.innerHTML = 'Generating...';
                 aiBtn.style.opacity = '0.7';
             }
+            // Click "Show Solution" to reveal the solution div
             if (showBtn && showBtn.style.display !== 'none') showBtn.click();
-            await new Promise(r => setTimeout(r, 100));
+            await new Promise(r => setTimeout(r, 200));
             const langMap = { 'Java': 'Java', 'Python': 'Python', 'C++': 'CPP', 'C++23': 'CPP', 'C': 'C' };
             const langKey = langMap[language] || language;
             const langSoln = document.getElementById('soln' + langKey);
             if (langSoln) {
-                const pre = langSoln.querySelector('pre.brush\\:' + language.toLowerCase().replace('++', 'pp').replace('23', '')) || langSoln.querySelector('pre');
+                // SkillRack uses class="brush:java;" style syntax which contains
+                // colons and semicolons — querySelector dot notation can't match this.
+                // Instead, find all <pre> tags and match by className string.
+                const brushLang = language.toLowerCase().replace('++', 'pp').replace('23', '');
+                let pre = null;
+                const allPres = langSoln.querySelectorAll('pre');
+                for (const p of allPres) {
+                    if (p.className && p.className.includes('brush') && p.className.includes(brushLang)) {
+                        pre = p;
+                        break;
+                    }
+                }
+                // Fallback: just grab the first <pre> in the language div
+                if (!pre && allPres.length > 0) pre = allPres[0];
+
                 const code = pre ? pre.textContent.trim() : '';
                 if (code && code.length > 10) {
                     if (window.txtCode && typeof window.txtCode.getSession === 'function') {
@@ -6273,20 +6550,32 @@
                     }
                     const $ = window.jQuery || window.$;
                     if ($ && $('#txtCode').length) $('#txtCode').val(code);
+
+                    // Hide the solution panel after extracting code
+                    const hideBtnNow = document.getElementById('hidebtn');
+                    if (hideBtnNow && hideBtnNow.style.display !== 'none') hideBtnNow.click();
+
                     if (aiBtn) {
                         aiBtn.disabled = false;
                         aiBtn.innerHTML = getAiButtonMarkup('AI Solution');
                         aiBtn.style.opacity = '1';
                     }
+                    console.log('[AI] Used SkillRack built-in solution for', langKey);
                     isAiGenerationInProgress = false;
                     return;
                 }
             }
+            // Solution div didn't have usable code — fall through to AI
+            // Hide the panel we opened
+            const hideBtnNow = document.getElementById('hidebtn');
+            if (hideBtnNow && hideBtnNow.style.display !== 'none') hideBtnNow.click();
+
             if (aiBtn) {
                 aiBtn.disabled = false;
                 aiBtn.innerHTML = getAiButtonMarkup('AI Solution');
                 aiBtn.style.opacity = '1';
             }
+            console.log('[AI] Built-in solution not found for', langKey, '— falling through to AI');
         }
 
         const errorInfo = getErrorInfo();  // NEW: Check for errors
