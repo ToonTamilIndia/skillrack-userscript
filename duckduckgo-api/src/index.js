@@ -9,8 +9,8 @@ const MODEL_MAP = {
 	'mistral-small-4': 'mistral-small-2603',
 	'mistral-small-2603': 'mistral-small-2603',
 	'claude-4-5-haiku': 'claude-4-5-haiku',
-	'gpt-5-4-mini': 'gpt-5-4-mini',
-	'gpt-5-4-nano': 'gpt-5-4-nano',
+	'gpt-5.4-mini': 'gpt-5.4-mini',
+	'gpt-5.4-nano': 'gpt-5.4-nano',
 	'gemma-4-31b': 'tinfoil/gemma4-31b'
 };
 
@@ -25,8 +25,8 @@ const AVAILABLE_MODELS = [
 	{ id: 'mistral-small-4', name: 'Mistral Small 4', owner: 'Mistral AI' },
 	{ id: 'mistral-small-2603', name: 'Mistral Small 2603', owner: 'Mistral AI' },
 	{ id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owner: 'Anthropic' },
-	{ id: 'gpt-5-4-mini', name: 'GPT-5.4 Mini', owner: 'OpenAI' },
-	{ id: 'gpt-5-4-nano', name: 'GPT-5.4 Nano', owner: 'OpenAI' },
+	{ id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', owner: 'OpenAI' },
+	{ id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', owner: 'OpenAI' },
 	{ id: 'gemma-4-31b', name: 'Gemma 4 31B', owner: 'Google' }
 ];
 
@@ -42,7 +42,7 @@ const GPT_OSS_TOOL_CHOICE = {
 	LocalSearch: false,
 	WeatherForecast: false
 };
-const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL, 'gpt-5-4-mini', 'gpt-5-4-nano']);
+const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL, 'gpt-5.4-mini', 'gpt-5.4-nano']);
 const CHAT_MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 900;
 
@@ -218,7 +218,8 @@ async function genRequestHash(hash) {
 			timestamp: timestamp,
 			origin: 'https://duck.ai',
 			stack: 'Error',
-			duration: '24'
+			debug: 'B\u001f',
+			duration: '0'
 		}
 	};
 
@@ -332,16 +333,17 @@ function normalizeReasoningEffort(value) {
 }
 
 function buildPayload(modelId, messages, options = {}) {
-	const payload = { model: modelId, messages };
-
-	if (supportsReasoning(modelId)) {
-		payload.metadata = (options.metadata && typeof options.metadata === 'object')
+	const payload = {
+		model: modelId,
+		messages,
+		metadata: (options.metadata && typeof options.metadata === 'object')
 			? options.metadata
-			: { toolChoice: { ...GPT_OSS_TOOL_CHOICE } };
-		payload.canUseTools = typeof options.canUseTools === 'boolean' ? options.canUseTools : true;
-		payload.reasoningEffort = normalizeReasoningEffort(options.reasoningEffort);
-		payload.canUseApproxLocation = options.canUseApproxLocation ?? null;
-	}
+			: { toolChoice: { ...GPT_OSS_TOOL_CHOICE } },
+		canUseTools: typeof options.canUseTools === 'boolean' ? options.canUseTools : true,
+		reasoningEffort: normalizeReasoningEffort(options.reasoningEffort),
+		canUseApproxLocation: options.canUseApproxLocation ?? null,
+		canDelegateImageGeneration: options.canDelegateImageGeneration ?? null
+	};
 
 	if (options.durableStream && typeof options.durableStream === 'object') {
 		payload.durableStream = options.durableStream;
@@ -357,12 +359,12 @@ function buildChatHeaders(modelId, token) {
 		'Origin': ORIGIN_API,
 		'Referer': `${ORIGIN_API}/`,
 		'User-Agent': USER_AGENT,
-		'x-vqd-hash-1': token
+		'x-vqd-hash-1': token,
+		'x-fe-signals': buildFeSignals()
 	};
 
 	if (supportsReasoning(modelId)) {
 		headers['Cookie'] = 'access_type=dev_01';
-		headers['x-fe-signals'] = buildFeSignals();
 	}
 
 	return headers;

@@ -1579,8 +1579,8 @@
                     { id: 'mistral-small-4', name: 'Mistral Small 4', owned_by: 'mistral' },
                     { id: 'mistral-small-2603', name: 'Mistral Small 2603', owned_by: 'mistral' },
                     { id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owned_by: 'anthropic' },
-                    { id: 'gpt-5-4-mini', name: 'GPT-5.4 Mini', owned_by: 'openai', reasoning: true },
-                    { id: 'gpt-5-4-nano', name: 'GPT-5.4 Nano', owned_by: 'openai', reasoning: true },
+                    { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', owned_by: 'openai', reasoning: true },
+                    { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', owned_by: 'openai', reasoning: true },
                     { id: 'gemma-4-31b', name: 'Gemma 4 31B', owned_by: 'google' }
                 ];
                 _cachedReasoningModels = new Set(
