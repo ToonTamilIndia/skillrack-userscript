@@ -1,10 +1,16 @@
 const MODEL_MAP = {
 	'gpt-4o-mini': 'gpt-4o-mini',
 	'gpt-5-mini': 'gpt-5-mini',
-	'gpt-oss-120b': 'tinfoil/gpt-oss-120b',
+	'gpt-oss-120b': 'openai/gpt-oss-120b',
 	'llama-4-scout': 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
 	'claude-haiku-4-5': 'claude-haiku-4-5',
-	'mistral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501'
+	'mistral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501',
+	'mixtral-small-3': 'mistralai/Mistral-Small-24B-Instruct-2501',
+	'mistral-small-4': 'mistralai/Mistral-Small-24B-Instruct-2501',
+	'claude-4-5-haiku': 'claude-4-5-haiku',
+	'gpt-5-4-mini': 'gpt-5-4-mini',
+	'gpt-5-4-nano': 'gpt-5-4-nano',
+	'gemma-4-31b': 'tinfoil/Gemma-4-31B'
 };
 
 const AVAILABLE_MODELS = [
@@ -13,10 +19,16 @@ const AVAILABLE_MODELS = [
 	{ id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'OpenAI' },
 	{ id: 'llama-4-scout', name: 'Llama 4 Scout', owner: 'Meta' },
 	{ id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owner: 'Anthropic' },
-	{ id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI' }
+	{ id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI' },
+	{ id: 'mixtral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI' },
+	{ id: 'mistral-small-4', name: 'Mistral Small 4', owner: 'Mistral AI' },
+	{ id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owner: 'Anthropic' },
+	{ id: 'gpt-5-4-mini', name: 'GPT-5.4 Mini', owner: 'OpenAI' },
+	{ id: 'gpt-5-4-nano', name: 'GPT-5.4 Nano', owner: 'OpenAI' },
+	{ id: 'gemma-4-31b', name: 'Gemma 4 31B', owner: 'Google' }
 ];
 
-const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Safari/605.1.15';
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36';
 const ORIGIN_API = 'https://duck.ai';
 const STATUS_URL = 'https://duck.ai/duckchat/v1/status';
 const CHAT_URL = 'https://duck.ai/duckchat/v1/chat';
@@ -168,12 +180,17 @@ async function genRequestHash(hash) {
 		if (!numberPat) throw new Error('extracted number not found');
 		const number = getHex(numberPat);
 		secondHash = await sha256Base64((number + 4).toString());
+	} else if (decodedStr.includes('getBoundingClientRect')) {
+		const numberPat = capture(",0x([0-9a-fA-F]+)\\)\\);\\}\\(\\)\\),\\(function");
+		if (!numberPat) throw new Error('base number not found for DOM check');
+		const number = getHex(numberPat);
+		secondHash = await sha256Base64((number + 5).toString());
 	} else {
 		throw new Error('unknown second client hash');
 	}
 
 	// Third hash
-	const thirdPat = capture(",0x([^)]+)\\)\\);\\}\\(\\)\\)\\]\\)");
+	const thirdPat = capture(",0x([0-9a-fA-F]+)\\)\\);\\}\\(\\)\\)\\]\\)");
 	if (!thirdPat) throw new Error('third pattern not found');
 	const thirdNum = getHex(thirdPat);
 	const thirdHash = await sha256Base64(thirdNum.toString());
@@ -198,7 +215,8 @@ async function genRequestHash(hash) {
 			challenge_id: challengeId,
 			timestamp: timestamp,
 			origin: 'https://duck.ai',
-			duration: '13'
+			stack: 'Error',
+			duration: '24'
 		}
 	};
 
