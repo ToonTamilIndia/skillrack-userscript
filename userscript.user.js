@@ -21,7 +21,7 @@
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
     const SCRIPT_VERSION = '6.0';
-    const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/Anti-Cheat Bypass 5.0.user.js';
+    const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
     const SCRIPT_DISABLED_KEY = 'skillrack_bypass_disabled_by_killswitch';
