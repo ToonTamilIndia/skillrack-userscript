@@ -4968,6 +4968,7 @@
     const CAPTCHA_STORAGE_KEY = 'skillrack_captcha_retries';
     const CAPTCHA_PENDING_KEY = 'skillrack_captcha_pending';
     const CAPTCHA_FAILED_KEY = 'skillrack_captcha_failed';
+    let captchaSolverRunning = false;
 
     function getCaptchaRetryCount() {
         return parseInt(localStorage.getItem(CAPTCHA_STORAGE_KEY) || '0', 10);
@@ -4990,12 +4991,16 @@
     // ===== IMPROVED: Multiple OCR attempts with different processing =====
     async function handleCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
+        if (captchaSolverRunning) {
+            console.log('[Captcha] Solver already running - skipping duplicate initialization');
+            return;
+        }
 
         // Check if we've exceeded max auto-retries
         const retryCount = getCaptchaRetryCount();
         if (retryCount >= CAPTCHA_MAX_AUTO_RETRIES) {
             console.log(`[Captcha] ⚠️ Max auto-retries (${CAPTCHA_MAX_AUTO_RETRIES}) reached - stopping auto-solve`);
-            handleIncorrectCaptcha();
+            handleIncorrectCaptcha(retryCount);
             return;
         }
 
@@ -5004,6 +5009,7 @@
             return;
         }
 
+        captchaSolverRunning = true;
         console.log('[Captcha] Starting captcha detection...');
 
         let image;
@@ -5011,6 +5017,7 @@
             image = await waitForCaptchaImage();
         } catch (e) {
             console.error('[Captcha] Failed to find captcha image:', e.message);
+            captchaSolverRunning = false;
             return;
         }
 
@@ -5019,6 +5026,7 @@
 
         if (!textbox || !button) {
             console.log("[Captcha] Input or button not found. Input:", !!textbox, "Button:", !!button);
+            captchaSolverRunning = false;
             return;
         }
 
@@ -5032,70 +5040,66 @@
             });
         }
 
-        // ===== USE ONE OCR METHOD PER RETRY (HIERARCHY) =====
+        // Try every image variant before falling back to manual entry. The retry
+        // counter tracks answers rejected by the server, not local OCR failures.
         const processingMethods = [
             { name: "Enhanced", fn: () => processImageForOCR(image) },
             { name: "Inverted", fn: () => invertColors(image) },
             { name: "Original", fn: () => image.src }
         ];
+        const startMethod = retryCount % processingMethods.length;
+        const orderedMethods = processingMethods.slice(startMethod)
+            .concat(processingMethods.slice(0, startMethod));
 
-        // Use retry count to pick which method to try (hierarchy: Enhanced → Inverted → Original)
-        const retryIdx = getCaptchaRetryCount();
-        const methodIdx = Math.min(retryIdx, processingMethods.length - 1);
-        const method = processingMethods[methodIdx];
-
-        console.log(`[Captcha] Using ${method.name} processing (attempt ${retryIdx + 1}/${CAPTCHA_MAX_AUTO_RETRIES})...`);
-
+        let ocrAttempts = 0;
         try {
-            const processedImg = method.fn();
+            for (const method of orderedMethods) {
+                ocrAttempts++;
+                console.log(`[Captcha] Using ${method.name} processing (OCR attempt ${ocrAttempts}/${processingMethods.length})...`);
 
-            const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
-                tessedit_char_whitelist: "0123456789+= ",
-                tessedit_pageseg_mode: "7", // Single line
-            });
+                try {
+                    const processedImg = method.fn();
+                    const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
+                        tessedit_char_whitelist: "0123456789+= ",
+                        tessedit_pageseg_mode: "7",
+                    });
 
-            console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
-            const result = solveCaptcha(text);
+                    console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
+                    const result = solveCaptcha(text);
 
-            if (result !== null) {
-                // Validate result is reasonable (1-198 for sum of two 1-99 numbers)
-                if (result < 1 || result > 198) {
-                    console.log(`[Captcha] ⚠️ Result ${result} seems invalid`);
-                    handleIncorrectCaptcha();
+                    if (result === null || result < 1 || result > 198) {
+                        console.log(`[Captcha] ✗ ${method.name} did not produce a valid result`);
+                        continue;
+                    }
+
+                    console.log(`[Captcha] ✓ Solution found: ${result}`);
+                    console.log('[Captcha] Submitting answer...');
+                    localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
+                    textbox.value = result;
+                    setTimeout(() => safeButtonClick(button), 100);
                     return;
+                } catch (error) {
+                    console.error(`[Captcha] ${method.name} OCR Error:`, error);
                 }
-
-                console.log(`[Captcha] ✓ Solution found: ${result}`);
-                console.log(`[Captcha] Submitting answer...`);
-
-                // Mark that we're attempting (will be checked on next page load)
-                localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
-
-                textbox.value = result;
-                setTimeout(() => safeButtonClick(button), 100);
-                return;
             }
-
-        } catch (error) {
-            console.error(`[Captcha] ${method.name} OCR Error:`, error);
+        } finally {
+            captchaSolverRunning = false;
         }
 
-        // Method failed to produce a valid result
-        console.log(`[Captcha] ✗ ${method.name} OCR method failed`);
-        handleIncorrectCaptcha();
+        console.log(`[Captcha] ✗ All ${ocrAttempts} OCR methods failed`);
+        handleIncorrectCaptcha(ocrAttempts);
     }
 
 
-    function handleIncorrectCaptcha() {
+    function handleIncorrectCaptcha(attemptCount = getCaptchaRetryCount()) {
         if (!SETTINGS.enableCaptchaSolver) return;
 
         // Mark that we've had an incorrect captcha attempt
         sessionStorage.setItem('captchaAttemptFailed', 'true');
 
-        const retryCount = getCaptchaRetryCount();
-        console.log(`[Captcha] ⚠️ Auto-solve failed after ${retryCount} attempts - requesting manual input`);
+        console.log(`[Captcha] ⚠️ Auto-solve failed after ${attemptCount} attempts - requesting manual input`);
 
-        const captext = prompt(`❌ Captcha auto-solve failed (${retryCount} attempts).\n\nPlease look at the captcha image and enter the math result manually:\n(e.g., if you see "7 + 2", enter "9")`);
+        const captext = prompt(`❌ Captcha auto-solve failed (${attemptCount} attempts).\n\nPlease look at the captcha image and enter the math result manually:\n(e.g., if you see "7 + 2", enter "9")`);
 
         if (captext === null || captext.trim() === '') {
             console.log('[Captcha] User cancelled manual input');
