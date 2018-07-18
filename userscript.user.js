@@ -7,6 +7,7 @@
 // @match        https://*.skillrack.com/*
 // @match        https://skillrack.com/*
 // @require      https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js
+// @require      https://js.puter.com/v2/
 // @grant        none
 // @run-at       document-start
 // @downloadURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js
@@ -455,6 +456,7 @@
         openaiModel: "gpt-4o-mini",
         openrouterApiKey: "",
         openrouterModel: "google/gemini-2.5-flash-001",
+        puterModel: "gpt-5.4-nano",
 
         // ========== G4F SETTINGS (NEW) ==========
         g4fApiKey: "",
@@ -1080,6 +1082,93 @@
             groupModels,
             clearCache,
             normalizeModel
+        };
+    })();
+
+    // ============================================
+    // PUTER.JS PROVIDER MODULE (STATIC MODEL CATALOG)
+    // ============================================
+
+    const PuterProvider = (function () {
+        'use strict';
+
+        const CONFIG = {
+            DEFAULT_MODEL: 'gpt-5.4-nano'
+        };
+
+        function normalizeModel(model) {
+            return {
+                id: model.id,
+                name: model.name,
+                group: model.group,
+                description: model.description || '',
+                aliases: model.aliases || []
+            };
+        }
+
+        function getModels() {
+            return [
+                { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', group: 'OpenAI', description: 'Highest capability general model' },
+                { id: 'gpt-5.5', name: 'GPT-5.5', group: 'OpenAI', description: 'Balanced high-end model' },
+                { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', group: 'OpenAI', description: 'Strong reasoning and coding' },
+                { id: 'gpt-5.4', name: 'GPT-5.4', group: 'OpenAI', description: 'General purpose GPT model' },
+                { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', group: 'OpenAI', description: 'Fast and capable compact model' },
+                { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', group: 'OpenAI', description: 'Fastest lightweight GPT model' },
+                { id: 'gpt-4o', name: 'GPT-4o', group: 'OpenAI', description: 'Multimodal general model' },
+                { id: 'gpt-4o-mini', name: 'GPT-4o Mini', group: 'OpenAI', description: 'Fast, low-cost OpenAI model' },
+                { id: 'o3', name: 'o3', group: 'OpenAI Reasoning', description: 'Reasoning-focused model' },
+                { id: 'o3-mini', name: 'o3 Mini', group: 'OpenAI Reasoning', description: 'Compact reasoning model' },
+                { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', group: 'Anthropic', description: 'Top-tier reasoning and coding' },
+                { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', group: 'Anthropic', description: 'Strong general-purpose model' },
+                { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', group: 'Anthropic', description: 'Fast and efficient' },
+                { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', group: 'Google', description: 'Advanced multimodal reasoning' },
+                { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', group: 'Google', description: 'Fast multimodal model' },
+                { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', group: 'Google', description: 'Strong general and coding model' },
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', group: 'Google', description: 'Fast balanced Gemini model' },
+                { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', group: 'Google', description: 'Very fast lightweight Gemini model' },
+                { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B IT', group: 'Google Gemma', description: 'Instruction-tuned Gemma model' },
+                { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B IT', group: 'Google Gemma', description: 'Large instruction-tuned Gemma model' },
+                { id: 'deepseek/deepseek-v4-pro', name: 'DeepSeek V4 Pro', group: 'DeepSeek', description: 'Strong reasoning and coding' },
+                { id: 'deepseek/deepseek-r1-0528', name: 'DeepSeek R1 0528', group: 'DeepSeek', description: 'Reasoning-focused model' },
+                { id: 'meta-llama/llama-4-maverick', name: 'Llama 4 Maverick', group: 'Meta', description: 'Powerful general Llama model' },
+                { id: 'meta-llama/llama-4-scout', name: 'Llama 4 Scout', group: 'Meta', description: 'Fast Llama model' },
+                { id: 'qwen/qwen3-max', name: 'Qwen3 Max', group: 'Qwen', description: 'Strong multilingual model' },
+                { id: 'mistralai/mistral-large-2411', name: 'Mistral Large 2411', group: 'Mistral', description: 'High-quality general model' },
+                { id: 'x-ai/grok-4.20', name: 'Grok 4.20', group: 'xAI', description: 'Conversational model' },
+                { id: 'gpt-image-2', name: 'GPT Image 2', group: 'Image', description: 'Image generation model' },
+                { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash TTS', group: 'Speech', description: 'Text-to-speech model' }
+            ].map(normalizeModel);
+        }
+
+        function filterModels(models, query) {
+            if (!query) return models;
+            const lowerQuery = query.toLowerCase().trim();
+            if (!lowerQuery) return models;
+            return models.filter(model => {
+                const aliases = Array.isArray(model.aliases) ? model.aliases : [];
+                return (model.id || '').toLowerCase().includes(lowerQuery) ||
+                    (model.name || '').toLowerCase().includes(lowerQuery) ||
+                    (model.group || '').toLowerCase().includes(lowerQuery) ||
+                    (model.description || '').toLowerCase().includes(lowerQuery) ||
+                    aliases.some(alias => String(alias).toLowerCase().includes(lowerQuery));
+            });
+        }
+
+        function groupModels(models) {
+            const groups = {};
+            (models || []).forEach(model => {
+                const group = model.group || 'Other';
+                if (!groups[group]) groups[group] = [];
+                groups[group].push(model);
+            });
+            return groups;
+        }
+
+        return {
+            CONFIG,
+            getModels,
+            filterModels,
+            groupModels
         };
     })();
 
@@ -2109,6 +2198,7 @@
                 <option value="gemini" ${SETTINGS.aiProvider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
                 <option value="openai" ${SETTINGS.aiProvider === 'openai' ? 'selected' : ''}>OpenAI (ChatGPT)</option>
                 <option value="openrouter" ${SETTINGS.aiProvider === 'openrouter' ? 'selected' : ''}>OpenRouter (Multi-Model)</option>
+                <option value="puter" ${SETTINGS.aiProvider === 'puter' ? 'selected' : ''}>Puter.js (Free, Unlimited)</option>
                 <option value="g4f" ${SETTINGS.aiProvider === 'g4f' ? 'selected' : ''}>G4F (g4f.space)</option>
                 <option value="duckduckgo" ${SETTINGS.aiProvider === 'duckduckgo' ? 'selected' : ''}>DuckDuckGo AI (FREE!)</option>
                 <option value="yuppbridge" ${SETTINGS.aiProvider === 'yuppbridge' ? 'selected' : ''}>YuppBridge (200+ Models)</option>
@@ -2122,6 +2212,7 @@
             const geminiModelWrapper = document.getElementById('gemini-model-wrapper');
             const openaiModelWrapper = document.getElementById('openai-model-wrapper');
             const orModelWrapper = document.getElementById('openrouter-model-wrapper');
+            const puterModelWrapper = document.getElementById('puter-model-wrapper');
             const g4fModelWrapper = document.getElementById('g4f-model-wrapper');
             const ddgModelWrapper = document.getElementById('duckduckgo-model-wrapper');
             if (geminiModelWrapper) {
@@ -2132,6 +2223,9 @@
             }
             if (orModelWrapper) {
                 orModelWrapper.style.display = providerSelect.value === 'openrouter' ? 'block' : 'none';
+            }
+            if (puterModelWrapper) {
+                puterModelWrapper.style.display = providerSelect.value === 'puter' ? 'block' : 'none';
             }
             if (g4fModelWrapper) {
                 g4fModelWrapper.style.display = providerSelect.value === 'g4f' ? 'block' : 'none';
@@ -2607,6 +2701,129 @@
         panelContent.appendChild(createOpenRouterModelSelector());
         // ========================================================
 
+        // ========== PUTER.JS MODEL SELECTOR (NO API KEY) ==========
+        const createPuterModelSelector = () => {
+            const wrapper = document.createElement('div');
+            wrapper.id = 'puter-model-wrapper';
+            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'puter' ? 'block' : 'none'};`;
+
+            wrapper.innerHTML = `
+                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">Puter.js Model</div>
+                <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+                    <input type="text" id="puterModelSearch" placeholder="Search models (e.g., gemini, claude, gpt)" style="
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #2d2d2d;
+                        color: #fff;
+                        font-size: 11px;
+                        box-sizing: border-box;
+                    ">
+                    <button id="puterRefreshModels" title="Reset models list" style="
+                        padding: 8px 12px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #3d3d3d;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">🔄</button>
+                </div>
+                <select id="puterModel" style="
+                    width: 100%;
+                    padding: 8px;
+                    border: 1px solid #444;
+                    border-radius: 6px;
+                    background: #2d2d2d;
+                    color: #fff;
+                    font-size: 11px;
+                    box-sizing: border-box;
+                ">
+                    <option value="gpt-5.4-nano">Loading models...</option>
+                </select>
+                <div id="puterModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div style="color: #888; font-size: 10px; margin-top: 4px; line-height: 1.4;">
+                    No API key required. Uses your Puter account and supports short aliases plus full model IDs.
+                </div>
+            `;
+
+            setTimeout(() => {
+                const select = document.getElementById('puterModel');
+                const searchInput = document.getElementById('puterModelSearch');
+                const refreshBtn = document.getElementById('puterRefreshModels');
+                const statusDiv = document.getElementById('puterModelStatus');
+
+                let allModels = PuterProvider.getModels();
+
+                const populateSelect = (models) => {
+                    if (!select) return;
+                    const currentValue = SETTINGS.puterModel || PuterProvider.CONFIG.DEFAULT_MODEL;
+                    select.innerHTML = '';
+
+                    const groups = PuterProvider.groupModels(models);
+                    const sortedGroups = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+
+                    for (const groupName of sortedGroups) {
+                        const groupModels = groups[groupName];
+                        if (!groupModels || groupModels.length === 0) continue;
+
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = `${groupName} (${groupModels.length})`;
+                        groupModels.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.id;
+                            option.textContent = model.name;
+                            option.title = model.description || '';
+                            option.selected = model.id === currentValue;
+                            optgroup.appendChild(option);
+                        });
+                        select.appendChild(optgroup);
+                    }
+
+                    if (statusDiv) statusDiv.textContent = `${models.length} models available`;
+                };
+
+                const loadModels = () => {
+                    allModels = PuterProvider.getModels();
+                    populateSelect(allModels);
+                    if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
+                };
+
+                if (searchInput) {
+                    let searchTimeout;
+                    searchInput.addEventListener('input', () => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            const filtered = PuterProvider.filterModels(allModels, searchInput.value.trim());
+                            populateSelect(filtered);
+                        }, 150);
+                    });
+                }
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => {
+                        if (searchInput) searchInput.value = '';
+                        loadModels();
+                    });
+                }
+
+                if (select) {
+                    select.addEventListener('change', () => {
+                        SETTINGS.puterModel = select.value;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                loadModels();
+            }, 100);
+
+            return wrapper;
+        };
+
+        panelContent.appendChild(createPuterModelSelector());
+        // ========================================================
+
         // ========== G4F API KEY AND MODEL SELECTOR (NEW) ==========
         panelContent.appendChild(createTextInput('g4fApiKey', 'G4F API Key', SETTINGS.g4fApiKey, 'Enter your G4F API key'));
         panelContent.appendChild(createG4FModelSelector());
@@ -3027,7 +3244,7 @@
 
         const note = document.createElement('div');
         note.style.cssText = 'color: #666; font-size: 10px; padding: 12px 0; text-align: center;';
-        note.innerHTML = 'Reload page after changing settings<br>Keys: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a><br>DuckDuckGo AI is FREE! | <a href="https://github.com/cloudWaddie/yuppbridge" target="_blank" style="color:#2196F3;">YuppBridge</a>';
+        note.innerHTML = 'Reload page after changing settings<br>Keys: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a><br>Puter.js: no API key required | <a href="https://developer.puter.com/ai/" target="_blank" style="color:#2196F3;">Puter AI docs</a><br>DuckDuckGo AI is FREE! | <a href="https://github.com/cloudWaddie/yuppbridge" target="_blank" style="color:#2196F3;">YuppBridge</a>';
         panelContent.appendChild(note);
 
         panel.appendChild(panelHeader);
@@ -4591,7 +4808,7 @@
 
     // ============================================
     // 10. AI SOLUTION GENERATOR
-    // Uses Gemini, OpenAI, OpenRouter, or G4F to generate code solutions
+    // Uses Gemini, OpenAI, OpenRouter, Puter.js, G4F, DuckDuckGo, or YuppBridge to generate code solutions
     // ============================================
 
     const getSelectedLanguage = () => {
@@ -4993,6 +5210,45 @@
         return data.choices?.[0]?.message?.content || '';
     };
 
+    const generateWithPuter = async (prompt) => {
+        if (typeof puter === 'undefined' || !puter?.ai?.chat) {
+            throw new Error('Puter.js is not loaded. Reload the page or reinstall the userscript.');
+        }
+
+        const model = SETTINGS.puterModel || PuterProvider.CONFIG.DEFAULT_MODEL;
+        const response = await puter.ai.chat(prompt, {
+            model: model
+        });
+
+        if (typeof response === 'string') {
+            return response;
+        }
+
+        if (Array.isArray(response)) {
+            return response
+                .map(part => part?.text || part?.reasoning || part?.content || '')
+                .filter(Boolean)
+                .join('\n');
+        }
+
+        const messageContent = response?.message?.content;
+        if (typeof messageContent === 'string') {
+            return messageContent;
+        }
+        if (Array.isArray(messageContent)) {
+            return messageContent
+                .map(part => part?.text || part?.content || '')
+                .filter(Boolean)
+                .join('\n');
+        }
+
+        if (typeof response?.text === 'string') {
+            return response.text;
+        }
+
+        return JSON.stringify(response || '', null, 2);
+    };
+
     const stripComments = (code, language) => {
         let result = code;
         const lang = language.toLowerCase();
@@ -5385,6 +5641,8 @@ SOLVING APPROACH:
                         return await generateWithGemini(promptText);
                     case 'openrouter':
                         return await generateWithOpenRouter(promptText);
+                    case 'puter':
+                        return await generateWithPuter(promptText);
                     case 'openai':
                         return await generateWithOpenAI(promptText);
                     case 'g4f':
