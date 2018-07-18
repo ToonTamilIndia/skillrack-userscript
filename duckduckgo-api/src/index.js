@@ -329,7 +329,7 @@ function supportsReasoning(modelId) {
 function normalizeReasoningEffort(value) {
 	const effort = `${value || ''}`.toLowerCase();
 	if (effort === 'medium' || effort === 'high') return effort;
-	return 'low';
+	return 'none';
 }
 
 function buildPayload(modelId, messages, options = {}) {
