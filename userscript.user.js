@@ -4778,17 +4778,27 @@
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
-        // Scale up for better OCR accuracy
-        const scale = 3;
-        canvas.width = (image.width || image.naturalWidth || 200) * scale;
-        canvas.height = (image.height || image.naturalHeight || 50) * scale;
+        const sourceWidth = image.naturalWidth || image.width || 350;
+        const sourceHeight = image.naturalHeight || image.height || 50;
+        // SkillRack puts the username on the first row and the equation on the
+        // second. Crop away the username so PSM 7 receives exactly one line.
+        const cropY = Math.floor(sourceHeight * 0.42);
+        const cropHeight = sourceHeight - cropY;
+        const scale = 4;
+        canvas.width = sourceWidth * scale;
+        canvas.height = cropHeight * scale;
 
         // Enable image smoothing for upscaling
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        // Draw scaled image
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+            image,
+            0, cropY, sourceWidth, cropHeight,
+            0, 0, canvas.width, canvas.height
+        );
 
         // Get image data
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -4804,9 +4814,9 @@
             // Calculate luminance
             const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
 
-            // Apply threshold (adjust if needed - lower = more black)
-            const threshold = 140;
-            const value = luminance < threshold ? 0 : 255;
+            // Source text is white on black. Invert it to black on white.
+            const threshold = 150;
+            const value = luminance > threshold ? 0 : 255;
 
             data[i] = value;     // R
             data[i + 1] = value; // G
@@ -4824,11 +4834,19 @@
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
 
-        const scale = 2;
-        canvas.width = (image.width || image.naturalWidth || 200) * scale;
-        canvas.height = (image.height || image.naturalHeight || 50) * scale;
+        const sourceWidth = image.naturalWidth || image.width || 350;
+        const sourceHeight = image.naturalHeight || image.height || 50;
+        const cropY = Math.floor(sourceHeight * 0.42);
+        const cropHeight = sourceHeight - cropY;
+        const scale = 4;
+        canvas.width = sourceWidth * scale;
+        canvas.height = cropHeight * scale;
 
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+            image,
+            0, cropY, sourceWidth, cropHeight,
+            0, 0, canvas.width, canvas.height
+        );
         ctx.globalCompositeOperation = "difference";
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -5099,31 +5117,39 @@
             { name: "Inverted", fn: () => invertColors(image) },
             { name: "Original", fn: () => image.src }
         ];
-        const method = processingMethods[Math.min(retryCount, processingMethods.length - 1)];
-        const attemptNumber = retryCount + 1;
+        const startMethod = retryCount % processingMethods.length;
+        const orderedMethods = processingMethods.slice(startMethod)
+            .concat(processingMethods.slice(0, startMethod));
+        let ocrAttempts = 0;
 
         try {
-            console.log(`[Captcha] Using ${method.name} processing (attempt ${attemptNumber}/${CAPTCHA_MAX_AUTO_RETRIES})...`);
-            const processedImg = method.fn();
-            const { data: { text } } = await recognizeCaptchaImage(processedImg);
+            for (const method of orderedMethods) {
+                ocrAttempts++;
+                console.log(`[Captcha] Using ${method.name} processing (OCR attempt ${ocrAttempts}/${processingMethods.length})...`);
 
-            console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
-            const result = solveCaptcha(text);
+                try {
+                    const processedImg = method.fn();
+                    const { data: { text } } = await recognizeCaptchaImage(processedImg);
+                    console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
+                    const result = solveCaptcha(text);
 
-            if (result === null || result < 1 || result > 198) {
-                console.log(`[Captcha] ✗ ${method.name} did not produce a valid result`);
-                handleIncorrectCaptcha(attemptNumber);
-                return;
+                    if (result === null || result < 1 || result > 198) {
+                        console.log(`[Captcha] ✗ ${method.name} did not produce a valid result`);
+                        continue;
+                    }
+
+                    console.log(`[Captcha] ✓ Solution found: ${result}`);
+                    console.log('[Captcha] Submitting answer...');
+                    localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
+                    textbox.value = result;
+                    setTimeout(() => safeButtonClick(button), 100);
+                    return;
+                } catch (error) {
+                    console.error(`[Captcha] ${method.name} OCR Error:`, error);
+                }
             }
 
-            console.log(`[Captcha] ✓ Solution found: ${result}`);
-            console.log('[Captcha] Submitting answer...');
-            localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
-            textbox.value = result;
-            setTimeout(() => safeButtonClick(button), 100);
-        } catch (error) {
-            console.error(`[Captcha] ${method.name} OCR Error:`, error);
-            handleIncorrectCaptcha(attemptNumber);
+            handleIncorrectCaptcha(ocrAttempts);
         } finally {
             captchaSolverRunning = false;
         }
