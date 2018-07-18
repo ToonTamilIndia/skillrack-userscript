@@ -7096,7 +7096,7 @@ SOLVING APPROACH:
             setTimeout(addAISolutionButton, 3000);
         }
 
-        // Also watch for dynamic content changes
+        // Also watch for dynamic content changes & PrimeFaces AJAX updates
         const aiObserver = new MutationObserver((mutations) => {
             if (!document.getElementById('ai-solution-btn')) {
                 setTimeout(addAISolutionButton, 500);
@@ -7110,6 +7110,22 @@ SOLVING APPROACH:
                 aiObserver.observe(document.body, { childList: true, subtree: true });
             });
         }
+
+        // Listen for PrimeFaces/jQuery AJAX completions (e.g. post-captcha load)
+        const bindAjaxHooks = () => {
+            const $ = window.jQuery || window.$;
+            if ($ && $.fn && $.fn.ajaxComplete) {
+                $(document).ajaxComplete(() => {
+                    setTimeout(() => {
+                        bypassAceEditor();
+                        addAISolutionButton();
+                    }, 200);
+                });
+            } else {
+                setTimeout(bindAjaxHooks, 500);
+            }
+        };
+        bindAjaxHooks();
     });
 
     // ============================================
@@ -7763,14 +7779,19 @@ SOLVING APPROACH:
                 if (shouldStop) { updateStatus('Stopped', 'warning'); setTimeout(hideStatus, 2000); solveInvocationActive = false; return false; }
             }
 
-            // Wait for code editor
+            // Wait for code editor (poll up to 15s as PrimeFaces AJAX replaces #programgrid)
             if (!hasCodeEditor()) {
                 updateStatus('Waiting for editor...', 'info');
-                console.log('[AutoSolver] Code editor not found, waiting...');
-                await sleep(3000);
+                console.log('[AutoSolver] Code editor not found, polling...');
+                let editorWait = 0;
+                const maxEditorWait = 15000;
+                while (!hasCodeEditor() && editorWait < maxEditorWait && !shouldStop) {
+                    await sleep(500);
+                    editorWait += 500;
+                }
                 if (shouldStop) { updateStatus('Stopped', 'warning'); setTimeout(hideStatus, 2000); solveInvocationActive = false; return false; }
                 if (!hasCodeEditor()) {
-                    console.log('[AutoSolver] Code editor still not found, aborting');
+                    console.log('[AutoSolver] Code editor still not found after 15s, aborting');
                     updateStatus('Editor not found', 'error');
                     setTimeout(hideStatus, 3000);
                     solveInvocationActive = false;
