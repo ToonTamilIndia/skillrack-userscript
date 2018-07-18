@@ -1548,9 +1548,15 @@
             { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owner: 'OpenAI', desc: 'Open source, Reasoning AI' },
             { id: 'llama-4-scout', name: 'Llama 4 Scout', owner: 'Meta', desc: 'Open source' },
             { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owner: 'Anthropic', desc: 'General-purpose + Reasoning AI' },
-            { id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI', desc: 'Open source' }
+            { id: 'mistral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI', desc: 'Open source' },
+            { id: 'mixtral-small-3', name: 'Mistral Small 3', owner: 'Mistral AI', desc: 'Open source' },
+            { id: 'mistral-small-4', name: 'Mistral Small 4', owner: 'Mistral AI', desc: 'Latest Mistral' },
+            { id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owner: 'Anthropic', desc: 'Latest Haiku' },
+            { id: 'gpt-5-4-mini', name: 'GPT-5.4 Mini', owner: 'OpenAI', desc: 'Latest GPT Mini' },
+            { id: 'gpt-5-4-nano', name: 'GPT-5.4 Nano', owner: 'OpenAI', desc: 'Fast & lightweight' },
+            { id: 'gemma-4-31b', name: 'Gemma 4 31B', owner: 'Google', desc: 'Open source' }
         ];
-        const REASONING_MODELS = new Set(['gpt-5-mini', 'gpt-oss-120b', 'claude-haiku-4-5']);
+        const REASONING_MODELS = new Set(['gpt-5-mini', 'gpt-oss-120b', 'claude-haiku-4-5', 'gpt-5-4-mini', 'gpt-5-4-nano']);
         const REASONING_EFFORTS = new Set(['minimal', 'low', 'medium', 'high', 'none']);
 
         function getApiUrl() {
@@ -3337,7 +3343,7 @@
 
                 const updateReasoningControls = () => {
                     const selectedModel = select ? select.value : currentModel;
-                    const supportsReasoning = selectedModel === 'gpt-5-mini' || selectedModel === 'gpt-oss-120b' || selectedModel === 'claude-haiku-4-5';
+                    const supportsReasoning = REASONING_MODELS.has(selectedModel);
                     const isEnabled = Boolean(includeReasoningToggle && includeReasoningToggle.checked);
 
                     if (includeReasoningToggle) {
@@ -3349,7 +3355,7 @@
                     if (reasoningHint) {
                         reasoningHint.textContent = supportsReasoning
                             ? 'Reasoning is requested from the proxy and prepended before the answer.'
-                            : 'Reasoning is available only for GPT-5 Mini, GPT-OSS 120B, and Claude Haiku 4.5.';
+                            : 'Reasoning is not available for this model.';
                     }
                 };
 
