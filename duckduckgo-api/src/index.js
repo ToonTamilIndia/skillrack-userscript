@@ -20,17 +20,15 @@ const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const ORIGIN_API = 'https://duck.ai';
 const STATUS_URL = 'https://duck.ai/duckchat/v1/status';
 const CHAT_URL = 'https://duck.ai/duckchat/v1/chat';
-const FE_VERSION = 'serp_20260410_130311_ET-b0ef3e01af034d9f7df515329a260728eea94525';
-const GPT_OSS_MODEL = 'tinfoil/gpt-oss-120b';
+const GPT_OSS_MODEL = 'openai/gpt-oss-120b';
 const GPT_5_MINI_MODEL = 'gpt-5-mini';
-const CLAUDE_HAIKU_MODEL = 'claude-haiku-4-5';
 const GPT_OSS_TOOL_CHOICE = {
 	NewsSearch: false,
 	VideosSearch: false,
 	LocalSearch: false,
 	WeatherForecast: false
 };
-const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL, CLAUDE_HAIKU_MODEL]);
+const REASONING_SUPPORTED_MODELS = new Set([GPT_5_MINI_MODEL, GPT_OSS_MODEL]);
 const CHAT_MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = 900;
 
@@ -61,66 +59,66 @@ function getHex(s) {
 async function genRequestHash(hash) {
 	// Decode base64
 	const decodedStr = atob(hash);
-	
+
 	// Helper to capture regex groups
 	const capture = (pat) => {
 		const regex = new RegExp(pat);
 		const match = decodedStr.match(regex);
 		return match ? match[1] : null;
 	};
-	
+
 	// Extract string array
 	const stringArrayMatch = capture("\\{const _0x......=\\[(.*?)\\];");
 	if (!stringArrayMatch) throw new Error('string array not found');
 	const stringArray = stringArrayMatch.split(',').map(s => s.replace(/^'|'$/g, ''));
-	
+
 	// Extract offset
 	const offsetMatch = capture("0x([0-9a-fA-F]+);let");
 	if (!offsetMatch) throw new Error('offset not found');
 	const offset = parseInt(offsetMatch, 16);
-	
+
 	// Find shift offset
 	let shiftOffset = null;
-	
+
 	const findOffset = (pat, target) => {
 		const index = getHex(pat);
 		const originIndex = stringArray.indexOf(target);
 		if (originIndex === -1) throw new Error('offset pattern not found in string array');
 		return originIndex - (index - offset);
 	};
-	
+
 	// Try Promise pattern
 	const promisePat = capture("await Promise\\[[^(]*\\(0x([0-9a-fA-F]+)\\)\\]");
 	if (promisePat && shiftOffset === null) {
-		try { shiftOffset = findOffset(promisePat, 'all'); } catch (e) {}
+		try { shiftOffset = findOffset(promisePat, 'all'); } catch (e) { }
 	}
-	
+
 	// Try userAgent pattern
 	const userAgentPat = capture("\\]\\(\\[navigator\\[[^(]*\\(0x([0-9a-fA-F]+)\\)\\],");
 	if (userAgentPat && shiftOffset === null) {
-		try { shiftOffset = findOffset(userAgentPat, 'userAgent'); } catch (e) {}
+		try { shiftOffset = findOffset(userAgentPat, 'userAgent'); } catch (e) { }
 	}
-	
+
 	// Try reduce pattern
 	const reducePat = capture("\\(Number\\)\\[_0x.{6}\\(0x([0-9a-fA-F]+)\\)\\]");
 	if (reducePat && shiftOffset === null) {
-		try { shiftOffset = findOffset(reducePat, 'reduce'); } catch (e) {}
+		try { shiftOffset = findOffset(reducePat, 'reduce'); } catch (e) { }
 	}
-	
+
 	// Try querySelectorAll pattern
 	const queryPat = capture("\\(0x([0-9a-fA-F]+)\\)]\\('\\*'\\)");
 	if (queryPat && shiftOffset === null) {
-		try { shiftOffset = findOffset(queryPat, 'querySelectorAll'); } catch (e) {}
+		try { shiftOffset = findOffset(queryPat, 'querySelectorAll'); } catch (e) { }
 	}
-	
+
 	if (shiftOffset === null) throw new Error('shift offset not found');
-	
+
 	// Extract server hashes
 	const serverHashRegex = /'server_hashes':\[([^,]+),([^,]+),([^\]]+)\]/;
 	const serverHashMatch = decodedStr.match(serverHashRegex);
 	if (!serverHashMatch) throw new Error('server hash pats not found');
 	const serverHashPats = [serverHashMatch[1], serverHashMatch[2], serverHashMatch[3]];
-	
+
 	const resolveValue = (pat) => {
 		if (pat.startsWith("'")) {
 			return pat.replace(/^'|'$/g, '');
@@ -131,34 +129,34 @@ async function genRequestHash(hash) {
 			return stringArray[originIndex];
 		}
 	};
-	
+
 	const serverHashes = serverHashPats.map(resolveValue);
-	
+
 	// User agent hash
 	const userAgentHash = await sha256Base64(USER_AGENT);
-	
+
 	// Second hash based on challenge type
 	let secondHash;
-	
+
 	if (decodedStr.includes('innerHTML')) {
 		const innerHtmlPat = capture("=([^,;]+),String");
 		if (!innerHtmlPat) throw new Error('inner html pattern not found');
 		const innerHTML = resolveValue(innerHtmlPat);
-		
+
 		const innerHtmlData = {
 			'<div><div></div><div></div': 99,
 			'<p><div></p><p></div': 128,
 			'<br><div></br><br></div': 92,
 			'<li><div></li><li></div': 87
 		};
-		
+
 		const innerHtmlLen = innerHtmlData[innerHTML];
 		if (innerHtmlLen === undefined) throw new Error('unknown inner html pattern');
-		
+
 		const numberPat = capture("String\\(0x([0-9a-fA-F]+)\\+");
 		if (!numberPat) throw new Error('extracted number not found');
 		const number = getHex(numberPat);
-		
+
 		secondHash = await sha256Base64((number + innerHtmlLen).toString());
 	} else if (decodedStr.includes('instanceof HTMLDivElement')) {
 		const numberPat = capture(",0x([0-9a-fA-F]+)\\)\\);\\}\\(\\)\\),\\(function");
@@ -173,23 +171,23 @@ async function genRequestHash(hash) {
 	} else {
 		throw new Error('unknown second client hash');
 	}
-	
+
 	// Third hash
 	const thirdPat = capture(",0x([^)]+)\\)\\);\\}\\(\\)\\)\\]\\)");
 	if (!thirdPat) throw new Error('third pattern not found');
 	const thirdNum = getHex(thirdPat);
 	const thirdHash = await sha256Base64(thirdNum.toString());
-	
+
 	// Challenge ID
 	const challengeIdPat = capture("'challenge_id':([^},]+)");
 	if (!challengeIdPat) throw new Error('challenge id not found');
 	const challengeId = resolveValue(challengeIdPat);
-	
+
 	// Timestamp
 	const timestampPat = capture("'timestamp':([^},]+)");
 	if (!timestampPat) throw new Error('timestamp not found');
 	const timestamp = resolveValue(timestampPat);
-	
+
 	// Build result
 	const result = {
 		server_hashes: serverHashes,
@@ -203,7 +201,7 @@ async function genRequestHash(hash) {
 			duration: '13'
 		}
 	};
-	
+
 	return btoa(JSON.stringify(result));
 }
 
@@ -217,18 +215,18 @@ async function loadToken() {
 			'x-vqd-accept': '1'
 		}
 	});
-	
+
 	if (!response.ok) {
 		throw new Error(`Status request failed: ${response.status}`);
 	}
-	
+
 	const hash = response.headers.get('x-vqd-hash-1');
 	if (!hash) {
 		const allHeaders = {};
 		response.headers.forEach((v, k) => allHeaders[k] = v);
 		throw new Error(`x-vqd-hash-1 not found. Headers: ${Object.keys(allHeaders).join(', ')}`);
 	}
-	
+
 	const requestHash = await genRequestHash(hash);
 	return requestHash;
 }
@@ -309,8 +307,7 @@ function supportsReasoning(modelId) {
 
 function normalizeReasoningEffort(value) {
 	const effort = `${value || ''}`.toLowerCase();
-	if (effort === 'none') return undefined;
-	if (effort === 'minimal' || effort === 'low' || effort === 'medium' || effort === 'high') return effort;
+	if (effort === 'medium' || effort === 'high') return effort;
 	return 'low';
 }
 
@@ -322,8 +319,7 @@ function buildPayload(modelId, messages, options = {}) {
 			? options.metadata
 			: { toolChoice: { ...GPT_OSS_TOOL_CHOICE } };
 		payload.canUseTools = typeof options.canUseTools === 'boolean' ? options.canUseTools : true;
-		const effort = normalizeReasoningEffort(options.reasoningEffort);
-		if (effort) payload.reasoningEffort = effort;
+		payload.reasoningEffort = normalizeReasoningEffort(options.reasoningEffort);
 		payload.canUseApproxLocation = options.canUseApproxLocation ?? null;
 	}
 
@@ -341,7 +337,6 @@ function buildChatHeaders(modelId, token) {
 		'Origin': ORIGIN_API,
 		'Referer': `${ORIGIN_API}/`,
 		'User-Agent': USER_AGENT,
-		'x-fe-version': FE_VERSION,
 		'x-vqd-hash-1': token
 	};
 
@@ -365,7 +360,6 @@ function extractChunkText(parsed) {
 
 function extractChunkReasoning(parsed) {
 	return (
-		((parsed?.role === 'reasoning') ? (reasoningFromValue(parsed?.text) || reasoningFromValue(parsed?.summaryText)) : '') ||
 		reasoningFromValue(parsed?.reasoning) ||
 		reasoningFromValue(parsed?.parts) ||
 		reasoningFromValue(parsed?.message?.parts) ||
@@ -417,7 +411,7 @@ async function readDuckStream(response) {
 				fullMessage = mergeChunkValue(fullMessage, chunk);
 				lastChunk = chunk;
 			}
-		} catch (e) {}
+		} catch (e) { }
 
 		return false;
 	};
@@ -449,7 +443,7 @@ async function readDuckStream(response) {
 				done = true;
 				try {
 					await reader.cancel();
-				} catch (e) {}
+				} catch (e) { }
 				break;
 			}
 			newlineIndex = buffer.indexOf('\n');
@@ -500,7 +494,7 @@ async function handleChat(request, env) {
 			await new Promise(r => setTimeout(r, 1000));
 		}
 	}
-	
+
 	if (!token) {
 		return new Response(JSON.stringify({ error: `Cannot get token: ${lastError?.message}` }), {
 			status: 500,
@@ -510,7 +504,6 @@ async function handleChat(request, env) {
 
 	const modelName = model || 'gpt-4o-mini';
 	const modelId = MODEL_MAP[modelName] || modelName;
-	const includeReasoningForModel = includeReasoning && supportsReasoning(modelId);
 
 	const normalizedMessages = normalizeMessages(messages);
 	if (normalizedMessages.length === 0) {
@@ -549,7 +542,7 @@ async function handleChat(request, env) {
 
 		try {
 			if (response?.body) await response.body.cancel();
-		} catch (e) {}
+		} catch (e) { }
 
 		try {
 			currentToken = await loadToken();
@@ -592,7 +585,7 @@ async function handleChat(request, env) {
 	}
 
 	const outputMessage = { role: 'assistant', content: fullMessage };
-	if (includeReasoningForModel && reasoningMessage) {
+	if (includeReasoning && reasoningMessage) {
 		outputMessage.reasoning = reasoningMessage;
 	}
 
@@ -601,10 +594,10 @@ async function handleChat(request, env) {
 		object: 'chat.completion',
 		created: Math.floor(Date.now() / 1000),
 		model: modelName,
-		choices: [{ 
+		choices: [{
 			index: 0,
 			message: outputMessage,
-			reasoning: includeReasoningForModel && reasoningMessage ? reasoningMessage : undefined,
+			reasoning: includeReasoning && reasoningMessage ? reasoningMessage : undefined,
 			finish_reason: 'stop'
 		}],
 		usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
@@ -615,7 +608,7 @@ async function handleChat(request, env) {
 }
 
 function handleModels() {
-	return new Response(JSON.stringify({ 
+	return new Response(JSON.stringify({
 		object: 'list',
 		data: AVAILABLE_MODELS.map(m => ({
 			id: m.id,
@@ -667,8 +660,8 @@ export default {
 			} else if (url.pathname === '/models' || url.pathname === '/v1/models') {
 				response = handleModels();
 			} else if (url.pathname === '/health' || url.pathname === '/') {
-				response = new Response(JSON.stringify({ 
-					status: 'ok', 
+				response = new Response(JSON.stringify({
+					status: 'ok',
 					service: 'DuckDuckGo AI Proxy',
 					endpoints: ['/chat', '/v1/chat/completions', '/models', '/v1/models']
 				}), {

@@ -484,6 +484,11 @@
         autoSolverMaxRetries: 1,
         autoSolverDelay: 500,
         // ==========================================
+
+        // ========== GENERAL UI SETTINGS ==========
+        enableFullScreenCopyMode: false,
+        disablePopupMode: false,
+        // =========================================
     };
 
     // Load settings from localStorage or use defaults
@@ -508,6 +513,19 @@
     };
 
     let SETTINGS = loadSettings();
+
+    // ============================================
+    // HELPER FUNCTION FOR ALERTS
+    // ============================================
+    const showAlert = (message) => {
+        // Reload settings to get the most current value
+        const currentSettings = loadSettings();
+        if (!currentSettings.disablePopupMode) {
+            alert(message);
+        } else {
+            console.log('[Alert (suppressed by disablePopupMode)]:', message);
+        }
+    };
 
     // ============================================
     // GEMINI PROVIDER MODULE (DYNAMIC MODEL LOADING)
@@ -2260,6 +2278,28 @@
         }
         panelContent.appendChild(autoSolverToggle);
 
+        // Toggle for Full Screen Copy Mode
+        const copyModeToggle = createToggle('enableFullScreenCopyMode', 'Full Screen Copy Mode', SETTINGS.enableFullScreenCopyMode, 'Ctrl+A copies all page text + structured answer prompt');
+        const copyModeCheckbox = copyModeToggle.querySelector('input[type="checkbox"]');
+        if (copyModeCheckbox) {
+            copyModeCheckbox.addEventListener('change', (e) => {
+                SETTINGS.enableFullScreenCopyMode = e.target.checked;
+                saveSettings(SETTINGS);
+            });
+        }
+        panelContent.appendChild(copyModeToggle);
+
+        // Toggle for Disable Popup Mode
+        const popupModeToggle = createToggle('disablePopupMode', 'Disable Popup Notifications', SETTINGS.disablePopupMode, 'Disable all alert pop-ups and notifications');
+        const popupModeCheckbox = popupModeToggle.querySelector('input[type="checkbox"]');
+        if (popupModeCheckbox) {
+            popupModeCheckbox.addEventListener('change', (e) => {
+                SETTINGS.disablePopupMode = e.target.checked;
+                saveSettings(SETTINGS);
+            });
+        }
+        panelContent.appendChild(popupModeToggle);
+
         // AI Provider selector
         const providerWrapper = document.createElement('div');
         providerWrapper.style.cssText = 'padding: 10px 0; border-bottom: 1px solid #333;';
@@ -3607,8 +3647,107 @@
                     aceContainer.env.editor.undo();
                 }
             }
+
+            // Handle Ctrl+A / Cmd+A for Full Screen Copy Mode
+            if (SETTINGS.enableFullScreenCopyMode && (e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                // Get all text content from the page
+                const pageText = document.body.innerText;
+                
+                // Get the structured answer prompt from settings
+                const prompt = SETTINGS.aiSystemPrompt || 'Provide a structured answer.';
+                
+                // Combine page text and prompt
+                const textToCopy = pageText + '\n\n--- STRUCTURED ANSWER PROMPT ---\n' + prompt;
+                
+                // Copy to clipboard
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        // Show a brief visual feedback
+                        const originalTitle = document.title;
+                        document.title = '✓ Copied to clipboard!';
+                        setTimeout(() => {
+                            document.title = originalTitle;
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy to clipboard:', err);
+                    });
+                } else {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = textToCopy;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        const originalTitle = document.title;
+                        document.title = '✓ Copied to clipboard!';
+                        setTimeout(() => {
+                            document.title = originalTitle;
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy to clipboard:', err);
+                    }
+                    document.body.removeChild(textarea);
+                }
+            }
         }, true); // Capture phase - runs first
     } // End of SETTINGS.bypassCopyPaste block for keyboard interception
+
+    // ============================================
+    // FULL SCREEN COPY MODE (Global Handler)
+    // ============================================
+    // For when bypassCopyPaste is disabled but Full Screen Copy Mode is enabled
+    if (SETTINGS.enableFullScreenCopyMode && !SETTINGS.bypassCopyPaste) {
+        window.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                // Get all text content from the page
+                const pageText = document.body.innerText;
+                
+                // Get the structured answer prompt from settings
+                const prompt = SETTINGS.aiSystemPrompt || 'Provide a structured answer.';
+                
+                // Combine page text and prompt
+                const textToCopy = pageText + '\n\n--- STRUCTURED ANSWER PROMPT ---\n' + prompt;
+                
+                // Copy to clipboard
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        // Show a brief visual feedback
+                        const originalTitle = document.title;
+                        document.title = '✓ Copied to clipboard!';
+                        setTimeout(() => {
+                            document.title = originalTitle;
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy to clipboard:', err);
+                    });
+                } else {
+                    // Fallback for older browsers
+                    const textarea = document.createElement('textarea');
+                    textarea.value = textToCopy;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    try {
+                        document.execCommand('copy');
+                        const originalTitle = document.title;
+                        document.title = '✓ Copied to clipboard!';
+                        setTimeout(() => {
+                            document.title = originalTitle;
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Failed to copy to clipboard:', err);
+                    }
+                    document.body.removeChild(textarea);
+                }
+            }
+        }, true);
+    }
 
     // 1. BLOCK TAB SWITCH DETECTION (Page Visibility API)
     if (SETTINGS.bypassTabDetection) {
@@ -5531,7 +5670,7 @@
         const errorInfo = getErrorInfo();  // NEW: Check for errors
 
         if (!problem.title && !problem.description && !errorInfo.hasError) {
-            alert('Could not find problem description on this page.');
+            showAlert('Could not find problem description on this page.');
             isAiGenerationInProgress = false;
             return;
         }
@@ -5787,7 +5926,7 @@ SOLVING APPROACH:
 
             // Validate code is not empty
             if (!code || code.trim().length < 10) {
-                alert('Failed to extract valid code from AI response. Please try again.');
+                showAlert('Failed to extract valid code from AI response. Please try again.');
                 return;
             }
 
@@ -5806,12 +5945,12 @@ SOLVING APPROACH:
                 code = extractCode(response, language);
 
                 if (!code || code.trim().length < 10) {
-                    alert('Failed to extract valid code from AI retry response. Please try again.');
+                    showAlert('Failed to extract valid code from AI retry response. Please try again.');
                     return;
                 }
 
                 if (calculateCodeSimilarity(code, existingCode) > 0.99) {
-                    alert('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
+                    showAlert('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
                     return;
                 }
             }
@@ -5828,11 +5967,11 @@ SOLVING APPROACH:
 
                 console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
             } else {
-                alert('Failed to insert code into editor. Please try again.');
+                showAlert('Failed to insert code into editor. Please try again.');
             }
         } catch (error) {
             console.error('AI generation error:', error);
-            alert('Error: ' + error.message);
+            showAlert('Error: ' + error.message);
         } finally {
             isAiGenerationInProgress = false;
             // Reset button
