@@ -457,6 +457,8 @@
         openrouterApiKey: "",
         openrouterModel: "google/gemini-2.5-flash-001",
         puterModel: "gpt-5.4-nano",
+        puterEnableReasoning: false,
+        puterReasoningEffort: "low",
 
         // ========== G4F SETTINGS (NEW) ==========
         g4fApiKey: "",
@@ -1096,48 +1098,126 @@
             DEFAULT_MODEL: 'gpt-5.4-nano'
         };
 
+        const MODEL_GROUPS = {
+            'OpenAI': [
+                'gpt-5.5-pro', 'gpt-5.5', 'gpt-5.4-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano',
+                'gpt-5.3-chat', 'gpt-5.3-codex', 'gpt-5.2-pro', 'gpt-5.2', 'gpt-5.2-chat',
+                'gpt-5.1', 'gpt-5.1-chat-latest', 'gpt-5.1-codex', 'gpt-5.1-codex-mini', 'gpt-5.1-codex-max',
+                'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5-chat-latest', 'gpt-4.5-preview',
+                'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o', 'gpt-4o-mini',
+                'o1', 'o1-mini', 'o1-pro', 'o3', 'o3-mini', 'o4-mini',
+                'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'openai/gpt-oss-safeguard-20b',
+                'openai/gpt-oss-120b:free', 'openai/gpt-oss-20b:free'
+            ],
+            'Anthropic': [
+                'claude-opus-4.7-fast', 'claude-opus-4-7', 'claude-opus-4.6-fast', 'claude-opus-4-6',
+                'claude-sonnet-4-6', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5',
+                'claude-opus-4-1', 'claude-opus-4', 'claude-sonnet-4',
+                'anthropic/claude-opus-4.1', 'anthropic/claude-opus-4.6-fast', 'anthropic/claude-opus-4.6'
+            ],
+            'Google Gemini': [
+                'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-3-flash-preview', 'gemini-3-pro-preview',
+                'gemini-2.5-pro', 'gemini-2.5-pro-preview', 'gemini-2.5-pro-preview-05-06',
+                'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash-lite-preview-09-2025',
+                'gemini-2.5-flash-preview-09-2025', 'gemini-2.0-flash-001', 'gemini-2.0-flash', 'gemini-2.0-flash-lite',
+                'gemini-2.0-flash-lite-001'
+            ],
+            'Google Gemma': [
+                'google/gemma-4-31b-it', 'google/gemma-4-26b-a4b-it', 'google/gemma-3-27b-it', 'google/gemma-3-12b-it',
+                'google/gemma-3-4b-it', 'google/gemma-3n-e4b-it', 'google/gemma-2-27b-it'
+            ],
+            'DeepSeek': [
+                'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash', 'deepseek/deepseek-r1-0528', 'deepseek/deepseek-r1',
+                'deepseek/deepseek-v3.2', 'deepseek/deepseek-v3.2-exp', 'deepseek/deepseek-v3.1-terminus',
+                'deepseek/deepseek-v3.1-terminus:exacto', 'deepseek/deepseek-chat-v3-0324', 'deepseek/deepseek-chat-v3.1',
+                'deepseek/deepseek-r1-distill-qwen-32b'
+            ],
+            'Meta Llama': [
+                'meta-llama/llama-4-maverick', 'meta-llama/llama-4-scout', 'meta-llama/llama-3.3-70b-instruct',
+                'meta-llama/llama-3.1-70b-instruct', 'meta-llama/llama-3.1-8b-instruct', 'meta-llama/llama-3-70b-instruct',
+                'meta-llama/llama-3-8b-instruct', 'meta-llama/llama-3.2-11b-vision-instruct', 'meta-llama/llama-3.2-3b-instruct',
+                'meta-llama/llama-3.2-1b-instruct', 'meta-llama/llama-guard-4-12b', 'meta-llama/llama-guard-3-8b'
+            ],
+            'Qwen': [
+                'qwen/qwen3-max', 'qwen/qwen3-max-thinking', 'qwen/qwen3-235b-a22b', 'qwen/qwen3-235b-a22b-thinking-2507',
+                'qwen/qwen3-235b-a22b-2507', 'qwen/qwen3-30b-a3b', 'qwen/qwen3-30b-a3b-instruct-2507',
+                'qwen/qwen3-30b-a3b-thinking-2507', 'qwen/qwen3-32b', 'qwen/qwen3-14b', 'qwen/qwen3-8b',
+                'qwen/qwen3-coder-480b-a35b-instruct', 'qwen/qwen3-coder-480b-a35b-instruct:free', 'qwen/qwen3-coder-30b-a3b-instruct',
+                'qwen/qwen3-coder-next', 'qwen/qwen3-coder-plus', 'qwen/qwen3-coder-flash',
+                'qwen/qwen3-vl-235b-a22b', 'qwen/qwen3-vl-235b-a22b-thinking', 'qwen/qwen3-vl-30b-a3b-instruct',
+                'qwen/qwen3-vl-30b-a3b-thinking', 'qwen/qwen3-vl-32b-instruct', 'qwen/qwen3-vl-8b-instruct',
+                'qwen/qwen3-vl-8b-thinking', 'qwen/qwen3.5-plus', 'qwen/qwen3.5-35b-a3b', 'qwen/qwen3.5-397b-a17b',
+                'qwen/qwen3.5-122b-a10b', 'qwen/qwen3.5-27b', 'qwen/qwen3.5-9b'
+            ],
+            'Mistral': [
+                'mistralai/mistral-large-2411', 'mistralai/mistral-large-2407', 'mistralai/mistral-medium-3.1',
+                'mistralai/mistral-small-3.2-24b-instruct', 'mistralai/mistral-small-3.1-24b-instruct',
+                'mistralai/mistral-small-2603', 'mistralai/mistral-small-24b-instruct-2501', 'mistralai/devstral-2512',
+                'mistralai/devstral-medium', 'mistralai/devstral-small', 'mistralai/mistral-7b-instruct-v0.1',
+                'mistralai/mixtral-8x22b-instruct', 'mistralai/mistral-saba'
+            ],
+            'xAI': [
+                'x-ai/grok-4.20', 'x-ai/grok-4.1-fast', 'x-ai/grok-4.20-multi-agent', 'x-ai/grok-3-beta',
+                'x-ai/grok-3-mini-beta'
+            ],
+            'OpenRouter / Other': [
+                'z-ai/glm-5.1', 'z-ai/glm-5', 'z-ai/glm-5-turbo', 'z-ai/glm-4.7', 'z-ai/glm-4.7-flash', 'z-ai/glm-4.6',
+                'z-ai/glm-4.5', 'z-ai/glm-4.5-air', 'z-ai/glm-4.5-air:free',
+                'openrouter/free', 'openrouter/bodybuilder', 'openrouter/elephant-alpha', 'perplexity/sonar',
+                'perplexity/sonar-pro', 'perplexity/sonar-reasoning-pro', 'perplexity/sonar-deep-research',
+                'perplexity/sonar-pro-search', 'cohere/command-a', 'cohere/command-r-08-2024', 'cohere/command-r-plus-08-2024',
+                'cohere/command-r7b-12-2024', 'ibm-granite/granite-4.0-h-micro', 'amazon/nova-pro-v1', 'amazon/nova-premier-v1',
+                'amazon/nova-lite-v1', 'amazon/nova-micro-v1', 'amazon/nova-2-lite-v1', 'liquid/lfm-2.24b-a2b',
+                'liquid/lfm-2.5-1.2b-instruct:free', 'liquid/lfm-2.5-1.2b-thinking:free', 'nousresearch/hermes-4-405b',
+                'nousresearch/hermes-4-70b', 'nousresearch/hermes-3-llama-3.1-405b', 'nousresearch/hermes-3-llama-3.1-405b:free',
+                'nousresearch/hermes-3-llama-3.1-70b', 'nvidia/nemotron-3-super-120b-a12b', 'nvidia/nemotron-3-super-120b-a12b:free',
+                'nvidia/nemotron-3-nano-30b-a3b', 'nvidia/nemotron-3-nano-30b-a3b:free', 'nvidia/nemotron-nano-9b-v2',
+                'nvidia/nemotron-nano-9b-v2:free', 'microsoft/phi-4', 'microsoft/wizardlm-2-8x22b', 'moonshotai/kimi-k2',
+                'moonshotai/kimi-k2-0905', 'moonshotai/kimi-k2-thinking', 'moonshotai/kimi-k2.5', 'minimax/minimax-m2.5',
+                'minimax/minimax-m2.5:free', 'minimax/minimax-m2.7', 'minimax/minimax-m2.1', 'minimax/minimax-m2',
+                'minimax/minimax-01', 'tencent/hunyuan-a13b-instruct', 'writer/palmyra-x5', 'upstage/solar-pro-3',
+                'stepfun/step-3.5-flash', 'prime-intellect/intellect-3', 'rekaai/reka-edge', 'rekaai/reka-flash-3',
+                'bytedance-seed/seed-1.6', 'bytedance-seed/seed-1.6-flash', 'bytedance-seed/seed-2.0-lite', 'bytedance-seed/seed-2.0-mini',
+                'bytedance/ui-tars-1.5-7b', 'xiaomi/mimo-v2-pro', 'xiaomi/mimo-v2-flash', 'xiaomi/mimo-v2-omni',
+                'anthracite-org/magnum-v4-72b', 'aion-labs/aion-2.0', 'aion-labs/aion-1.0', 'aion-labs/aion-1.0-mini',
+                'ai21/jamba-large-1.7', 'allenai/olmo-3-32b-think', 'arcee-ai/coder-large', 'arcee-ai/maestro-reasoning',
+                'arcee-ai/trinity-large-thinking', 'arcee-ai/trinity-large-preview:free', 'arcee-ai/trinity-mini', 'arcee-ai/spotlight'
+            ]
+        };
+
         function normalizeModel(model) {
+            const aliases = new Set(model.aliases || []);
+            if (model.id && model.id.includes('/')) {
+                aliases.add(model.id.split('/').pop());
+            }
             return {
                 id: model.id,
                 name: model.name,
                 group: model.group,
                 description: model.description || '',
-                aliases: model.aliases || []
+                aliases: Array.from(aliases)
             };
         }
 
+        function makeModel(id, group, description = '', aliases = []) {
+            const shortName = id.includes('/') ? id.split('/').pop() : id;
+            return normalizeModel({
+                id,
+                name: shortName,
+                group,
+                description,
+                aliases
+            });
+        }
+
         function getModels() {
-            return [
-                { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', group: 'OpenAI', description: 'Highest capability general model' },
-                { id: 'gpt-5.5', name: 'GPT-5.5', group: 'OpenAI', description: 'Balanced high-end model' },
-                { id: 'gpt-5.4-pro', name: 'GPT-5.4 Pro', group: 'OpenAI', description: 'Strong reasoning and coding' },
-                { id: 'gpt-5.4', name: 'GPT-5.4', group: 'OpenAI', description: 'General purpose GPT model' },
-                { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', group: 'OpenAI', description: 'Fast and capable compact model' },
-                { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', group: 'OpenAI', description: 'Fastest lightweight GPT model' },
-                { id: 'gpt-4o', name: 'GPT-4o', group: 'OpenAI', description: 'Multimodal general model' },
-                { id: 'gpt-4o-mini', name: 'GPT-4o Mini', group: 'OpenAI', description: 'Fast, low-cost OpenAI model' },
-                { id: 'o3', name: 'o3', group: 'OpenAI Reasoning', description: 'Reasoning-focused model' },
-                { id: 'o3-mini', name: 'o3 Mini', group: 'OpenAI Reasoning', description: 'Compact reasoning model' },
-                { id: 'claude-opus-4-7', name: 'Claude Opus 4.7', group: 'Anthropic', description: 'Top-tier reasoning and coding' },
-                { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', group: 'Anthropic', description: 'Strong general-purpose model' },
-                { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', group: 'Anthropic', description: 'Fast and efficient' },
-                { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', group: 'Google', description: 'Advanced multimodal reasoning' },
-                { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', group: 'Google', description: 'Fast multimodal model' },
-                { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', group: 'Google', description: 'Strong general and coding model' },
-                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', group: 'Google', description: 'Fast balanced Gemini model' },
-                { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', group: 'Google', description: 'Very fast lightweight Gemini model' },
-                { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B IT', group: 'Google Gemma', description: 'Instruction-tuned Gemma model' },
-                { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B IT', group: 'Google Gemma', description: 'Large instruction-tuned Gemma model' },
-                { id: 'deepseek/deepseek-v4-pro', name: 'DeepSeek V4 Pro', group: 'DeepSeek', description: 'Strong reasoning and coding' },
-                { id: 'deepseek/deepseek-r1-0528', name: 'DeepSeek R1 0528', group: 'DeepSeek', description: 'Reasoning-focused model' },
-                { id: 'meta-llama/llama-4-maverick', name: 'Llama 4 Maverick', group: 'Meta', description: 'Powerful general Llama model' },
-                { id: 'meta-llama/llama-4-scout', name: 'Llama 4 Scout', group: 'Meta', description: 'Fast Llama model' },
-                { id: 'qwen/qwen3-max', name: 'Qwen3 Max', group: 'Qwen', description: 'Strong multilingual model' },
-                { id: 'mistralai/mistral-large-2411', name: 'Mistral Large 2411', group: 'Mistral', description: 'High-quality general model' },
-                { id: 'x-ai/grok-4.20', name: 'Grok 4.20', group: 'xAI', description: 'Conversational model' },
-                { id: 'gpt-image-2', name: 'GPT Image 2', group: 'Image', description: 'Image generation model' },
-                { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash TTS', group: 'Speech', description: 'Text-to-speech model' }
-            ].map(normalizeModel);
+            const models = [];
+            for (const [group, ids] of Object.entries(MODEL_GROUPS)) {
+                for (const id of ids) {
+                    models.push(makeModel(id, group, ''));
+                }
+            }
+            return models;
         }
 
         function filterModels(models, query) {
@@ -2743,6 +2823,27 @@
                     <option value="gpt-5.4-nano">Loading models...</option>
                 </select>
                 <div id="puterModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 10px; cursor: pointer;">
+                        <input type="checkbox" id="puterEnableReasoning" style="margin: 0;">
+                        Enable reasoning
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 10px; cursor: pointer;">
+                        <span>Effort</span>
+                        <select id="puterReasoningEffort" style="
+                            padding: 4px 6px;
+                            border: 1px solid #444;
+                            border-radius: 4px;
+                            background: #2d2d2d;
+                            color: #fff;
+                            font-size: 10px;
+                        ">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </label>
+                </div>
                 <div style="color: #888; font-size: 10px; margin-top: 4px; line-height: 1.4;">
                     No API key required. Uses your Puter account and supports short aliases plus full model IDs.
                 </div>
@@ -2753,8 +2854,13 @@
                 const searchInput = document.getElementById('puterModelSearch');
                 const refreshBtn = document.getElementById('puterRefreshModels');
                 const statusDiv = document.getElementById('puterModelStatus');
+                const reasoningToggle = document.getElementById('puterEnableReasoning');
+                const reasoningEffortSelect = document.getElementById('puterReasoningEffort');
 
                 let allModels = PuterProvider.getModels();
+
+                if (reasoningToggle) reasoningToggle.checked = Boolean(SETTINGS.puterEnableReasoning);
+                if (reasoningEffortSelect) reasoningEffortSelect.value = SETTINGS.puterReasoningEffort || 'low';
 
                 const populateSelect = (models) => {
                     if (!select) return;
@@ -2811,6 +2917,20 @@
                 if (select) {
                     select.addEventListener('change', () => {
                         SETTINGS.puterModel = select.value;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                if (reasoningToggle) {
+                    reasoningToggle.addEventListener('change', () => {
+                        SETTINGS.puterEnableReasoning = reasoningToggle.checked;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                if (reasoningEffortSelect) {
+                    reasoningEffortSelect.addEventListener('change', () => {
+                        SETTINGS.puterReasoningEffort = reasoningEffortSelect.value;
                         saveSettings(SETTINGS);
                     });
                 }
@@ -5216,9 +5336,15 @@
         }
 
         const model = SETTINGS.puterModel || PuterProvider.CONFIG.DEFAULT_MODEL;
-        const response = await puter.ai.chat(prompt, {
+        const options = {
             model: model
-        });
+        };
+
+        if (SETTINGS.puterEnableReasoning) {
+            options.reasoning_effort = SETTINGS.puterReasoningEffort || 'low';
+        }
+
+        const response = await puter.ai.chat(prompt, options);
 
         if (typeof response === 'string') {
             return response;
