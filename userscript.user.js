@@ -1962,6 +1962,19 @@
     // ============================================
     // SETTINGS UI
     // ============================================
+    const MODEL_LOAD_TIMEOUT = 15000;
+
+    function loadModelsWithTimeout(promise, providerName) {
+        let timeoutId;
+        const timeout = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error(`${providerName} model loading timed out after ${MODEL_LOAD_TIMEOUT / 1000}s`));
+            }, MODEL_LOAD_TIMEOUT);
+        });
+
+        return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+    }
+
     const createSettingsUI = () => {
         // Inject Google Fonts once
         if (!document.getElementById('bypass-gfont')) {
@@ -2279,7 +2292,7 @@
                     if (statusDiv) statusDiv.textContent = 'Loading models...';
 
                     try {
-                        allModels = await G4FProvider.fetchModels(forceRefresh);
+                        allModels = await loadModelsWithTimeout(G4FProvider.fetchModels(forceRefresh), 'G4F');
                         populateSelect(allModels);
                     } catch (error) {
                         if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
@@ -2589,7 +2602,7 @@
                     }
 
                     try {
-                        allModels = await GeminiProvider.fetchModels(forceRefresh);
+                        allModels = await loadModelsWithTimeout(GeminiProvider.fetchModels(forceRefresh), 'Gemini');
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -2726,7 +2739,7 @@
                     }
 
                     try {
-                        allModels = await OpenAIProvider.fetchModels(forceRefresh);
+                        allModels = await loadModelsWithTimeout(OpenAIProvider.fetchModels(forceRefresh), 'OpenAI');
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -2951,7 +2964,7 @@
                     }
 
                     try {
-                        allModels = await OpenRouterProvider.fetchModels(forceRefresh);
+                        allModels = await loadModelsWithTimeout(OpenRouterProvider.fetchModels(forceRefresh), 'OpenRouter');
                         applyFilters();
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -3540,7 +3553,7 @@
                     }
 
                     try {
-                        allModels = await YuppBridgeProvider.fetchModels(forceRefresh);
+                        allModels = await loadModelsWithTimeout(YuppBridgeProvider.fetchModels(forceRefresh), 'YuppBridge');
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
@@ -4610,7 +4623,8 @@
         initialDelay: 800,
         retryDelay: 400,
         maxRetries: 12,
-        observerTimeout: 8000
+        observerTimeout: 8000,
+        ocrTimeout: 20000
     };
 
     // Find captcha image dynamically
@@ -4820,6 +4834,44 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         return canvas.toDataURL();
+    }
+
+    async function recognizeCaptchaImage(imageSource) {
+        let worker = null;
+        let aborted = false;
+        let timeoutId;
+
+        const recognition = (async () => {
+            worker = await Tesseract.createWorker("eng");
+            if (aborted) {
+                await worker.terminate();
+                worker = null;
+                throw new Error('OCR initialization timed out');
+            }
+            await worker.setParameters({
+                tessedit_char_whitelist: "0123456789+= ",
+                tessedit_pageseg_mode: "7",
+            });
+            return worker.recognize(imageSource);
+        })();
+
+        const timeout = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                aborted = true;
+                if (worker) worker.terminate().catch(() => {});
+                reject(new Error(`OCR timed out after ${CAPTCHA_CONFIG.ocrTimeout / 1000}s`));
+            }, CAPTCHA_CONFIG.ocrTimeout);
+        });
+
+        try {
+            return await Promise.race([recognition, timeout]);
+        } finally {
+            clearTimeout(timeoutId);
+            if (worker) {
+                await worker.terminate().catch(() => {});
+                worker = null;
+            }
+        }
     }
 
     // ===== IMPROVED: Smarter math expression parser =====
@@ -5040,54 +5092,41 @@
             });
         }
 
-        // Try every image variant before falling back to manual entry. The retry
-        // counter tracks answers rejected by the server, not local OCR failures.
+        // Use one image variant per server attempt. If SkillRack rejects the
+        // answer, retryCount advances and the next variant is used after reload.
         const processingMethods = [
             { name: "Enhanced", fn: () => processImageForOCR(image) },
             { name: "Inverted", fn: () => invertColors(image) },
             { name: "Original", fn: () => image.src }
         ];
-        const startMethod = retryCount % processingMethods.length;
-        const orderedMethods = processingMethods.slice(startMethod)
-            .concat(processingMethods.slice(0, startMethod));
+        const method = processingMethods[Math.min(retryCount, processingMethods.length - 1)];
+        const attemptNumber = retryCount + 1;
 
-        let ocrAttempts = 0;
         try {
-            for (const method of orderedMethods) {
-                ocrAttempts++;
-                console.log(`[Captcha] Using ${method.name} processing (OCR attempt ${ocrAttempts}/${processingMethods.length})...`);
+            console.log(`[Captcha] Using ${method.name} processing (attempt ${attemptNumber}/${CAPTCHA_MAX_AUTO_RETRIES})...`);
+            const processedImg = method.fn();
+            const { data: { text } } = await recognizeCaptchaImage(processedImg);
 
-                try {
-                    const processedImg = method.fn();
-                    const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
-                        tessedit_char_whitelist: "0123456789+= ",
-                        tessedit_pageseg_mode: "7",
-                    });
+            console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
+            const result = solveCaptcha(text);
 
-                    console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
-                    const result = solveCaptcha(text);
-
-                    if (result === null || result < 1 || result > 198) {
-                        console.log(`[Captcha] ✗ ${method.name} did not produce a valid result`);
-                        continue;
-                    }
-
-                    console.log(`[Captcha] ✓ Solution found: ${result}`);
-                    console.log('[Captcha] Submitting answer...');
-                    localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
-                    textbox.value = result;
-                    setTimeout(() => safeButtonClick(button), 100);
-                    return;
-                } catch (error) {
-                    console.error(`[Captcha] ${method.name} OCR Error:`, error);
-                }
+            if (result === null || result < 1 || result > 198) {
+                console.log(`[Captcha] ✗ ${method.name} did not produce a valid result`);
+                handleIncorrectCaptcha(attemptNumber);
+                return;
             }
+
+            console.log(`[Captcha] ✓ Solution found: ${result}`);
+            console.log('[Captcha] Submitting answer...');
+            localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
+            textbox.value = result;
+            setTimeout(() => safeButtonClick(button), 100);
+        } catch (error) {
+            console.error(`[Captcha] ${method.name} OCR Error:`, error);
+            handleIncorrectCaptcha(attemptNumber);
         } finally {
             captchaSolverRunning = false;
         }
-
-        console.log(`[Captcha] ✗ All ${ocrAttempts} OCR methods failed`);
-        handleIncorrectCaptcha(ocrAttempts);
     }
 
 
@@ -5249,21 +5288,8 @@
 
         window.addEventListener("load", function () {
             setTimeout(() => {
-                // Clear the failure flag when page reloads after successful submission
-                const errors = document.getElementsByClassName(ERROR_CLASS);
-                let hasIncorrectCaptchaError = false;
-                for (let err of errors) {
-                    if (err.textContent.includes("Incorrect Captcha")) {
-                        hasIncorrectCaptchaError = true;
-                        break;
-                    }
-                }
-
-                // Only clear flags if there's no error (meaning previous attempt was successful)
-                if (!hasIncorrectCaptchaError) {
-                    resetCaptchaRetry();
-                }
-
+                // This is only a backup initializer. State is reset by
+                // initCaptchaSolver after the captcha page has actually gone.
                 const img = findCaptchaImage();
                 const textbox = document.getElementById(CAPTCHA_INPUT_ID);
                 if (img && textbox && !textbox.value) {
