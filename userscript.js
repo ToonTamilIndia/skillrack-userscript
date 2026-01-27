@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      3.0
-// @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, and auto-solve captcha
+// @version      4.0
+// @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
 // @match        https://skillrack.com/*
@@ -31,6 +31,12 @@
         // Captcha solver (credit: adithyagenie)
         enableCaptchaSolver: true,     // Auto-solve math captcha
         captchaUsername: "",           // Username to remove from captcha (optional)
+        
+        // AI Solution Generator
+        enableAISolver: true,          // Enable AI solution button
+        aiProvider: "gemini",          // "gemini" or "openai"
+        geminiApiKey: "",              // Google Gemini API key
+        openaiApiKey: "",              // OpenAI API key
     };
 
     // Load settings from localStorage or use defaults
@@ -225,9 +231,41 @@
         panelContent.appendChild(createToggle('enableCaptchaSolver', 'Auto-Solve Captcha', SETTINGS.enableCaptchaSolver, 'Automatically solve math captcha'));
         panelContent.appendChild(createTextInput('captchaUsername', 'Username (optional)', SETTINGS.captchaUsername, 'e.g., abcd123+21@xyz'));
 
+        panelContent.appendChild(createSectionHeader('AI Solution Generator'));
+        panelContent.appendChild(createToggle('enableAISolver', 'Enable AI Solver', SETTINGS.enableAISolver, 'Show AI solution button'));
+        
+        // AI Provider selector
+        const providerWrapper = document.createElement('div');
+        providerWrapper.style.cssText = 'padding: 10px 0; border-bottom: 1px solid #333;';
+        providerWrapper.innerHTML = `
+            <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">AI Provider</div>
+            <select id="aiProvider" style="
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #444;
+                border-radius: 6px;
+                background: #2d2d2d;
+                color: #fff;
+                font-size: 12px;
+                box-sizing: border-box;
+            ">
+                <option value="gemini" ${SETTINGS.aiProvider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
+                <option value="openai" ${SETTINGS.aiProvider === 'openai' ? 'selected' : ''}>OpenAI (ChatGPT)</option>
+            </select>
+        `;
+        const providerSelect = providerWrapper.querySelector('select');
+        providerSelect.addEventListener('change', () => {
+            SETTINGS.aiProvider = providerSelect.value;
+            saveSettings(SETTINGS);
+        });
+        panelContent.appendChild(providerWrapper);
+        
+        panelContent.appendChild(createTextInput('geminiApiKey', 'Gemini API Key', SETTINGS.geminiApiKey, 'Enter your Gemini API key'));
+        panelContent.appendChild(createTextInput('openaiApiKey', 'OpenAI API Key', SETTINGS.openaiApiKey, 'Enter your OpenAI API key'));
+
         const note = document.createElement('div');
         note.style.cssText = 'color: #666; font-size: 10px; padding: 12px 0; text-align: center;';
-        note.innerHTML = '⚠️ Reload page after changing settings<br>Some features require page refresh';
+        note.innerHTML = '⚠️ Reload page after changing settings<br>Some features require page refresh<br>🔑 Get Gemini key: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">AI Studio</a>';
         panelContent.appendChild(note);
 
         panel.appendChild(panelHeader);
@@ -1115,11 +1153,66 @@
     
     const TUTOR_REGEX = /https:\/\/(www.)?skillrack\.com\/faces\/candidate\/tutorprogram\.xhtml/gi;
     const ERROR_CLASS = "ui-growl-item";
-    const TUTOR_IMG_ID = "j_id_5s";
-    const NON_TUTOR_IMG_ID = "j_id_76";
-    const BACK_BTN_ID = "j_id_63";
     const CAPTCHA_INPUT_ID = "capval";
     const PROCEED_BTN_ID = "proceedbtn";
+
+    // Find captcha image dynamically (IDs change between pages/sessions)
+    function findCaptchaImage() {
+        // Method 1: Find image near the captcha input
+        const captchaInput = document.getElementById(CAPTCHA_INPUT_ID);
+        if (captchaInput) {
+            // Look for img in the same parent/grandparent container
+            let container = captchaInput.parentElement;
+            for (let i = 0; i < 3 && container; i++) {
+                const img = container.querySelector('img[src^="data:image"]');
+                if (img) return img;
+                container = container.parentElement;
+            }
+        }
+        
+        // Method 2: Find any base64 captcha image in the code editor panel
+        const codeEditorPanel = document.getElementById('codeeditorpanel');
+        if (codeEditorPanel) {
+            const img = codeEditorPanel.querySelector('img[src^="data:image"]');
+            if (img) return img;
+        }
+        
+        // Method 3: Look for img elements with base64 src that look like captcha
+        const allImages = document.querySelectorAll('img[src^="data:image/png;base64"]');
+        for (const img of allImages) {
+            // Captcha images are typically small and near input fields
+            if (img.width > 50 && img.width < 400 && img.height > 20 && img.height < 100) {
+                return img;
+            }
+        }
+        
+        // Method 4: Fallback to known IDs (these can change)
+        const knownIds = ['j_id_5s', 'j_id_76', 'j_id_75', 'j_id_74'];
+        for (const id of knownIds) {
+            const img = document.getElementById(id);
+            if (img && img.tagName === 'IMG') return img;
+        }
+        
+        return null;
+    }
+
+    // Find back button dynamically
+    function findBackButton() {
+        // Look for button with "Back" text
+        const buttons = document.querySelectorAll('button');
+        for (const btn of buttons) {
+            if (btn.textContent.includes('Back')) {
+                return btn;
+            }
+        }
+        // Fallback to known IDs
+        const knownIds = ['j_id_63', 'j_id_62'];
+        for (const id of knownIds) {
+            const btn = document.getElementById(id);
+            if (btn) return btn;
+        }
+        return null;
+    }
 
     // Invert colours for better OCR
     function invertColors(image) {
@@ -1178,15 +1271,13 @@
             return;
         }
 
-        // Get the captcha image
-        const isTutor = window.location.href.includes("tutorprogram");
-        const captchaImageId = isTutor ? TUTOR_IMG_ID : NON_TUTOR_IMG_ID;
-        const image = document.getElementById(captchaImageId);
+        // Get the captcha image dynamically
+        const image = findCaptchaImage();
         const textbox = document.getElementById(CAPTCHA_INPUT_ID);
         const button = document.getElementById(PROCEED_BTN_ID);
         
         if (!image || !textbox || !button) {
-            console.log("Captcha elements not found, skipping.");
+            console.log("Captcha elements not found, skipping. Image:", !!image, "Input:", !!textbox, "Button:", !!button);
             return;
         }
 
@@ -1236,7 +1327,7 @@
         
         // Go back and retry
         sessionStorage.setItem("captchaFail", "true");
-        const backBtn = document.getElementById(BACK_BTN_ID);
+        const backBtn = findBackButton();
         safeButtonClick(backBtn);
     }
 
@@ -1276,6 +1367,387 @@
         handleCaptcha();
     });
 
-    console.log('Anti-cheat bypass script v3.0 loaded successfully');
+    console.log('Anti-cheat bypass script v4.0 loaded successfully');
     console.log('Settings:', SETTINGS);
+
+    // ============================================
+    // 10. AI SOLUTION GENERATOR
+    // Uses Gemini or OpenAI to generate code solutions
+    // ============================================
+    
+    const getSelectedLanguage = () => {
+        const langSelect = document.getElementById('langs_input');
+        if (!langSelect) return 'C';
+        
+        const selectedOption = langSelect.options[langSelect.selectedIndex];
+        if (!selectedOption) return 'C';
+        
+        const text = selectedOption.text || selectedOption.textContent;
+        if (text.includes('Java')) return 'Java';
+        if (text.includes('Python')) return 'Python';
+        if (text.includes('CPP23')) return 'C++23';
+        if (text.includes('CPP')) return 'C++';
+        return 'C';
+    };
+
+    const getProblemDescription = () => {
+        const isTutorPage = window.location.href.includes('tutorprogram');
+        
+        // Find the problem description card
+        const cards = document.querySelectorAll('.ui-card-content');
+        for (const card of cards) {
+            const ribbon = card.querySelector('.ribbon');
+            if (ribbon) {
+                // This is the problem card
+                let problemTitle = '';
+                let description = '';
+                let tutorialHint = '';
+                let preCode = '';
+                let postCode = '';
+                
+                // Get the problem title (first .ui.label that's not ribbon/circular/image)
+                const labels = card.querySelectorAll('.ui.label');
+                for (const label of labels) {
+                    if (!label.classList.contains('ribbon') && 
+                        !label.classList.contains('circular') && 
+                        !label.classList.contains('image') &&
+                        !label.textContent.includes('Max Execution') &&
+                        !label.textContent.includes('ProgramID')) {
+                        problemTitle = label.textContent.trim();
+                        break;
+                    }
+                }
+                
+                // For tutor pages, get the tutorial highlight (explanation)
+                if (isTutorPage) {
+                    const tutorHighlight = card.querySelector('.tutorhighlight');
+                    if (tutorHighlight) {
+                        tutorialHint = tutorHighlight.textContent.trim();
+                    }
+                    
+                    // Get pre-code and post-code from the code editor panel
+                    const preCodes = document.querySelectorAll('#codeeditorpanel pre, .ui-outputpanel pre');
+                    preCodes.forEach((pre, index) => {
+                        const text = pre.textContent.trim();
+                        // Skip empty or very short snippets
+                        if (text.length > 5) {
+                            if (index === 0 || pre.closest('#j_id_7a, [id*="_7a"]')) {
+                                preCode = text;
+                            } else if (pre.closest('#j_id_7g, [id*="_7g"]')) {
+                                postCode = text;
+                            }
+                        }
+                    });
+                    
+                    // Alternative: find pre/post code by position in card
+                    if (!preCode || !postCode) {
+                        const allPres = card.querySelectorAll('pre');
+                        if (allPres.length >= 1 && !preCode) preCode = allPres[0].textContent.trim();
+                        if (allPres.length >= 2 && !postCode) postCode = allPres[1].textContent.trim();
+                    }
+                }
+                
+                // Get the problem description text
+                const allText = card.textContent;
+                const labelMatch = allText.indexOf(problemTitle);
+                if (labelMatch !== -1) {
+                    const afterTitle = allText.substring(labelMatch + problemTitle.length);
+                    const maxExecIdx = afterTitle.indexOf('Max Execution');
+                    description = maxExecIdx !== -1 ? afterTitle.substring(0, maxExecIdx) : afterTitle;
+                }
+                
+                // Also get paragraphs for cleaner description
+                const paragraphs = card.querySelectorAll('p');
+                let pText = '';
+                paragraphs.forEach(p => {
+                    const txt = p.textContent.trim();
+                    if (txt && !txt.includes('Max Execution')) {
+                        pText += txt + '\n';
+                    }
+                });
+                if (pText) {
+                    description = pText.trim();
+                }
+                
+                // Build full context for AI
+                let fullDescription = description;
+                if (isTutorPage) {
+                    fullDescription = '';
+                    if (tutorialHint) {
+                        fullDescription += `Tutorial Hint: ${tutorialHint}\n\n`;
+                    }
+                    fullDescription += `Task: ${description}\n`;
+                    if (preCode) {
+                        fullDescription += `\nPre-written code (DO NOT include this, it's already provided):\n\`\`\`\n${preCode}\n\`\`\`\n`;
+                    }
+                    if (postCode) {
+                        fullDescription += `\nPost-code that will run after your solution (DO NOT include this):\n\`\`\`\n${postCode}\n\`\`\`\n`;
+                    }
+                    fullDescription += `\nIMPORTANT: Write ONLY the middle part of the code. The pre-code and post-code are already provided by the system.`;
+                }
+                
+                return {
+                    title: problemTitle,
+                    description: fullDescription.trim(),
+                    isTutor: isTutorPage,
+                    preCode: preCode,
+                    postCode: postCode
+                };
+            }
+        }
+        return { title: '', description: '', isTutor: false, preCode: '', postCode: '' };
+    };
+
+    const generateWithGemini = async (prompt) => {
+        const apiKey = SETTINGS.geminiApiKey;
+        if (!apiKey) {
+            throw new Error('Gemini API key not configured. Please add it in settings.');
+        }
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: prompt }]
+                }],
+                generationConfig: {
+                    temperature: 0.2,
+                    maxOutputTokens: 2048,
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || 'Gemini API request failed');
+        }
+
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    };
+
+    const generateWithOpenAI = async (prompt) => {
+        const apiKey = SETTINGS.openaiApiKey;
+        if (!apiKey) {
+            throw new Error('OpenAI API key not configured. Please add it in settings.');
+        }
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }],
+                temperature: 0.2,
+                max_tokens: 2048
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || 'OpenAI API request failed');
+        }
+
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '';
+    };
+
+    const extractCode = (response, language) => {
+        // Try to extract code from markdown code blocks
+        const codeBlockRegex = /```(?:\w+)?\s*([\s\S]*?)```/g;
+        const matches = [...response.matchAll(codeBlockRegex)];
+        
+        if (matches.length > 0) {
+            return matches[0][1].trim();
+        }
+        
+        // If no code blocks, return the whole response (might be plain code)
+        return response.trim();
+    };
+
+    const generateAISolution = async () => {
+        if (!SETTINGS.enableAISolver) return;
+        
+        const language = getSelectedLanguage();
+        const problem = getProblemDescription();
+        
+        if (!problem.title && !problem.description) {
+            alert('Could not find problem description on this page.');
+            return;
+        }
+
+        // Build prompt based on page type
+        let prompt;
+        if (problem.isTutor) {
+            prompt = `You are an expert ${language} programmer. Complete the MIDDLE PORTION of the code for this problem.
+
+Problem: ${problem.title}
+${problem.description}
+
+CRITICAL REQUIREMENTS:
+- Write ONLY the missing middle part of the code
+- Do NOT include the pre-code or post-code sections (they are already provided)
+- Do NOT include imports, class declarations, or main function boilerplate if the pre-code already has them
+- The code you write will be inserted between the pre-code and post-code
+- Make sure variables from pre-code are used and variables needed by post-code are created
+- Write clean, minimal code that solves the problem
+
+Respond with ONLY the middle code portion, wrapped in a code block.`;
+        } else {
+            prompt = `You are an expert competitive programmer. Write a complete, working solution for this problem in ${language}.
+
+Problem: ${problem.title}
+${problem.description}
+
+Requirements:
+- Write ONLY the code, no explanations
+- The code must be complete and ready to compile/run
+- Use standard input/output as shown in the examples
+- Follow ${language} best practices
+- Keep the code simple and efficient
+- For Java, use class name "Hello" (required by SkillRack)
+- Include all necessary imports/headers
+
+Respond with ONLY the code, wrapped in a code block.`;
+        }
+
+        // Show loading indicator
+        const aiBtn = document.getElementById('ai-solution-btn');
+        if (aiBtn) {
+            aiBtn.disabled = true;
+            aiBtn.innerHTML = '⏳ Generating...';
+            aiBtn.style.opacity = '0.7';
+        }
+
+        try {
+            let response;
+            if (SETTINGS.aiProvider === 'gemini') {
+                response = await generateWithGemini(prompt);
+            } else {
+                response = await generateWithOpenAI(prompt);
+            }
+
+            const code = extractCode(response, language);
+            
+            if (code && window.txtCode) {
+                // Insert the code into ACE editor
+                window.txtCode.getSession().setValue(code);
+                
+                // Sync with hidden textarea
+                const $ = window.jQuery || window.$;
+                if ($ && $("#txtCode").length) {
+                    $("#txtCode").val(code);
+                }
+                
+                console.log('AI solution inserted successfully');
+            } else {
+                alert('Failed to generate solution. Please try again.');
+            }
+        } catch (error) {
+            console.error('AI generation error:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            // Reset button
+            if (aiBtn) {
+                aiBtn.disabled = false;
+                aiBtn.innerHTML = '🤖 AI Solution';
+                aiBtn.style.opacity = '1';
+            }
+        }
+    };
+
+    // Add AI Solution button to the page
+    const addAISolutionButton = () => {
+        if (!SETTINGS.enableAISolver) return;
+        
+        // Find the button group (Save/Run buttons)
+        const btnTables = document.querySelectorAll('.padtbl');
+        let targetRow = null;
+        
+        for (const table of btnTables) {
+            const saveBtn = table.querySelector('button[id$="_bf"], button span');
+            if (saveBtn && (saveBtn.textContent === 'Save' || saveBtn.querySelector?.('span')?.textContent === 'Save')) {
+                targetRow = table.querySelector('tr');
+                break;
+            }
+        }
+        
+        // Alternative: find by button text
+        if (!targetRow) {
+            const allButtons = document.querySelectorAll('button');
+            for (const btn of allButtons) {
+                if (btn.textContent.trim() === 'Save') {
+                    targetRow = btn.closest('tr');
+                    break;
+                }
+            }
+        }
+
+        if (targetRow && !document.getElementById('ai-solution-btn')) {
+            const td = document.createElement('td');
+            const aiBtn = document.createElement('button');
+            aiBtn.id = 'ai-solution-btn';
+            aiBtn.type = 'button';
+            aiBtn.innerHTML = '🤖 AI Solution';
+            aiBtn.className = 'ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only ui-button-outlined';
+            aiBtn.style.cssText = `
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+                color: white !important;
+                border: none !important;
+                padding: 8px 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            `;
+            aiBtn.onmouseover = () => {
+                aiBtn.style.transform = 'scale(1.05)';
+                aiBtn.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+            };
+            aiBtn.onmouseout = () => {
+                aiBtn.style.transform = 'scale(1)';
+                aiBtn.style.boxShadow = 'none';
+            };
+            aiBtn.onclick = generateAISolution;
+            
+            td.appendChild(aiBtn);
+            targetRow.appendChild(td);
+            
+            console.log('AI Solution button added');
+        }
+    };
+
+    // Initialize AI button when page is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(addAISolutionButton, 1000);
+            setTimeout(addAISolutionButton, 3000);
+        });
+    } else {
+        setTimeout(addAISolutionButton, 1000);
+        setTimeout(addAISolutionButton, 3000);
+    }
+
+    // Also watch for dynamic content changes
+    const aiObserver = new MutationObserver((mutations) => {
+        if (!document.getElementById('ai-solution-btn')) {
+            setTimeout(addAISolutionButton, 500);
+        }
+    });
+    
+    if (document.body) {
+        aiObserver.observe(document.body, { childList: true, subtree: true });
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            aiObserver.observe(document.body, { childList: true, subtree: true });
+        });
+    }
 })();
