@@ -10,7 +10,7 @@ A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanism
 
 ---
 
-## Version 4.0 Features
+## Version 4.1 Features
 
 ### 🎛️ Settings Panel
 Click the ⚙️ button (bottom-right corner) to toggle features on/off:
@@ -18,9 +18,13 @@ Click the ⚙️ button (bottom-right corner) to toggle features on/off:
 - Settings are saved to localStorage
 - Changes take effect after page reload
 
-### 🤖 NEW: AI Solution Generator
+### 🤖 AI Solution Generator
 - Automatically generates code solutions using AI
-- Supports **Google Gemini** and **OpenAI (ChatGPT)**
+- Supports **Google Gemini**, **OpenAI (ChatGPT)**, and **OpenRouter (Multi-Model)**
+- **NEW in v4.1:** OpenRouter integration with 30+ models including:
+  - ⭐ **15 Free Models**: Gemini 2.0 Flash, DeepSeek R1, Qwen3 Coder 480B, Llama 3.3 70B, and more
+  - Premium models: Claude Sonnet 4, GPT-4o, Gemini 2.5 Pro, Mistral Large, etc.
+  - Custom model ID input for any OpenRouter model
 - Works on both tutorial pages (generates middle code portion) and code track pages (generates complete solution)
 - Purple "🤖 AI Solution" button appears next to Save/Run buttons
 - Configure your API key in the settings panel
@@ -119,9 +123,11 @@ Click the **⚙️ gear button** in the bottom-right corner to open settings:
 | Setting | Description | Default |
 |---------|-------------|---------|
 | Enable AI Solver | Show AI solution button | ✅ On |
-| AI Provider | Choose Gemini or OpenAI | Gemini |
+| AI Provider | Choose Gemini, OpenAI, or OpenRouter | Gemini |
 | Gemini API Key | Your Google Gemini API key | (empty) |
 | OpenAI API Key | Your OpenAI API key | (empty) |
+| OpenRouter API Key | Your OpenRouter API key | (empty) |
+| OpenRouter Model | Select from 30+ models or enter custom ID | Gemini 2.0 Flash |
 
 ---
 
@@ -137,6 +143,28 @@ Click the **⚙️ gear button** in the bottom-right corner to open settings:
 2. Create an API key
 3. Paste it in the settings panel under "OpenAI API Key"
 4. Change "AI Provider" to "OpenAI (ChatGPT)"
+
+### Using OpenRouter (Free & Paid Models)
+1. Go to [OpenRouter](https://openrouter.ai/keys)
+2. Create an API key (free tier available)
+3. Paste it in the settings panel under "OpenRouter API Key"
+4. Change "AI Provider" to "OpenRouter (Multi-Model)"
+5. Select a model from the dropdown or enter a custom model ID
+
+#### Available Free Models on OpenRouter:
+| Model | Provider |
+|-------|----------|
+| Gemini 2.0 Flash Exp | Google |
+| DeepSeek R1 0528 | DeepSeek |
+| Qwen3 Coder 480B | Qwen |
+| Qwen3 Next 80B | Qwen |
+| GPT-OSS 120B / 20B | OpenAI |
+| Llama 3.3 70B | Meta |
+| Gemma 3 27B | Google |
+| Nemotron 3 Nano 30B | NVIDIA |
+| GLM 4.5 Air | Z-AI |
+| Trinity Mini | Arcee AI |
+| DeepSeek R1T2/R1T Chimera | TNGTech |
 
 ---
 

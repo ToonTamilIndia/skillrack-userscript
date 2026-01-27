@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.0
+// @version      4.1
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -34,9 +34,11 @@
         
         // AI Solution Generator
         enableAISolver: true,          // Enable AI solution button
-        aiProvider: "gemini",          // "gemini" or "openai"
+        aiProvider: "gemini",          // "gemini", "openai", or "openrouter"
         geminiApiKey: "",              // Google Gemini API key
         openaiApiKey: "",              // OpenAI API key
+        openrouterApiKey: "",          // OpenRouter API key
+        openrouterModel: "google/gemini-2.5-flash-001", // OpenRouter model ID
     };
 
     // Load settings from localStorage or use defaults
@@ -251,21 +253,122 @@
             ">
                 <option value="gemini" ${SETTINGS.aiProvider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
                 <option value="openai" ${SETTINGS.aiProvider === 'openai' ? 'selected' : ''}>OpenAI (ChatGPT)</option>
+                <option value="openrouter" ${SETTINGS.aiProvider === 'openrouter' ? 'selected' : ''}>OpenRouter (Multi-Model)</option>
             </select>
         `;
         const providerSelect = providerWrapper.querySelector('select');
         providerSelect.addEventListener('change', () => {
             SETTINGS.aiProvider = providerSelect.value;
             saveSettings(SETTINGS);
+            // Show/hide OpenRouter model selector
+            const orModelWrapper = document.getElementById('openrouter-model-wrapper');
+            if (orModelWrapper) {
+                orModelWrapper.style.display = providerSelect.value === 'openrouter' ? 'block' : 'none';
+            }
         });
         panelContent.appendChild(providerWrapper);
         
         panelContent.appendChild(createTextInput('geminiApiKey', 'Gemini API Key', SETTINGS.geminiApiKey, 'Enter your Gemini API key'));
         panelContent.appendChild(createTextInput('openaiApiKey', 'OpenAI API Key', SETTINGS.openaiApiKey, 'Enter your OpenAI API key'));
+        panelContent.appendChild(createTextInput('openrouterApiKey', 'OpenRouter API Key', SETTINGS.openrouterApiKey, 'Enter your OpenRouter API key'));
+        
+        // OpenRouter Model selector
+        const orModelWrapper = document.createElement('div');
+        orModelWrapper.id = 'openrouter-model-wrapper';
+        orModelWrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'openrouter' ? 'block' : 'none'};`;
+        orModelWrapper.innerHTML = `
+            <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">OpenRouter Model</div>
+            <select id="openrouterModel" style="
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #444;
+                border-radius: 6px;
+                background: #2d2d2d;
+                color: #fff;
+                font-size: 11px;
+                box-sizing: border-box;
+            ">
+                <optgroup label="⭐ Free Models">
+                    <option value="google/gemini-2.0-flash-exp:free" ${SETTINGS.openrouterModel === 'google/gemini-2.0-flash-exp:free' ? 'selected' : ''}>Gemini 2.0 Flash Exp (Free)</option>
+                    <option value="deepseek/deepseek-r1-0528:free" ${SETTINGS.openrouterModel === 'deepseek/deepseek-r1-0528:free' ? 'selected' : ''}>DeepSeek R1 0528 (Free)</option>
+                    <option value="qwen/qwen3-coder-480b-a35b:free" ${SETTINGS.openrouterModel === 'qwen/qwen3-coder-480b-a35b:free' ? 'selected' : ''}>Qwen3 Coder 480B (Free)</option>
+                    <option value="qwen/qwen3-next-80b-a3b-instruct:free" ${SETTINGS.openrouterModel === 'qwen/qwen3-next-80b-a3b-instruct:free' ? 'selected' : ''}>Qwen3 Next 80B (Free)</option>
+                    <option value="openai/gpt-oss-120b:free" ${SETTINGS.openrouterModel === 'openai/gpt-oss-120b:free' ? 'selected' : ''}>GPT-OSS 120B (Free)</option>
+                    <option value="openai/gpt-oss-20b:free" ${SETTINGS.openrouterModel === 'openai/gpt-oss-20b:free' ? 'selected' : ''}>GPT-OSS 20B (Free)</option>
+                    <option value="meta-llama/llama-3.3-70b-instruct:free" ${SETTINGS.openrouterModel === 'meta-llama/llama-3.3-70b-instruct:free' ? 'selected' : ''}>Llama 3.3 70B (Free)</option>
+                    <option value="google/gemma-3-27b:free" ${SETTINGS.openrouterModel === 'google/gemma-3-27b:free' ? 'selected' : ''}>Gemma 3 27B (Free)</option>
+                    <option value="nvidia/nemotron-3-nano-30b-a3b:free" ${SETTINGS.openrouterModel === 'nvidia/nemotron-3-nano-30b-a3b:free' ? 'selected' : ''}>Nemotron 3 Nano 30B (Free)</option>
+                    <option value="nvidia/nemotron-nano-12b-2-vl:free" ${SETTINGS.openrouterModel === 'nvidia/nemotron-nano-12b-2-vl:free' ? 'selected' : ''}>Nemotron Nano 12B VL (Free)</option>
+                    <option value="z-ai/glm-4.5-air:free" ${SETTINGS.openrouterModel === 'z-ai/glm-4.5-air:free' ? 'selected' : ''}>GLM 4.5 Air (Free)</option>
+                    <option value="arcee-ai/trinity-mini:free" ${SETTINGS.openrouterModel === 'arcee-ai/trinity-mini:free' ? 'selected' : ''}>Trinity Mini (Free)</option>
+                    <option value="tngtech/deepseek-r1t2-chimera:free" ${SETTINGS.openrouterModel === 'tngtech/deepseek-r1t2-chimera:free' ? 'selected' : ''}>DeepSeek R1T2 Chimera (Free)</option>
+                    <option value="tngtech/deepseek-r1t-chimera:free" ${SETTINGS.openrouterModel === 'tngtech/deepseek-r1t-chimera:free' ? 'selected' : ''}>DeepSeek R1T Chimera (Free)</option>
+                    <option value="tngtech/r1t-chimera:free" ${SETTINGS.openrouterModel === 'tngtech/r1t-chimera:free' ? 'selected' : ''}>R1T Chimera (Free)</option>
+                </optgroup>
+                <optgroup label="Google">
+                    <option value="google/gemini-2.0-flash-001" ${SETTINGS.openrouterModel === 'google/gemini-2.0-flash-001' ? 'selected' : ''}>Gemini 2.0 Flash</option>
+                    <option value="google/gemini-2.5-pro-preview" ${SETTINGS.openrouterModel === 'google/gemini-2.5-pro-preview' ? 'selected' : ''}>Gemini 2.5 Pro</option>
+                    <option value="google/gemini-2.5-flash-preview" ${SETTINGS.openrouterModel === 'google/gemini-2.5-flash-preview' ? 'selected' : ''}>Gemini 2.5 Flash</option>
+                </optgroup>
+                <optgroup label="Anthropic">
+                    <option value="anthropic/claude-sonnet-4" ${SETTINGS.openrouterModel === 'anthropic/claude-sonnet-4' ? 'selected' : ''}>Claude Sonnet 4</option>
+                    <option value="anthropic/claude-3.5-haiku" ${SETTINGS.openrouterModel === 'anthropic/claude-3.5-haiku' ? 'selected' : ''}>Claude 3.5 Haiku</option>
+                </optgroup>
+                <optgroup label="OpenAI">
+                    <option value="openai/gpt-4o" ${SETTINGS.openrouterModel === 'openai/gpt-4o' ? 'selected' : ''}>GPT-4o</option>
+                    <option value="openai/gpt-4o-mini" ${SETTINGS.openrouterModel === 'openai/gpt-4o-mini' ? 'selected' : ''}>GPT-4o Mini</option>
+                    <option value="openai/o3-mini" ${SETTINGS.openrouterModel === 'openai/o3-mini' ? 'selected' : ''}>o3-mini</option>
+                </optgroup>
+                <optgroup label="Meta">
+                    <option value="meta-llama/llama-3.3-70b-instruct" ${SETTINGS.openrouterModel === 'meta-llama/llama-3.3-70b-instruct' ? 'selected' : ''}>Llama 3.3 70B</option>
+                    <option value="meta-llama/llama-4-scout" ${SETTINGS.openrouterModel === 'meta-llama/llama-4-scout' ? 'selected' : ''}>Llama 4 Scout</option>
+                </optgroup>
+                <optgroup label="DeepSeek">
+                    <option value="deepseek/deepseek-chat" ${SETTINGS.openrouterModel === 'deepseek/deepseek-chat' ? 'selected' : ''}>DeepSeek V3</option>
+                    <option value="deepseek/deepseek-r1" ${SETTINGS.openrouterModel === 'deepseek/deepseek-r1' ? 'selected' : ''}>DeepSeek R1</option>
+                </optgroup>
+                <optgroup label="Qwen">
+                    <option value="qwen/qwen-2.5-coder-32b-instruct" ${SETTINGS.openrouterModel === 'qwen/qwen-2.5-coder-32b-instruct' ? 'selected' : ''}>Qwen 2.5 Coder 32B</option>
+                    <option value="qwen/qwen3-235b-a22b" ${SETTINGS.openrouterModel === 'qwen/qwen3-235b-a22b' ? 'selected' : ''}>Qwen3 235B</option>
+                </optgroup>
+                <optgroup label="Mistral">
+                    <option value="mistralai/mistral-large" ${SETTINGS.openrouterModel === 'mistralai/mistral-large' ? 'selected' : ''}>Mistral Large</option>
+                    <option value="mistralai/codestral-latest" ${SETTINGS.openrouterModel === 'mistralai/codestral-latest' ? 'selected' : ''}>Codestral</option>
+                </optgroup>
+                <optgroup label="Other">
+                    <option value="nvidia/llama-3.1-nemotron-70b-instruct" ${SETTINGS.openrouterModel === 'nvidia/llama-3.1-nemotron-70b-instruct' ? 'selected' : ''}>Nemotron 70B</option>
+                </optgroup>
+            </select>
+            <input type="text" id="openrouterCustomModel" placeholder="Or enter custom model ID" value="" style="
+                width: 100%;
+                padding: 8px;
+                margin-top: 6px;
+                border: 1px solid #444;
+                border-radius: 6px;
+                background: #2d2d2d;
+                color: #fff;
+                font-size: 11px;
+                box-sizing: border-box;
+            ">
+        `;
+        const orModelSelect = orModelWrapper.querySelector('select');
+        const orCustomInput = orModelWrapper.querySelector('input');
+        orModelSelect.addEventListener('change', () => {
+            SETTINGS.openrouterModel = orModelSelect.value;
+            saveSettings(SETTINGS);
+        });
+        orCustomInput.addEventListener('change', () => {
+            if (orCustomInput.value.trim()) {
+                SETTINGS.openrouterModel = orCustomInput.value.trim();
+                orModelSelect.value = ''; // Deselect dropdown
+                saveSettings(SETTINGS);
+            }
+        });
+        panelContent.appendChild(orModelWrapper);
 
         const note = document.createElement('div');
         note.style.cssText = 'color: #666; font-size: 10px; padding: 12px 0; text-align: center;';
-        note.innerHTML = '⚠️ Reload page after changing settings<br>Some features require page refresh<br>🔑 Get Gemini key: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">AI Studio</a>';
+        note.innerHTML = '⚠️ Reload page after changing settings<br>🔑 <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a>';
         panelContent.appendChild(note);
 
         panel.appendChild(panelHeader);
@@ -1561,6 +1664,42 @@
         return data.choices?.[0]?.message?.content || '';
     };
 
+    const generateWithOpenRouter = async (prompt) => {
+        const apiKey = SETTINGS.openrouterApiKey;
+        if (!apiKey) {
+            throw new Error('OpenRouter API key not configured. Please add it in settings.');
+        }
+
+        const model = SETTINGS.openrouterModel || 'google/gemini-2.0-flash-001';
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'HTTP-Referer': window.location.href,
+                'X-Title': 'SkillRack AI Solver'
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }],
+                temperature: 0.2,
+                max_tokens: 2048
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error?.message || `OpenRouter API request failed (${model})`);
+        }
+
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '';
+    };
+
     const extractCode = (response, language) => {
         // Try to extract code from markdown code blocks
         const codeBlockRegex = /```(?:\w+)?\s*([\s\S]*?)```/g;
@@ -1632,6 +1771,8 @@ Respond with ONLY the code, wrapped in a code block.`;
             let response;
             if (SETTINGS.aiProvider === 'gemini') {
                 response = await generateWithGemini(prompt);
+            } else if (SETTINGS.aiProvider === 'openrouter') {
+                response = await generateWithOpenRouter(prompt);
             } else {
                 response = await generateWithOpenAI(prompt);
             }
