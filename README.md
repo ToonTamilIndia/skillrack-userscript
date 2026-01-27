@@ -2,7 +2,13 @@
 
 A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanisms on SkillRack.
 
-## Features
+## Version 3.0 Features
+
+### 🎛️ Settings Panel
+Click the ⚙️ button (bottom-right corner) to toggle features on/off:
+- All bypasses can be individually enabled/disabled
+- Settings are saved to localStorage
+- Changes take effect after page reload
 
 ### 1. Tab Switch Detection Bypass
 - Spoofs `document.visibilityState` to always return `'visible'`
@@ -45,8 +51,14 @@ Handles ACE Editor-specific restrictions:
 
 ### 8. Heartbeat/Telemetry Blocking
 - Intercepts XMLHttpRequest and Fetch API
-- Blocks requests to URLs containing: `heartbeat`, `telemetry`, `log`, `activity`
+- Blocks requests to specific proctoring/telemetry endpoints
 - Returns fake successful responses
+
+### 9. 🆕 Auto Captcha Solver (Credit: [adithyagenie](https://github.com/adithyagenie/skillrack-captcha-solver))
+- Automatically solves math captcha using Tesseract.js OCR
+- Inverts image colors for better OCR accuracy
+- Handles retry on failure
+- **Optional username parsing**: If your username contains '+' and numbers (e.g., `abcd123+21@xyz`), set it in the settings panel to remove it from the captcha text before solving
 
 ## Installation
 
@@ -55,14 +67,25 @@ Handles ACE Editor-specific restrictions:
 3. Copy the contents of `userscript.js` into the editor
 4. Save and enable the script
 
-## Configuration
+## Settings Panel
 
-By default, the script matches all URLs (`*://*/*`). To restrict it to specific sites, modify the `@match` directive:
+Click the **⚙️ gear button** in the bottom-right corner to open settings:
 
-```javascript
-// @match        https://www.skillrack.com/*
-// @match        https://assessment.example.com/*
-```
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Tab Detection Bypass | Prevent tab switch detection | ✅ On |
+| Copy/Paste Bypass | Enable clipboard in code editor | ✅ On |
+| Fullscreen Bypass | Skip fullscreen enforcement | ✅ On |
+| Multi-Monitor Bypass | Block monitor detection | ✅ On |
+| Block Telemetry | Block heartbeat requests | ✅ On |
+| Drag & Drop | Enable drag & drop text | ✅ On |
+| Text Selection | Enable text selection | ✅ On |
+| Context Menu | Enable right-click menu | ✅ On |
+| Auto-Solve Captcha | Automatically solve math captcha | ✅ On |
+| Username (optional) | Your username for captcha parsing | (empty) |
+
+### Username Setting for Captcha
+If your username contains '+' and numbers together (e.g., `abcd123+21@xyz`), the captcha solver might misread it as part of the math equation. Enter your username in the settings to filter it out.
 
 ## How It Works
 
