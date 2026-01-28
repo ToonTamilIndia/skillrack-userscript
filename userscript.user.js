@@ -9,6 +9,8 @@
 // @require      https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js
 // @grant        none
 // @run-at       document-start
+// @downloadURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.js
+// @updateURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.js
 // ==/UserScript==
 
 (function() {
@@ -33,7 +35,7 @@
         captchaUsername: "",           // Username to remove from captcha (optional)
         
         // AI Solution Generator
-        enableAISolver: true,          // Enable AI solution button
+        enableAISolver: false,          // Enable AI solution button
         aiProvider: "gemini",          // "gemini", "openai", or "openrouter"
         geminiApiKey: "",              // Google Gemini API key
         openaiApiKey: "",              // OpenAI API key
@@ -1253,62 +1255,159 @@
     // 9. CAPTCHA SOLVER (Credit: adithyagenie)
     // https://github.com/adithyagenie/skillrack-captcha-solver
     // ============================================
+
     
     const TUTOR_REGEX = /https:\/\/(www.)?skillrack\.com\/faces\/candidate\/tutorprogram\.xhtml/gi;
     const ERROR_CLASS = "ui-growl-item";
     const CAPTCHA_INPUT_ID = "capval";
     const PROCEED_BTN_ID = "proceedbtn";
-
-    // Find captcha image dynamically (IDs change between pages/sessions)
+    
+    // ===== TIMING CONFIGURATION =====
+    const CAPTCHA_CONFIG = {
+        initialDelay: 800,
+        retryDelay: 400,
+        maxRetries: 12,
+        observerTimeout: 8000
+    };
+    
+    // Find captcha image dynamically
     function findCaptchaImage() {
-        // Method 1: Find image near the captcha input
-        const captchaInput = document.getElementById(CAPTCHA_INPUT_ID);
-        if (captchaInput) {
-            // Look for img in the same parent/grandparent container
-            let container = captchaInput.parentElement;
-            for (let i = 0; i < 3 && container; i++) {
-                const img = container.querySelector('img[src^="data:image"]');
-                if (img) return img;
-                container = container.parentElement;
+        const allImages = document.querySelectorAll('img');
+        const idPattern = /^j_id_[a-zA-Z0-9]+$/;
+        
+        for (const img of allImages) {
+            if (img.id && idPattern.test(img.id)) {
+                if (img.src && img.src.length > 100) {
+                    console.log(`[Captcha] Found image with matching ID pattern: ${img.id}`);
+                    return img;
+                }
             }
         }
-        
-        // Method 2: Find any base64 captcha image in the code editor panel
-        const codeEditorPanel = document.getElementById('codeeditorpanel');
-        if (codeEditorPanel) {
-            const img = codeEditorPanel.querySelector('img[src^="data:image"]');
-            if (img) return img;
-        }
-        
-        // Method 3: Look for img elements with base64 src that look like captcha
-        const allImages = document.querySelectorAll('img[src^="data:image/png;base64"]');
-        for (const img of allImages) {
-            // Captcha images are typically small and near input fields
-            if (img.width > 50 && img.width < 400 && img.height > 20 && img.height < 100) {
+    
+        const knownIds = ['j_id_5s', 'j_id_76', 'j_id_75', 'j_id_74', 'j_id_5r', 'j_id_5t'];
+        for (const id of knownIds) {
+            const img = document.getElementById(id);
+            if (img && img.tagName === 'IMG' && img.src && img.src.length > 100) {
+                console.log(`[Captcha] Found image with known ID: ${id}`);
                 return img;
             }
         }
-        
-        // Method 4: Fallback to known IDs (these can change)
-        const knownIds = ['j_id_5s', 'j_id_76', 'j_id_75', 'j_id_74'];
-        for (const id of knownIds) {
-            const img = document.getElementById(id);
-            if (img && img.tagName === 'IMG') return img;
+    
+        const base64Images = document.querySelectorAll('img[src^="data:image"]');
+        for (const img of base64Images) {
+            const width = img.width || img.naturalWidth;
+            const height = img.height || img.naturalHeight;
+            
+            if (width > 50 && width < 400 && height > 20 && height < 100) {
+                console.log(`[Captcha] Found base64 image: ${width}x${height}`);
+                return img;
+            }
         }
-        
+    
+        const codeEditorPanel = document.getElementById('codeeditorpanel');
+        if (codeEditorPanel) {
+            const img = codeEditorPanel.querySelector('img[src^="data:image"]');
+            if (img && img.src && img.src.length > 100) {
+                console.log('[Captcha] Found image in code editor panel');
+                return img;
+            }
+        }
+    
+        const captchaInput = document.getElementById(CAPTCHA_INPUT_ID);
+        if (captchaInput) {
+            let container = captchaInput.parentElement;
+            for (let i = 0; i < 5 && container; i++) {
+                const img = container.querySelector('img[src^="data:image"]');
+                if (img && img.src && img.src.length > 100) {
+                    console.log(`[Captcha] Found image near input (depth: ${i})`);
+                    return img;
+                }
+                container = container.parentElement;
+            }
+        }
+    
         return null;
     }
-
-    // Find back button dynamically
+    
+    // Wait for captcha image with retry
+    function waitForCaptchaImage() {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            
+            function tryFind() {
+                attempts++;
+                const img = findCaptchaImage();
+                
+                if (img) {
+                    console.log(`[Captcha] ✓ Image found on attempt ${attempts}`);
+                    resolve(img);
+                    return;
+                }
+                
+                if (attempts >= CAPTCHA_CONFIG.maxRetries) {
+                    console.log(`[Captcha] Retry exhausted, trying MutationObserver...`);
+                    waitForCaptchaWithObserver()
+                        .then(resolve)
+                        .catch(reject);
+                    return;
+                }
+                
+                console.log(`[Captcha] Attempt ${attempts}/${CAPTCHA_CONFIG.maxRetries} - waiting...`);
+                setTimeout(tryFind, CAPTCHA_CONFIG.retryDelay);
+            }
+            
+            setTimeout(tryFind, CAPTCHA_CONFIG.initialDelay);
+        });
+    }
+    
+    function waitForCaptchaWithObserver() {
+        return new Promise((resolve, reject) => {
+            const img = findCaptchaImage();
+            if (img) {
+                resolve(img);
+                return;
+            }
+            
+            console.log('[Captcha] Setting up DOM observer...');
+            
+            let resolved = false;
+            const observer = new MutationObserver(() => {
+                if (resolved) return;
+                
+                const img = findCaptchaImage();
+                if (img) {
+                    resolved = true;
+                    observer.disconnect();
+                    console.log('[Captcha] ✓ Image detected by observer');
+                    resolve(img);
+                }
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src', 'id']
+            });
+            
+            setTimeout(() => {
+                if (!resolved) {
+                    resolved = true;
+                    observer.disconnect();
+                    console.warn('[Captcha] ✗ Observer timeout - no image found');
+                    reject(new Error('Captcha image not found'));
+                }
+            }, CAPTCHA_CONFIG.observerTimeout);
+        });
+    }
+    
     function findBackButton() {
-        // Look for button with "Back" text
         const buttons = document.querySelectorAll('button');
         for (const btn of buttons) {
             if (btn.textContent.includes('Back')) {
                 return btn;
             }
         }
-        // Fallback to known IDs
         const knownIds = ['j_id_63', 'j_id_62'];
         for (const id of knownIds) {
             const btn = document.getElementById(id);
@@ -1316,37 +1415,160 @@
         }
         return null;
     }
-
-    // Invert colours for better OCR
+    
+    // ===== IMPROVED: Enhanced image processing for better OCR =====
+    function processImageForOCR(image) {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        
+        // Scale up for better OCR accuracy
+        const scale = 3;
+        canvas.width = (image.width || image.naturalWidth || 200) * scale;
+        canvas.height = (image.height || image.naturalHeight || 50) * scale;
+        
+        // Enable image smoothing for upscaling
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
+        // Draw scaled image
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        
+        // Get image data
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // ===== ENHANCED PROCESSING =====
+        // Convert to high contrast black/white with threshold
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // Calculate luminance
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            
+            // Apply threshold (adjust if needed - lower = more black)
+            const threshold = 140;
+            const value = luminance < threshold ? 0 : 255;
+            
+            data[i] = value;     // R
+            data[i + 1] = value; // G
+            data[i + 2] = value; // B
+            // Alpha stays the same
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        return canvas.toDataURL();
+    }
+    
+    // ===== IMPROVED: Alternative invert processing =====
     function invertColors(image) {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        canvas.width = image.width;
-        canvas.height = image.height;
-        ctx.drawImage(image, 0, 0);
+        
+        const scale = 2;
+        canvas.width = (image.width || image.naturalWidth || 200) * scale;
+        canvas.height = (image.height || image.naturalHeight || 50) * scale;
+        
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
         ctx.globalCompositeOperation = "difference";
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
         return canvas.toDataURL();
     }
-
-    // Remove username from captcha and solve math
+    
+    // ===== IMPROVED: Smarter math expression parser =====
     function solveCaptcha(text) {
         const username = SETTINGS.captchaUsername || "";
         let cleanedText = text;
         
+        // Remove username (handle different usernames in captcha)
+        // Extract just the email pattern and remove it
+        cleanedText = cleanedText.replace(/\d{12}@[a-zA-Z]+/gi, "").trim();
+        
+        // Also try removing the configured username
         if (username) {
-            cleanedText = text.replace(new RegExp(username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi"), "").trim();
+            cleanedText = cleanedText.replace(new RegExp(username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi"), "").trim();
         }
         
-        const match = cleanedText.match(/(\d+)\s*\+\s*(\d+)/);
+        // Remove common OCR noise
+        cleanedText = cleanedText.replace(/[\n\r\t]/g, " ").trim();
+        
+        console.log(`[Captcha] Cleaned text: "${cleanedText}"`);
+        
+        // ===== METHOD 1: Standard pattern with + sign =====
+        let match = cleanedText.match(/(\d+)\s*\+\s*(\d+)/);
         if (match) {
-            return parseInt(match[1], 10) + parseInt(match[2], 10);
+            const result = parseInt(match[1], 10) + parseInt(match[2], 10);
+            console.log(`[Captcha] Pattern 1 (X+Y): ${match[1]} + ${match[2]} = ${result}`);
+            return result;
         }
+        
+        // ===== METHOD 2: Handle merged digits (1748 -> 17+48) =====
+        // Look for 3-4 digit number that could be two numbers merged
+        match = cleanedText.match(/(\d{3,4})/);
+        if (match) {
+            const numStr = match[1];
+            console.log(`[Captcha] Found merged number: ${numStr}`);
+            
+            // Try splitting at different positions
+            const results = [];
+            
+            for (let i = 1; i < numStr.length; i++) {
+                const num1 = parseInt(numStr.substring(0, i), 10);
+                const num2 = parseInt(numStr.substring(i), 10);
+                
+                // Valid split: both numbers should be reasonable (1-99)
+                if (num1 >= 1 && num1 <= 99 && num2 >= 1 && num2 <= 99) {
+                    const sum = num1 + num2;
+                    results.push({ num1, num2, sum, split: i });
+                    console.log(`[Captcha] Possible split: ${num1} + ${num2} = ${sum}`);
+                }
+            }
+            
+            // If only one valid split, use it
+            if (results.length === 1) {
+                console.log(`[Captcha] ✓ Using split: ${results[0].num1} + ${results[0].num2}`);
+                return results[0].sum;
+            }
+            
+            // If multiple splits possible, prefer middle split (most common for 4 digits)
+            if (results.length > 1 && numStr.length === 4) {
+                const middleSplit = results.find(r => r.split === 2);
+                if (middleSplit) {
+                    console.log(`[Captcha] ✓ Using middle split: ${middleSplit.num1} + ${middleSplit.num2}`);
+                    return middleSplit.sum;
+                }
+            }
+            
+            // Fallback: use first valid split
+            if (results.length > 0) {
+                console.log(`[Captcha] ✓ Using first split: ${results[0].num1} + ${results[0].num2}`);
+                return results[0].sum;
+            }
+        }
+        
+        // ===== METHOD 3: Two separate numbers on same line =====
+        match = cleanedText.match(/(\d{1,2})\s+(\d{1,2})/);
+        if (match) {
+            const result = parseInt(match[1], 10) + parseInt(match[2], 10);
+            console.log(`[Captcha] Pattern 3 (X Y): ${match[1]} + ${match[2]} = ${result}`);
+            return result;
+        }
+        
+        // ===== METHOD 4: Numbers with + as 4 or t or similar OCR errors =====
+        match = cleanedText.match(/(\d{1,2})\s*[4tT\+xX\*]\s*(\d{1,2})/);
+        if (match) {
+            const result = parseInt(match[1], 10) + parseInt(match[2], 10);
+            console.log(`[Captcha] Pattern 4 (OCR fix): ${match[1]} + ${match[2]} = ${result}`);
+            return result;
+        }
+        
         return null;
     }
-
-    // Helper function to safely click buttons that may have PrimeFaces handlers
+    
     function safeButtonClick(button) {
         if (!button) return;
         
@@ -1364,57 +1586,85 @@
             }
         }, 50);
     }
-
-    function handleCaptcha() {
+    
+    // ===== IMPROVED: Multiple OCR attempts with different processing =====
+    async function handleCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
         
-        // Check if Tesseract is available
         if (typeof Tesseract === 'undefined') {
-            console.log('Tesseract not loaded, skipping captcha solver');
+            console.log('[Captcha] Tesseract not loaded, skipping');
             return;
         }
-
-        // Get the captcha image dynamically
-        const image = findCaptchaImage();
+    
+        console.log('[Captcha] Starting captcha detection...');
+        
+        let image;
+        try {
+            image = await waitForCaptchaImage();
+        } catch (e) {
+            console.error('[Captcha] Failed to find captcha image:', e.message);
+            return;
+        }
+        
         const textbox = document.getElementById(CAPTCHA_INPUT_ID);
         const button = document.getElementById(PROCEED_BTN_ID);
         
-        if (!image || !textbox || !button) {
-            console.log("Captcha elements not found, skipping. Image:", !!image, "Input:", !!textbox, "Button:", !!button);
+        if (!textbox || !button) {
+            console.log("[Captcha] Input or button not found. Input:", !!textbox, "Button:", !!button);
             return;
         }
-
-        console.log("Captcha detected, attempting to solve...");
-        const invertedImg = invertColors(image);
+    
+        console.log("[Captcha] All elements found! Processing OCR...");
         
-        // Process with Tesseract.js
-        Tesseract.recognize(invertedImg, "eng", {
-            whitelist: "1234567890+=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ@ ",
-            psm: 6,
-        })
-        .then(({ data: { text } }) => {
-            console.log(`OCR Result: ${text}`);
-            const result = solveCaptcha(text);
+        // Ensure image is fully loaded
+        if (!image.complete) {
+            await new Promise(resolve => {
+                image.onload = resolve;
+                setTimeout(resolve, 1000);
+            });
+        }
+        
+        // ===== TRY MULTIPLE OCR PROCESSING METHODS =====
+        const processingMethods = [
+            { name: "Enhanced", fn: () => processImageForOCR(image) },
+            { name: "Inverted", fn: () => invertColors(image) },
+            { name: "Original", fn: () => image.src }
+        ];
+        
+        for (const method of processingMethods) {
+            console.log(`[Captcha] Trying ${method.name} processing...`);
             
-            if (result === null) {
-                console.log("Could not solve captcha automatically");
-                handleIncorrectCaptcha();
-                return;
+            try {
+                const processedImg = method.fn();
+                
+                const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
+                    tessedit_char_whitelist: "0123456789+= ",
+                    tessedit_pageseg_mode: "7", // Single line
+                });
+                
+                console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
+                const result = solveCaptcha(text);
+                
+                if (result !== null) {
+                    console.log(`[Captcha] ✓ Solution found: ${result}`);
+                    textbox.value = result;
+                    setTimeout(() => safeButtonClick(button), 100);
+                    return;
+                }
+                
+            } catch (error) {
+                console.error(`[Captcha] ${method.name} OCR Error:`, error);
             }
-            
-            console.log(`Captcha solution: ${result}`);
-            textbox.value = result;
-            safeButtonClick(button);
-        })
-        .catch((error) => {
-            console.error("Error processing captcha:", error);
-        });
+        }
+        
+        // All methods failed
+        console.log("[Captcha] ✗ All OCR methods failed");
+        handleIncorrectCaptcha();
     }
-
+    
     function handleIncorrectCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
         
-        // If in tutorial pages, can't go back
         if (window.location.href.match(TUTOR_REGEX)) {
             const captext = prompt("Unable to solve captcha automatically. Please enter the math result:");
             if (captext === null) return;
@@ -1428,13 +1678,11 @@
             return;
         }
         
-        // Go back and retry
         sessionStorage.setItem("captchaFail", "true");
         const backBtn = findBackButton();
         safeButtonClick(backBtn);
     }
-
-    // Store solve button ID for retry
+    
     document.addEventListener("click", (event) => {
         if (SETTINGS.enableCaptchaSolver &&
             event.target.tagName === "SPAN" && 
@@ -1443,12 +1691,10 @@
             sessionStorage.setItem("Solvebtnid", event.target.parentNode.id);
         }
     }, false);
-
-    // Initialize captcha solver on page load
-    window.addEventListener("load", function() {
+    
+    function initCaptchaSolver() {
         if (!SETTINGS.enableCaptchaSolver) return;
         
-        // Detect if last captcha attempt was a fail to re-nav back
         if (sessionStorage.getItem("captchaFail")) {
             sessionStorage.removeItem("captchaFail");
             const oldBtnId = sessionStorage.getItem("Solvebtnid");
@@ -1458,18 +1704,33 @@
             }
             return;
         }
-
-        // Check for incorrect captcha error
+    
         const errors = document.getElementsByClassName(ERROR_CLASS);
         if (errors.length > 0 && errors[0].textContent.includes("Incorrect Captcha")) {
             handleIncorrectCaptcha();
             return;
         }
         
-        // Try to solve captcha
         handleCaptcha();
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCaptchaSolver);
+    } else {
+        setTimeout(initCaptchaSolver, 100);
+    }
+    
+    window.addEventListener("load", function() {
+        setTimeout(() => {
+            const img = findCaptchaImage();
+            const textbox = document.getElementById(CAPTCHA_INPUT_ID);
+            if (img && textbox && !textbox.value) {
+                console.log('[Captcha] Backup initialization triggered');
+                handleCaptcha();
+            }
+        }, 500);
     });
-
+    
     console.log('Anti-cheat bypass script v4.0 loaded successfully');
     console.log('Settings:', SETTINGS);
 
