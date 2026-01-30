@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.1
+// @version      4.2
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -21,26 +21,31 @@
     // ============================================
     const DEFAULT_SETTINGS = {
         // Anti-cheat bypasses
-        bypassTabDetection: true,      // Bypass tab switch detection
-        bypassCopyPaste: true,         // Enable copy/paste in ACE editor
-        bypassFullscreen: true,        // Bypass fullscreen enforcement
-        bypassMultiMonitor: true,      // Block multi-monitor detection
-        blockTelemetry: true,          // Block heartbeat/telemetry requests
-        enableDragDrop: true,          // Enable drag & drop
-        enableTextSelection: true,     // Enable text selection
-        enableContextMenu: true,       // Enable right-click menu
+        bypassTabDetection: true,
+        bypassCopyPaste: true,
+        bypassFullscreen: true,
+        bypassMultiMonitor: true,
+        blockTelemetry: true,
+        enableDragDrop: true,
+        enableTextSelection: true,
+        enableContextMenu: true,
         
         // Captcha solver (credit: adithyagenie)
-        enableCaptchaSolver: true,     // Auto-solve math captcha
-        captchaUsername: "",           // Username to remove from captcha (optional)
+        enableCaptchaSolver: true,
+        captchaUsername: "",
         
         // AI Solution Generator
-        enableAISolver: false,          // Enable AI solution button
-        aiProvider: "gemini",          // "gemini", "openai", or "openrouter"
-        geminiApiKey: "",              // Google Gemini API key
-        openaiApiKey: "",              // OpenAI API key
-        openrouterApiKey: "",          // OpenRouter API key
-        openrouterModel: "google/gemini-2.5-flash-001", // OpenRouter model ID
+        enableAISolver: false,
+        aiProvider: "gemini",
+        geminiApiKey: "",
+        openaiApiKey: "",
+        openrouterApiKey: "",
+        openrouterModel: "google/gemini-2.5-flash-001",
+        
+        // ========== G4F SETTINGS (NEW) ==========
+        g4fApiKey: "",
+        g4fModel: "auto",
+        // ========================================
     };
 
     // Load settings from localStorage or use defaults
@@ -65,6 +70,209 @@
     };
 
     let SETTINGS = loadSettings();
+
+    // ============================================
+    // G4F PROVIDER MODULE (NEW)
+    // ============================================
+    
+    const G4FProvider = (function() {
+        'use strict';
+
+        const CONFIG = {
+            BASE_URL: 'https://g4f.space',
+            CACHE_KEY: 'g4f_models_cache',
+            CACHE_TTL: 24 * 60 * 60 * 1000,
+            DEFAULT_MODEL: 'auto'
+        };
+
+        function getApiKey() {
+            return SETTINGS.g4fApiKey || null;
+        }
+
+        function normalizeModel(rawModel) {
+            const nameParts = (rawModel.id || '').split('/');
+            const displayName = nameParts.length > 1 
+                ? nameParts[nameParts.length - 1] 
+                : rawModel.id;
+
+            return {
+                id: rawModel.id || '',
+                name: displayName || rawModel.id || 'Unknown Model',
+                owner: rawModel.owned_by || 'unknown',
+                context_window: rawModel.context_window || rawModel.max_tokens || null
+            };
+        }
+
+        function getCachedModels() {
+            try {
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                if (!cached) return null;
+
+                const { models, timestamp } = JSON.parse(cached);
+                const age = Date.now() - timestamp;
+                
+                if (age > CONFIG.CACHE_TTL) {
+                    localStorage.removeItem(CONFIG.CACHE_KEY);
+                    return null;
+                }
+
+                return models;
+            } catch (error) {
+                try { localStorage.removeItem(CONFIG.CACHE_KEY); } catch (e) {}
+                return null;
+            }
+        }
+
+        function setCachedModels(models) {
+            try {
+                localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({
+                    models: models,
+                    timestamp: Date.now()
+                }));
+            } catch (error) {
+                console.error('[G4F] Cache write error:', error);
+            }
+        }
+
+        function clearCache() {
+            try {
+                localStorage.removeItem(CONFIG.CACHE_KEY);
+            } catch (error) {}
+        }
+
+        async function fetchModels(forceRefresh = false) {
+            if (!forceRefresh) {
+                const cachedModels = getCachedModels();
+                if (cachedModels && cachedModels.length > 0) {
+                    return cachedModels;
+                }
+            }
+
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                throw new Error('G4F API key not configured. Please add it in settings.');
+            }
+
+            const response = await fetch(`${CONFIG.BASE_URL}/v1/models`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => 'Unknown error');
+                throw new Error(`Failed to fetch G4F models: ${response.status}`);
+            }
+
+            const rawResponse = await response.json();
+            let modelArray;
+            
+            if (Array.isArray(rawResponse)) {
+                modelArray = rawResponse;
+            } else if (rawResponse.data && Array.isArray(rawResponse.data)) {
+                modelArray = rawResponse.data;
+            } else if (rawResponse.models && Array.isArray(rawResponse.models)) {
+                modelArray = rawResponse.models;
+            } else {
+                modelArray = [];
+            }
+
+            const normalizedModels = modelArray
+                .filter(m => m && m.id)
+                .map(m => normalizeModel(m));
+
+            if (normalizedModels.length > 0) {
+                setCachedModels(normalizedModels);
+            }
+
+            return normalizedModels;
+        }
+
+        function filterModels(models, query) {
+            if (!query || typeof query !== 'string' || !Array.isArray(models)) {
+                return models || [];
+            }
+
+            const lowerQuery = query.toLowerCase().trim();
+            if (!lowerQuery) return models;
+
+            return models.filter(model => {
+                const id = (model.id || '').toLowerCase();
+                const name = (model.name || '').toLowerCase();
+                const owner = (model.owner || '').toLowerCase();
+                return id.includes(lowerQuery) || name.includes(lowerQuery) || owner.includes(lowerQuery);
+            });
+        }
+
+        async function generateCompletion(messages, options = {}) {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                throw new Error('G4F API key not configured. Please add it in settings.');
+            }
+
+            if (!Array.isArray(messages) || messages.length === 0) {
+                throw new Error('Messages array is required');
+            }
+
+            const model = options.model || CONFIG.DEFAULT_MODEL;
+            const payload = {
+                model: model,
+                messages: messages
+            };
+
+            if (typeof options.temperature === 'number') payload.temperature = options.temperature;
+            if (typeof options.max_tokens === 'number') payload.max_tokens = options.max_tokens;
+
+            const response = await fetch(`${CONFIG.BASE_URL}/v1/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                let errorMessage = `G4F API request failed: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData.error?.message) errorMessage = errorData.error.message;
+                } catch (e) {}
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            const content = data.choices?.[0]?.message?.content;
+            
+            if (!content) {
+                throw new Error('G4F returned empty response');
+            }
+
+            return content;
+        }
+
+        return {
+            CONFIG,
+            fetchModels,
+            filterModels,
+            clearCache,
+            generateCompletion,
+            getApiKey,
+            normalizeModel
+        };
+    })();
+
+    // G4F wrapper function (NEW)
+    const generateWithG4F = async (prompt) => {
+        const model = SETTINGS.g4fModel || 'auto';
+        return await G4FProvider.generateCompletion(
+            [{ role: 'user', content: prompt }],
+            { model: model, temperature: 0.2, max_tokens: 2048 }
+        );
+    };
 
     // ============================================
     // SETTINGS UI
@@ -218,6 +426,115 @@
             return header;
         };
 
+        // ========== G4F MODEL SELECTOR FUNCTION (NEW) ==========
+        const createG4FModelSelector = () => {
+            const wrapper = document.createElement('div');
+            wrapper.id = 'g4f-model-wrapper';
+            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'g4f' ? 'block' : 'none'};`;
+            
+            wrapper.innerHTML = `
+                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">G4F Model</div>
+                <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+                    <input type="text" id="g4fModelSearch" placeholder="Search models (e.g., qwen, gpt)" style="
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #2d2d2d;
+                        color: #fff;
+                        font-size: 11px;
+                        box-sizing: border-box;
+                    ">
+                    <button id="g4fRefreshModels" style="
+                        padding: 8px 12px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #3d3d3d;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">🔄</button>
+                </div>
+                <select id="g4fModel" style="
+                    width: 100%;
+                    padding: 8px;
+                    border: 1px solid #444;
+                    border-radius: 6px;
+                    background: #2d2d2d;
+                    color: #fff;
+                    font-size: 11px;
+                    box-sizing: border-box;
+                ">
+                    <option value="auto">Auto (Automatic Model Selection)</option>
+                </select>
+                <div id="g4fModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+            `;
+
+            setTimeout(() => {
+                const select = document.getElementById('g4fModel');
+                const searchInput = document.getElementById('g4fModelSearch');
+                const refreshBtn = document.getElementById('g4fRefreshModels');
+                const statusDiv = document.getElementById('g4fModelStatus');
+                
+                let allModels = [];
+
+                const populateSelect = (models) => {
+                    if (!select) return;
+                    const currentValue = SETTINGS.g4fModel || 'auto';
+                    select.innerHTML = '<option value="auto">Auto (Automatic Model Selection)</option>';
+                    
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.textContent = `${model.name} (${model.owner})`;
+                        option.selected = model.id === currentValue;
+                        select.appendChild(option);
+                    });
+                    
+                    if (statusDiv) statusDiv.textContent = `${models.length} models available`;
+                };
+
+                const loadModels = async (forceRefresh = false) => {
+                    if (!SETTINGS.g4fApiKey) {
+                        if (statusDiv) statusDiv.textContent = 'Enter API key to load models';
+                        return;
+                    }
+                    
+                    if (statusDiv) statusDiv.textContent = 'Loading models...';
+                    
+                    try {
+                        allModels = await G4FProvider.fetchModels(forceRefresh);
+                        populateSelect(allModels);
+                    } catch (error) {
+                        if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
+                    }
+                };
+
+                if (searchInput) {
+                    searchInput.addEventListener('input', () => {
+                        const filtered = G4FProvider.filterModels(allModels, searchInput.value.trim());
+                        populateSelect(filtered);
+                    });
+                }
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => loadModels(true));
+                }
+
+                if (select) {
+                    select.addEventListener('change', () => {
+                        SETTINGS.g4fModel = select.value;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                loadModels();
+            }, 100);
+
+            return wrapper;
+        };
+        // ========================================================
+
         // Add toggles
         panelContent.appendChild(createSectionHeader('Anti-Cheat Bypasses'));
         panelContent.appendChild(createToggle('bypassTabDetection', 'Tab Detection Bypass', SETTINGS.bypassTabDetection, 'Prevent tab switch detection'));
@@ -238,7 +555,7 @@
         panelContent.appendChild(createSectionHeader('AI Solution Generator'));
         panelContent.appendChild(createToggle('enableAISolver', 'Enable AI Solver', SETTINGS.enableAISolver, 'Show AI solution button'));
         
-        // AI Provider selector
+        // ========== UPDATED AI Provider selector with G4F option (MODIFIED) ==========
         const providerWrapper = document.createElement('div');
         providerWrapper.style.cssText = 'padding: 10px 0; border-bottom: 1px solid #333;';
         providerWrapper.innerHTML = `
@@ -256,19 +573,25 @@
                 <option value="gemini" ${SETTINGS.aiProvider === 'gemini' ? 'selected' : ''}>Google Gemini</option>
                 <option value="openai" ${SETTINGS.aiProvider === 'openai' ? 'selected' : ''}>OpenAI (ChatGPT)</option>
                 <option value="openrouter" ${SETTINGS.aiProvider === 'openrouter' ? 'selected' : ''}>OpenRouter (Multi-Model)</option>
+                <option value="g4f" ${SETTINGS.aiProvider === 'g4f' ? 'selected' : ''}>G4F (g4f.space)</option>
             </select>
         `;
         const providerSelect = providerWrapper.querySelector('select');
         providerSelect.addEventListener('change', () => {
             SETTINGS.aiProvider = providerSelect.value;
             saveSettings(SETTINGS);
-            // Show/hide OpenRouter model selector
+            // Show/hide model selectors based on provider
             const orModelWrapper = document.getElementById('openrouter-model-wrapper');
+            const g4fModelWrapper = document.getElementById('g4f-model-wrapper');
             if (orModelWrapper) {
                 orModelWrapper.style.display = providerSelect.value === 'openrouter' ? 'block' : 'none';
             }
+            if (g4fModelWrapper) {
+                g4fModelWrapper.style.display = providerSelect.value === 'g4f' ? 'block' : 'none';
+            }
         });
         panelContent.appendChild(providerWrapper);
+        // ================================================================================
         
         panelContent.appendChild(createTextInput('geminiApiKey', 'Gemini API Key', SETTINGS.geminiApiKey, 'Enter your Gemini API key'));
         panelContent.appendChild(createTextInput('openaiApiKey', 'OpenAI API Key', SETTINGS.openaiApiKey, 'Enter your OpenAI API key'));
@@ -362,15 +685,20 @@
         orCustomInput.addEventListener('change', () => {
             if (orCustomInput.value.trim()) {
                 SETTINGS.openrouterModel = orCustomInput.value.trim();
-                orModelSelect.value = ''; // Deselect dropdown
+                orModelSelect.value = '';
                 saveSettings(SETTINGS);
             }
         });
         panelContent.appendChild(orModelWrapper);
 
+        // ========== G4F API KEY AND MODEL SELECTOR (NEW) ==========
+        panelContent.appendChild(createTextInput('g4fApiKey', 'G4F API Key', SETTINGS.g4fApiKey, 'Enter your G4F API key'));
+        panelContent.appendChild(createG4FModelSelector());
+        // ===========================================================
+
         const note = document.createElement('div');
         note.style.cssText = 'color: #666; font-size: 10px; padding: 12px 0; text-align: center;';
-        note.innerHTML = '⚠️ Reload page after changing settings<br>🔑 <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a>';
+        note.innerHTML = '⚠️ Reload page after changing settings<br>🔑 <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a>';
         panelContent.appendChild(note);
 
         panel.appendChild(panelHeader);
@@ -1662,25 +1990,24 @@
         handleIncorrectCaptcha();
     }
     
+
     function handleIncorrectCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
         
-        if (window.location.href.match(TUTOR_REGEX)) {
-            const captext = prompt("Unable to solve captcha automatically. Please enter the math result:");
-            if (captext === null) return;
-            
-            const textbox = document.getElementById(CAPTCHA_INPUT_ID);
-            const button = document.getElementById(PROCEED_BTN_ID);
-            if (textbox && button) {
-                textbox.value = captext;
-                safeButtonClick(button);
-            }
+        const captext = prompt("❌ Captcha failed! Please enter the math result manually:");
+        
+        if (captext === null || captext.trim() === '') {
+            console.log('[Captcha] User cancelled manual input');
             return;
         }
         
-        sessionStorage.setItem("captchaFail", "true");
-        const backBtn = findBackButton();
-        safeButtonClick(backBtn);
+        const textbox = document.getElementById(CAPTCHA_INPUT_ID);
+        const button = document.getElementById(PROCEED_BTN_ID);
+        
+        if (textbox && button) {
+            textbox.value = captext.trim();
+            setTimeout(() => safeButtonClick(button), 100);
+        }
     }
     
     document.addEventListener("click", (event) => {
@@ -1731,12 +2058,12 @@
         }, 500);
     });
     
-    console.log('Anti-cheat bypass script v4.0 loaded successfully');
+    console.log('Anti-cheat bypass script v4.2 loaded successfully');
     console.log('Settings:', SETTINGS);
 
     // ============================================
     // 10. AI SOLUTION GENERATOR
-    // Uses Gemini or OpenAI to generate code solutions
+    // Uses Gemini, OpenAI, OpenRouter, or G4F to generate code solutions
     // ============================================
     
     const getSelectedLanguage = () => {
@@ -1753,6 +2080,8 @@
         if (text.includes('CPP')) return 'C++';
         return 'C';
     };
+
+
 
     const getProblemDescription = () => {
         const isTutorPage = window.location.href.includes('tutorprogram');
@@ -1860,6 +2189,88 @@
             }
         }
         return { title: '', description: '', isTutor: false, preCode: '', postCode: '' };
+    };
+
+    // ========== Get error information from page ==========
+    const getErrorInfo = () => {
+        let errorInfo = {
+            hasError: false,
+            errorType: null,  // 'wrong_output' or 'compilation_error'
+            input: '',
+            expectedOutput: '',
+            yourOutput: '',
+            compilationError: '',
+            currentCode: ''
+        };
+        
+        // Get current code from editor
+        if (window.txtCode && window.txtCode.getSession) {
+            errorInfo.currentCode = window.txtCode.getSession().getValue();
+        }
+        
+        // Check for "Incorrect Captcha" - ignore this
+        const growlItems = document.querySelectorAll('.ui-growl-item');
+        for (const item of growlItems) {
+            if (item.textContent.includes('Incorrect Captcha')) {
+                return errorInfo; // Not a code error
+            }
+        }
+        
+        // Check for error panel
+        const errorPanel = document.getElementById('errormsg');
+        if (!errorPanel) return errorInfo;
+        
+        const panelContent = errorPanel.querySelector('#errormsg_content');
+        if (!panelContent) return errorInfo;
+        
+        // Check if it's visible/has content
+        const panelText = panelContent.textContent.trim();
+        if (!panelText) return errorInfo;
+        
+        errorInfo.hasError = true;
+        
+        // Check for compilation error (has error messages like "error:", "undefined reference", etc.)
+        const compilationIndicators = [
+            'error:', 'undefined reference', 'multiple definition', 
+            'ld returned', 'collect2:', 'fatal error', 'syntax error',
+            'expected', 'undeclared', 'implicit declaration'
+        ];
+        
+        const isCompilationError = compilationIndicators.some(indicator => 
+            panelText.toLowerCase().includes(indicator.toLowerCase())
+        );
+        
+        if (isCompilationError) {
+            errorInfo.errorType = 'compilation_error';
+            // Get the compilation error text
+            const errorDiv = panelContent.querySelector('div[style*="word-wrap"]');
+            if (errorDiv) {
+                errorInfo.compilationError = errorDiv.textContent.replace(/\s+/g, ' ').trim();
+            } else {
+                errorInfo.compilationError = panelText;
+            }
+        } else {
+            errorInfo.errorType = 'wrong_output';
+            
+            // Extract Input, Expected Output, Your Output
+            const cards = panelContent.querySelectorAll('.ui-card-content');
+            const labels = panelContent.querySelectorAll('.ui.label');
+            
+            labels.forEach((label, index) => {
+                const labelText = label.textContent.toLowerCase();
+                const cardContent = cards[index]?.textContent.trim() || '';
+                
+                if (labelText.includes('input')) {
+                    errorInfo.input = cardContent;
+                } else if (labelText.includes('expected')) {
+                    errorInfo.expectedOutput = cardContent;
+                } else if (labelText.includes('your program') || labelText.includes('your output')) {
+                    errorInfo.yourOutput = cardContent;
+                }
+            });
+        }
+        
+        return errorInfo;
     };
 
     const generateWithGemini = async (prompt) => {
@@ -1974,21 +2385,69 @@
         return response.trim();
     };
 
+    // ==========  generateAISolution FUNCTION ==========
     const generateAISolution = async () => {
         if (!SETTINGS.enableAISolver) return;
         
         const language = getSelectedLanguage();
         const problem = getProblemDescription();
+        const errorInfo = getErrorInfo();  // NEW: Check for errors
         
-        if (!problem.title && !problem.description) {
+        if (!problem.title && !problem.description && !errorInfo.hasError) {
             alert('Could not find problem description on this page.');
             return;
         }
-
-        // Build prompt based on page type
+    
         let prompt;
-        if (problem.isTutor) {
-            prompt = `You are an expert ${language} programmer. Complete the MIDDLE PORTION of the code for this problem.
+        
+        // ========== NEW: Error fix mode ==========
+        if (errorInfo.hasError && errorInfo.currentCode) {
+            if (errorInfo.errorType === 'compilation_error') {
+                prompt = `You are an expert ${language} programmer. Fix the compilation error in this code.
+    
+    Problem: ${problem.title}
+    ${problem.description}
+    
+    CURRENT CODE (has compilation error):
+    \`\`\`${language.toLowerCase()}
+    ${errorInfo.currentCode}
+    \`\`\`
+    
+    COMPILATION ERROR:
+    ${errorInfo.compilationError}
+    
+    INSTRUCTIONS:
+    - Fix ONLY the compilation error
+    - Keep the logic the same unless it's causing the error
+    - Return the COMPLETE fixed code
+    - Do NOT explain, just provide the fixed code in a code block`;
+    
+            } else if (errorInfo.errorType === 'wrong_output') {
+                prompt = `You are an expert ${language} programmer. Fix the logic error in this code.
+
+Problem: ${problem.title}
+${problem.description}
+
+CURRENT CODE (produces wrong output):
+\`\`\`${language.toLowerCase()}
+${errorInfo.currentCode}
+\`\`\`
+
+TEST CASE THAT FAILED:
+- Input: ${errorInfo.input}
+- Expected Output: ${errorInfo.expectedOutput}
+- Your Output: ${errorInfo.yourOutput}
+
+INSTRUCTIONS:
+- Analyze why the output is wrong
+- Fix the logic to produce the expected output
+- Return the COMPLETE fixed code
+- Do NOT explain, just provide the fixed code in a code block`;
+        }
+    }
+    // ========== Normal mode (no error) ==========
+    else if (problem.isTutor) {
+        prompt = `You are an expert ${language} programmer. Complete the MIDDLE PORTION of the code for this problem.
 
 Problem: ${problem.title}
 ${problem.description}
@@ -2002,8 +2461,8 @@ CRITICAL REQUIREMENTS:
 - Write clean, minimal code that solves the problem
 
 Respond with ONLY the middle code portion, wrapped in a code block.`;
-        } else {
-            prompt = `You are an expert competitive programmer. Write a complete, working solution for this problem in ${language}.
+    } else {
+        prompt = `You are an expert competitive programmer. Write a complete, working solution for this problem in ${language}.
 
 Problem: ${problem.title}
 ${problem.description}
@@ -2019,25 +2478,35 @@ Requirements:
 
 Respond with ONLY the code, wrapped in a code block.`;
         }
-
+    
         // Show loading indicator
         const aiBtn = document.getElementById('ai-solution-btn');
         if (aiBtn) {
             aiBtn.disabled = true;
-            aiBtn.innerHTML = '⏳ Generating...';
+            aiBtn.innerHTML = errorInfo.hasError ? '🔧 Fixing...' : '⏳ Generating...';
             aiBtn.style.opacity = '0.7';
         }
-
+    
         try {
             let response;
-            if (SETTINGS.aiProvider === 'gemini') {
-                response = await generateWithGemini(prompt);
-            } else if (SETTINGS.aiProvider === 'openrouter') {
-                response = await generateWithOpenRouter(prompt);
-            } else {
-                response = await generateWithOpenAI(prompt);
+            
+            switch (SETTINGS.aiProvider) {
+                case 'gemini':
+                    response = await generateWithGemini(prompt);
+                    break;
+                case 'openrouter':
+                    response = await generateWithOpenRouter(prompt);
+                    break;
+                case 'openai':
+                    response = await generateWithOpenAI(prompt);
+                    break;
+                case 'g4f':
+                    response = await generateWithG4F(prompt);
+                    break;
+                default:
+                    throw new Error(`Unknown AI provider: ${SETTINGS.aiProvider}`);
             }
-
+    
             const code = extractCode(response, language);
             
             if (code && window.txtCode) {
@@ -2050,7 +2519,7 @@ Respond with ONLY the code, wrapped in a code block.`;
                     $("#txtCode").val(code);
                 }
                 
-                console.log('AI solution inserted successfully');
+                console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
             } else {
                 alert('Failed to generate solution. Please try again.');
             }
@@ -2066,6 +2535,7 @@ Respond with ONLY the code, wrapped in a code block.`;
             }
         }
     };
+
 
     // Add AI Solution button to the page
     const addAISolutionButton = () => {
