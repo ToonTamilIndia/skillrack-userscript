@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.2
+// @version      4.3
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -9,8 +9,8 @@
 // @require      https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js
 // @grant        none
 // @run-at       document-start
-// @downloadURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js
-// @updateURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js
+// @downloadURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.js
+// @updateURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.js
 // ==/UserScript==
 
 (function() {
@@ -1994,6 +1994,10 @@
     function handleIncorrectCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
         
+        // Mark that we've had an incorrect captcha attempt
+        sessionStorage.setItem('captchaAttemptFailed', 'true');
+        console.log('[Captcha] Incorrect captcha detected - waiting for manual input');
+        
         const captext = prompt("❌ Captcha failed! Please enter the math result manually:");
         
         if (captext === null || captext.trim() === '') {
@@ -2016,11 +2020,19 @@
             event.target.parentNode.tagName === "BUTTON" && 
             event.target.textContent === "Solve") {
             sessionStorage.setItem("Solvebtnid", event.target.parentNode.id);
+            // Reset failure flag when user manually clicks Solve button
+            sessionStorage.removeItem('captchaAttemptFailed');
         }
     }, false);
     
     function initCaptchaSolver() {
         if (!SETTINGS.enableCaptchaSolver) return;
+        
+        // Don't auto-solve if we already had an incorrect attempt
+        if (sessionStorage.getItem("captchaAttemptFailed")) {
+            console.log('[Captcha] Previous attempt failed - not auto-solving again');
+            return;
+        }
         
         if (sessionStorage.getItem("captchaFail")) {
             sessionStorage.removeItem("captchaFail");
@@ -2034,6 +2046,7 @@
     
         const errors = document.getElementsByClassName(ERROR_CLASS);
         if (errors.length > 0 && errors[0].textContent.includes("Incorrect Captcha")) {
+            console.log('[Captcha] Incorrect captcha error found on page');
             handleIncorrectCaptcha();
             return;
         }
@@ -2049,6 +2062,21 @@
     
     window.addEventListener("load", function() {
         setTimeout(() => {
+            // Clear the failure flag when page reloads after successful submission
+            const errors = document.getElementsByClassName(ERROR_CLASS);
+            let hasIncorrectCaptchaError = false;
+            for (let err of errors) {
+                if (err.textContent.includes("Incorrect Captcha")) {
+                    hasIncorrectCaptchaError = true;
+                    break;
+                }
+            }
+            
+            // Only clear flag if there's no error (meaning previous attempt was successful)
+            if (!hasIncorrectCaptchaError) {
+                sessionStorage.removeItem('captchaAttemptFailed');
+            }
+            
             const img = findCaptchaImage();
             const textbox = document.getElementById(CAPTCHA_INPUT_ID);
             if (img && textbox && !textbox.value) {
@@ -2085,6 +2113,7 @@
 
     const getProblemDescription = () => {
         const isTutorPage = window.location.href.includes('tutorprogram');
+        const isCodeTrackPage = window.location.href.includes('codeprogram');
         
         // Find the problem description card
         const cards = document.querySelectorAll('.ui-card-content');
@@ -2140,6 +2169,34 @@
                     }
                 }
                 
+                // For code track pages, get pre-code shown above the editor
+                if (isCodeTrackPage) {
+                    // Look for pre elements in the code editor panel (these show struct definitions, etc.)
+                    const codeEditorPanel = document.getElementById('codeeditorpanel');
+                    if (codeEditorPanel) {
+                        const preCodes = codeEditorPanel.querySelectorAll('pre');
+                        preCodes.forEach((pre) => {
+                            const text = pre.textContent.trim();
+                            // Skip empty snippets and the post-code section
+                            if (text.length > 5 && !pre.closest('#j_id_8t, [id*="_8t"]')) {
+                                // This is likely the pre-code/struct definition
+                                if (!preCode) {
+                                    preCode = text;
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Also check for pre elements in the problem card itself
+                    const cardPres = card.querySelectorAll('pre');
+                    cardPres.forEach((pre) => {
+                        const text = pre.textContent.trim();
+                        if (text.length > 5 && !preCode) {
+                            preCode = text;
+                        }
+                    });
+                }
+                
                 // Get the problem description text
                 const allText = card.textContent;
                 const labelMatch = allText.indexOf(problemTitle);
@@ -2177,25 +2234,31 @@
                         fullDescription += `\nPost-code that will run after your solution (DO NOT include this):\n\`\`\`\n${postCode}\n\`\`\`\n`;
                     }
                     fullDescription += `\nIMPORTANT: Write ONLY the middle part of the code. The pre-code and post-code are already provided by the system.`;
+                } else if (isCodeTrackPage && preCode) {
+                    // For code track with pre-code (like struct definitions)
+                    fullDescription = `${description}\n\n`;
+                    fullDescription += `IMPORTANT - Pre-defined code structure (already provided by the system):\n\`\`\`\n${preCode}\n\`\`\`\n`;
+                    fullDescription += `\nYour solution should work with this pre-defined structure. You may need to use it in your implementation.`;
                 }
                 
                 return {
                     title: problemTitle,
                     description: fullDescription.trim(),
                     isTutor: isTutorPage,
+                    isCodeTrack: isCodeTrackPage,
                     preCode: preCode,
                     postCode: postCode
                 };
             }
         }
-        return { title: '', description: '', isTutor: false, preCode: '', postCode: '' };
+        return { title: '', description: '', isTutor: false, isCodeTrack: false, preCode: '', postCode: '' };
     };
 
     // ========== Get error information from page ==========
     const getErrorInfo = () => {
         let errorInfo = {
             hasError: false,
-            errorType: null,  // 'wrong_output' or 'compilation_error'
+            errorType: null,  // 'wrong_output', 'compilation_error', or 'runtime_error'
             input: '',
             expectedOutput: '',
             yourOutput: '',
@@ -2236,8 +2299,20 @@
             'expected', 'undeclared', 'implicit declaration'
         ];
         
+        // Check for runtime errors
+        const runtimeIndicators = [
+            'segmentation fault', 'core dumped', 'bus error', 'floating point exception',
+            'abort', 'timeout', 'time limit exceeded', 'memory limit', 'stack overflow',
+            'runtime error', 'killed', 'signal'
+        ];
+        
+        const panelTextLower = panelText.toLowerCase();
         const isCompilationError = compilationIndicators.some(indicator => 
-            panelText.toLowerCase().includes(indicator.toLowerCase())
+            panelTextLower.includes(indicator.toLowerCase())
+        );
+        
+        const isRuntimeError = runtimeIndicators.some(indicator =>
+            panelTextLower.includes(indicator.toLowerCase())
         );
         
         if (isCompilationError) {
@@ -2249,6 +2324,24 @@
             } else {
                 errorInfo.compilationError = panelText;
             }
+        } else if (isRuntimeError) {
+            errorInfo.errorType = 'runtime_error';
+            // Extract Input, Expected Output, Your Output (runtime error shows these)
+            const cards = panelContent.querySelectorAll('.ui-card-content');
+            const labels = panelContent.querySelectorAll('.ui.label');
+            
+            labels.forEach((label, index) => {
+                const labelText = label.textContent.toLowerCase();
+                const cardContent = cards[index]?.textContent.trim() || '';
+                
+                if (labelText.includes('input')) {
+                    errorInfo.input = cardContent;
+                } else if (labelText.includes('expected')) {
+                    errorInfo.expectedOutput = cardContent;
+                } else if (labelText.includes('your program') || labelText.includes('your output')) {
+                    errorInfo.yourOutput = cardContent;
+                }
+            });
         } else {
             errorInfo.errorType = 'wrong_output';
             
@@ -2374,15 +2467,41 @@
 
     const extractCode = (response, language) => {
         // Try to extract code from markdown code blocks
-        const codeBlockRegex = /```(?:\w+)?\s*([\s\S]*?)```/g;
+        // Match ```language or ``` followed by code
+        const codeBlockRegex = /```(?:\w+)?\n?([\s\S]*?)```/g;
         const matches = [...response.matchAll(codeBlockRegex)];
         
         if (matches.length > 0) {
-            return matches[0][1].trim();
+            // Get the largest code block (most likely the complete solution)
+            let bestMatch = matches[0][1].trim();
+            for (const match of matches) {
+                if (match[1].trim().length > bestMatch.length) {
+                    bestMatch = match[1].trim();
+                }
+            }
+            return bestMatch;
+        }
+        
+        // Try without closing backticks (sometimes AI forgets to close)
+        const openBlockRegex = /```(?:\w+)?\n([\s\S]+)/;
+        const openMatch = response.match(openBlockRegex);
+        if (openMatch) {
+            return openMatch[1].trim();
         }
         
         // If no code blocks, return the whole response (might be plain code)
-        return response.trim();
+        // But remove any leading/trailing non-code text
+        let code = response.trim();
+        
+        // Remove common prefixes/suffixes that aren't code
+        const nonCodePrefixes = ['Here is', 'Here\'s', 'The fixed code', 'The solution', 'Fixed code:', 'Solution:'];
+        for (const prefix of nonCodePrefixes) {
+            if (code.toLowerCase().startsWith(prefix.toLowerCase())) {
+                code = code.substring(prefix.length).trim();
+            }
+        }
+        
+        return code;
     };
 
     // ==========  generateAISolution FUNCTION ==========
@@ -2403,80 +2522,210 @@
         // ========== NEW: Error fix mode ==========
         if (errorInfo.hasError && errorInfo.currentCode) {
             if (errorInfo.errorType === 'compilation_error') {
-                prompt = `You are an expert ${language} programmer. Fix the compilation error in this code.
-    
-    Problem: ${problem.title}
-    ${problem.description}
-    
-    CURRENT CODE (has compilation error):
-    \`\`\`${language.toLowerCase()}
-    ${errorInfo.currentCode}
-    \`\`\`
-    
-    COMPILATION ERROR:
-    ${errorInfo.compilationError}
-    
-    INSTRUCTIONS:
-    - Fix ONLY the compilation error
-    - Keep the logic the same unless it's causing the error
-    - Return the COMPLETE fixed code
-    - Do NOT explain, just provide the fixed code in a code block`;
-    
-            } else if (errorInfo.errorType === 'wrong_output') {
-                prompt = `You are an expert ${language} programmer. Fix the logic error in this code.
+                prompt = `You are an expert ${language} programmer.
 
-Problem: ${problem.title}
+=== TASK TYPE ===
+FIX COMPILATION ERROR
+
+=== PROBLEM ===
+${problem.title}
+
 ${problem.description}
 
-CURRENT CODE (produces wrong output):
+=== BUGGY CODE ===
 \`\`\`${language.toLowerCase()}
 ${errorInfo.currentCode}
 \`\`\`
 
-TEST CASE THAT FAILED:
-- Input: ${errorInfo.input}
-- Expected Output: ${errorInfo.expectedOutput}
-- Your Output: ${errorInfo.yourOutput}
+=== COMPILATION ERROR ===
+${errorInfo.compilationError}
 
-INSTRUCTIONS:
-- Analyze why the output is wrong
-- Fix the logic to produce the expected output
-- Return the COMPLETE fixed code
-- Do NOT explain, just provide the fixed code in a code block`;
+=== YOUR TASK ===
+1. READ the error message carefully
+2. FIND the line causing the error
+3. FIX the syntax/type error
+4. Keep the logic unchanged
+
+=== OUTPUT ===
+Return ONLY the complete fixed code in a code block. No explanations.
+
+\`\`\`${language.toLowerCase()}`;
+    
+            } else if (errorInfo.errorType === 'runtime_error') {
+                // Runtime error like segmentation fault
+                const runtimeHints = [];
+                const errLower = errorInfo.yourOutput.toLowerCase();
+                if (errLower.includes('segmentation fault') || errLower.includes('core dumped')) {
+                    runtimeHints.push('- Check for NULL pointer dereference');
+                    runtimeHints.push('- Check array bounds (index < size)');
+                    runtimeHints.push('- Ensure malloc returns non-NULL');
+                    runtimeHints.push('- Check pointer arithmetic');
+                }
+                if (errLower.includes('timeout') || errLower.includes('time limit')) {
+                    runtimeHints.push('- Check for infinite loops');
+                    runtimeHints.push('- Use more efficient algorithm');
+                    runtimeHints.push('- Reduce nested loops');
+                }
+                if (errLower.includes('floating point')) {
+                    runtimeHints.push('- Check for division by zero');
+                }
+
+                prompt = `You are an expert ${language} programmer.
+
+=== TASK TYPE ===
+FIX RUNTIME ERROR - ${errorInfo.yourOutput.trim() || 'CRASH'}
+
+=== PROBLEM ===
+${problem.title}
+
+${problem.description}
+
+=== BUGGY CODE ===
+\`\`\`${language.toLowerCase()}
+${errorInfo.currentCode}
+\`\`\`
+
+=== ERROR DETAILS ===
+Runtime Error: ${errorInfo.yourOutput}
+Test Input: ${errorInfo.input}
+Expected Output: ${errorInfo.expectedOutput}
+
+=== DEBUGGING HINTS ===
+${runtimeHints.length > 0 ? runtimeHints.join('\n') : '- Check memory access\n- Check loop conditions\n- Check pointer validity'}
+
+=== YOUR TASK ===
+1. TRACE the code with the given input
+2. FIND where the crash occurs
+3. FIX the memory/logic issue
+4. Ensure all edge cases are handled
+
+=== OUTPUT ===
+Return ONLY the complete fixed code in a code block. No explanations.
+
+\`\`\`${language.toLowerCase()}`;
+
+            } else if (errorInfo.errorType === 'wrong_output') {
+                prompt = `You are an expert ${language} programmer. The code below produces WRONG OUTPUT.
+
+=== PROBLEM ===
+${problem.title}
+
+${problem.description}
+
+=== FAILED TEST CASE ===
+INPUT:
+${errorInfo.input}
+
+EXPECTED OUTPUT:
+${errorInfo.expectedOutput}
+
+ACTUAL (WRONG) OUTPUT:
+${errorInfo.yourOutput}
+
+=== BUGGY CODE ===
+\`\`\`${language.toLowerCase()}
+${errorInfo.currentCode}
+\`\`\`
+
+=== YOUR TASK ===
+1. ANALYZE: Compare expected vs actual output - what's different?
+2. TRACE: Walk through the code with the given input step by step
+3. IDENTIFY: Find the exact line(s) causing the wrong result
+4. FIX: Correct the logic error
+
+COMMON ISSUES TO CHECK:
+- Wrong loop bounds or conditions
+- Off-by-one errors
+- Wrong formula or calculation
+- Incorrect array indexing
+- Missing edge cases
+- Wrong variable used
+
+=== OUTPUT ===
+Return ONLY the complete fixed code in a code block. No explanations.
+
+\`\`\`${language.toLowerCase()}`;
         }
     }
     // ========== Normal mode (no error) ==========
     else if (problem.isTutor) {
-        prompt = `You are an expert ${language} programmer. Complete the MIDDLE PORTION of the code for this problem.
+        prompt = `You are an expert ${language} programmer.
 
-Problem: ${problem.title}
+=== TASK TYPE ===
+TUTOR PROGRAM - Write ONLY the middle portion of code
+
+=== PROBLEM ===
+${problem.title}
+
 ${problem.description}
 
-CRITICAL REQUIREMENTS:
-- Write ONLY the missing middle part of the code
-- Do NOT include the pre-code or post-code sections (they are already provided)
-- Do NOT include imports, class declarations, or main function boilerplate if the pre-code already has them
-- The code you write will be inserted between the pre-code and post-code
-- Make sure variables from pre-code are used and variables needed by post-code are created
-- Write clean, minimal code that solves the problem
+=== REQUIREMENTS ===
+1. Write ONLY the missing middle code
+2. Do NOT include pre-code or post-code (already provided)
+3. Do NOT include imports, class declarations, or main()
+4. Use variables from pre-code
+5. Create variables needed by post-code
+6. Keep code clean and minimal
 
-Respond with ONLY the middle code portion, wrapped in a code block.`;
+=== OUTPUT ===
+Return ONLY the middle code portion in a code block.
+
+\`\`\`${language.toLowerCase()}`;
+    } else if (problem.isCodeTrack) {
+        // Code track - function implementation required (with or without preCode)
+        prompt = `You are an expert ${language} programmer.
+
+=== TASK TYPE ===
+FUNCTION IMPLEMENTATION - Write ONLY the required function(s)
+
+=== PROBLEM ===
+${problem.title}
+
+${problem.description}
+${problem.preCode ? `\n=== PRE-DEFINED STRUCTURE ===\n\`\`\`${language.toLowerCase()}\n${problem.preCode}\n\`\`\`` : ''}
+
+=== CRITICAL RULES ===
+1. Do NOT write main() - it is provided by the system
+2. Implement ONLY the function mentioned in the problem
+3. Match the EXACT function signature
+4. Read the problem examples carefully to understand the logic
+5. Handle edge cases (size < minimum, empty input, etc.)
+${language === 'C' || language === 'C++' || language === 'C++23' ? '6. Include necessary headers (#include <stdio.h>, etc.)' : ''}
+
+=== ALGORITHM TIPS ===
+- Read the problem statement word by word
+- Trace through the examples manually first
+- Identify the pattern or formula
+- Handle boundary conditions
+
+=== OUTPUT ===
+Return ONLY the function implementation (with includes if needed) in a code block.
+
+\`\`\`${language.toLowerCase()}`;
     } else {
-        prompt = `You are an expert competitive programmer. Write a complete, working solution for this problem in ${language}.
+        prompt = `You are an expert ${language} competitive programmer.
 
-Problem: ${problem.title}
+=== TASK TYPE ===
+COMPLETE SOLUTION - Write full working code
+
+=== PROBLEM ===
+${problem.title}
+
 ${problem.description}
 
-Requirements:
-- Write ONLY the code, no explanations
-- The code must be complete and ready to compile/run
-- Use standard input/output as shown in the examples
-- Follow ${language} best practices
-- Keep the code simple and efficient
-- For Java, use class name "Hello" (required by SkillRack)
-- Include all necessary imports/headers
+=== REQUIREMENTS ===
+1. Write complete, compilable code
+2. Use standard input/output
+3. Handle all edge cases
+4. Follow ${language} best practices
+5. Keep code simple and efficient
+6. For Java: use class name "Hello"
+7. Include all necessary imports/headers
 
-Respond with ONLY the code, wrapped in a code block.`;
+=== OUTPUT ===
+Return ONLY the code in a code block. No explanations.
+
+\`\`\`${language.toLowerCase()}`;
         }
     
         // Show loading indicator
