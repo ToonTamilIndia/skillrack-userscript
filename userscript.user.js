@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.3
+// @version      4.4
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
 // @match        https://skillrack.com/*
-// @require      https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js
+// @require      https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js
 // @grant        none
 // @run-at       document-start
 // @downloadURL https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js
@@ -46,6 +46,12 @@
         g4fApiKey: "",
         g4fModel: "auto",
         // ========================================
+        
+        // ========== AUTO SOLVER SETTINGS ==========
+        enableAutoSolver: false,
+        autoSolverMaxRetries: 3,
+        autoSolverDelay: 500,
+        // ==========================================
     };
 
     // Load settings from localStorage or use defaults
@@ -554,6 +560,32 @@
 
         panelContent.appendChild(createSectionHeader('AI Solution Generator'));
         panelContent.appendChild(createToggle('enableAISolver', 'Enable AI Solver', SETTINGS.enableAISolver, 'Show AI solution button'));
+        
+        // Special toggle for Auto Solver with warning
+        const autoSolverToggle = createToggle('enableAutoSolver', '⚡ Auto Solver', SETTINGS.enableAutoSolver, 'Auto-solve & submit (requires AI Solver)');
+        const autoSolverCheckbox = autoSolverToggle.querySelector('input[type="checkbox"]');
+        if (autoSolverCheckbox) {
+            autoSolverCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    const confirmed = confirm(
+                        '⚠️ AUTO SOLVER - EXPERIMENTAL FEATURE ⚠️\n\n' +
+                        '• This feature is UNDER DEVELOPMENT\n' +
+                        '• Errors and unexpected behavior may occur\n' +
+                        '• Not fully tested on all problem types\n' +
+                        '• May cause page reloads or get stuck\n\n' +
+                        'USE AT YOUR OWN RISK!\n\n' +
+                        'You can stop it anytime using the STOP button that appears.\n\n' +
+                        'Do you want to enable Auto Solver?'
+                    );
+                    if (!confirmed) {
+                        e.target.checked = false;
+                        SETTINGS.enableAutoSolver = false;
+                        saveSettings(SETTINGS);
+                    }
+                }
+            });
+        }
+        panelContent.appendChild(autoSolverToggle);
         
         // ========== UPDATED AI Provider selector with G4F option (MODIFIED) ==========
         const providerWrapper = document.createElement('div');
@@ -1812,29 +1844,62 @@
         const username = SETTINGS.captchaUsername || "";
         let cleanedText = text;
         
-        // Remove username (handle different usernames in captcha)
-        // Extract just the email pattern and remove it
-        cleanedText = cleanedText.replace(/\d{12}@[a-zA-Z]+/gi, "").trim();
+        // Remove username patterns (handle OCR adding spaces)
+        // Pattern: 12 digits followed by @ and letters (with possible spaces)
+        cleanedText = cleanedText.replace(/\d{9,12}\s*@\s*[a-zA-Z]+/gi, "").trim();
         
-        // Also try removing the configured username
+        // Also remove any standalone 12-digit numbers (roll numbers)
+        cleanedText = cleanedText.replace(/\b\d{9,12}\b/g, "").trim();
+        
+        // Also try removing the configured username (with flexible spacing)
         if (username) {
-            cleanedText = cleanedText.replace(new RegExp(username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi"), "").trim();
+            // Create pattern that allows spaces around @
+            const escapedUsername = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const flexiblePattern = escapedUsername.replace(/@/g, '\\s*@\\s*');
+            cleanedText = cleanedText.replace(new RegExp(flexiblePattern, "gi"), "").trim();
         }
+        
+        // Remove any remaining @ symbols and email-like patterns
+        cleanedText = cleanedText.replace(/@[a-zA-Z]+/gi, "").trim();
         
         // Remove common OCR noise
         cleanedText = cleanedText.replace(/[\n\r\t]/g, " ").trim();
         
+        // Remove multiple spaces
+        cleanedText = cleanedText.replace(/\s+/g, " ").trim();
+        
         console.log(`[Captcha] Cleaned text: "${cleanedText}"`);
         
         // ===== METHOD 1: Standard pattern with + sign =====
+        // This should match "100+3", "5+6", "23+45" etc.
         let match = cleanedText.match(/(\d+)\s*\+\s*(\d+)/);
         if (match) {
-            const result = parseInt(match[1], 10) + parseInt(match[2], 10);
-            console.log(`[Captcha] Pattern 1 (X+Y): ${match[1]} + ${match[2]} = ${result}`);
-            return result;
+            const num1 = parseInt(match[1], 10);
+            const num2 = parseInt(match[2], 10);
+            // Validate both numbers are reasonable (1-999 to handle 3-digit numbers)
+            if (num1 >= 1 && num1 <= 999 && num2 >= 1 && num2 <= 999) {
+                const result = num1 + num2;
+                console.log(`[Captcha] Pattern 1 (X+Y): ${num1} + ${num2} = ${result}`);
+                return result;
+            }
         }
         
-        // ===== METHOD 2: Handle merged digits (1748 -> 17+48) =====
+        // ===== METHOD 2: Handle 2-digit number that should be two single digits =====
+        // e.g., "72" is really "7+2" (OCR missed the + sign)
+        match = cleanedText.match(/^(\d{2})$/);
+        if (match) {
+            const numStr = match[1];
+            const num1 = parseInt(numStr[0], 10);
+            const num2 = parseInt(numStr[1], 10);
+            // Both should be non-zero single digits
+            if (num1 >= 1 && num1 <= 9 && num2 >= 1 && num2 <= 9) {
+                const result = num1 + num2;
+                console.log(`[Captcha] Pattern 2 (XY->X+Y): ${num1} + ${num2} = ${result}`);
+                return result;
+            }
+        }
+        
+        // ===== METHOD 3: Handle merged 3-4 digits (1748 -> 17+48) =====
         // Look for 3-4 digit number that could be two numbers merged
         match = cleanedText.match(/(\d{3,4})/);
         if (match) {
@@ -1915,9 +1980,41 @@
         }, 50);
     }
     
+    // ===== CAPTCHA RETRY TRACKING (uses localStorage for persistence across refreshes) =====
+    const CAPTCHA_MAX_AUTO_RETRIES = 3; // Stop auto-solving after this many FAILED attempts
+    const CAPTCHA_STORAGE_KEY = 'skillrack_captcha_retries';
+    const CAPTCHA_PENDING_KEY = 'skillrack_captcha_pending';
+    const CAPTCHA_FAILED_KEY = 'skillrack_captcha_failed';
+    
+    function getCaptchaRetryCount() {
+        return parseInt(localStorage.getItem(CAPTCHA_STORAGE_KEY) || '0', 10);
+    }
+    
+    function incrementCaptchaRetry() {
+        const count = getCaptchaRetryCount() + 1;
+        localStorage.setItem(CAPTCHA_STORAGE_KEY, count.toString());
+        console.log(`[Captcha] Retry count: ${count}/${CAPTCHA_MAX_AUTO_RETRIES}`);
+        return count;
+    }
+    
+    function resetCaptchaRetry() {
+        localStorage.removeItem(CAPTCHA_STORAGE_KEY);
+        localStorage.removeItem(CAPTCHA_PENDING_KEY);
+        localStorage.removeItem(CAPTCHA_FAILED_KEY);
+        console.log('[Captcha] Retry count reset');
+    }
+    
     // ===== IMPROVED: Multiple OCR attempts with different processing =====
     async function handleCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
+        
+        // Check if we've exceeded max auto-retries
+        const retryCount = getCaptchaRetryCount();
+        if (retryCount >= CAPTCHA_MAX_AUTO_RETRIES) {
+            console.log(`[Captcha] ⚠️ Max auto-retries (${CAPTCHA_MAX_AUTO_RETRIES}) reached - stopping auto-solve`);
+            handleIncorrectCaptcha();
+            return;
+        }
         
         if (typeof Tesseract === 'undefined') {
             console.log('[Captcha] Tesseract not loaded, skipping');
@@ -1974,7 +2071,18 @@
                 const result = solveCaptcha(text);
                 
                 if (result !== null) {
+                    // Validate result is reasonable (1-198 for sum of two 1-99 numbers)
+                    if (result < 1 || result > 198) {
+                        console.log(`[Captcha] ⚠️ Result ${result} seems invalid, skipping...`);
+                        continue;
+                    }
+                    
                     console.log(`[Captcha] ✓ Solution found: ${result}`);
+                    console.log(`[Captcha] Submitting answer...`);
+                    
+                    // Mark that we're attempting (will be checked on next page load)
+                    localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
+                    
                     textbox.value = result;
                     setTimeout(() => safeButtonClick(button), 100);
                     return;
@@ -1996,9 +2104,11 @@
         
         // Mark that we've had an incorrect captcha attempt
         sessionStorage.setItem('captchaAttemptFailed', 'true');
-        console.log('[Captcha] Incorrect captcha detected - waiting for manual input');
         
-        const captext = prompt("❌ Captcha failed! Please enter the math result manually:");
+        const retryCount = getCaptchaRetryCount();
+        console.log(`[Captcha] ⚠️ Auto-solve failed after ${retryCount} attempts - requesting manual input`);
+        
+        const captext = prompt(`❌ Captcha auto-solve failed (${retryCount} attempts).\n\nPlease look at the captcha image and enter the math result manually:\n(e.g., if you see "7 + 2", enter "9")`);
         
         if (captext === null || captext.trim() === '') {
             console.log('[Captcha] User cancelled manual input');
@@ -2009,6 +2119,9 @@
         const button = document.getElementById(PROCEED_BTN_ID);
         
         if (textbox && button) {
+            // Reset retry count on manual input (user is solving it now)
+            resetCaptchaRetry();
+            
             textbox.value = captext.trim();
             setTimeout(() => safeButtonClick(button), 100);
         }
@@ -2020,17 +2133,99 @@
             event.target.parentNode.tagName === "BUTTON" && 
             event.target.textContent === "Solve") {
             sessionStorage.setItem("Solvebtnid", event.target.parentNode.id);
-            // Reset failure flag when user manually clicks Solve button
-            sessionStorage.removeItem('captchaAttemptFailed');
+            // Reset ALL failure tracking when user manually clicks Solve button
+            resetCaptchaRetry();
         }
     }, false);
+    
+    // Check if captcha elements exist on the current page
+    // Check if we're on the CODING page (has Run, Save buttons)
+    function isOnCodingPageGlobal() {
+        // Check for Run button
+        const buttons = document.querySelectorAll('button');
+        for (const btn of buttons) {
+            const text = btn.textContent || '';
+            if (text.includes('Run') || text.includes('Save') || text.includes('Submit')) {
+                return true;
+            }
+        }
+        // Check for code editor
+        if (document.getElementById('txtCode') || document.querySelector('.ace_editor')) {
+            return true;
+        }
+        return false;
+    }
+    
+    function hasCaptchaElements() {
+        // If we're on coding page with Run/Save buttons, we're NOT on captcha page
+        if (isOnCodingPageGlobal()) {
+            return false;
+        }
+        
+        const captchaInput = document.getElementById(CAPTCHA_INPUT_ID);
+        const proceedBtn = document.getElementById(PROCEED_BTN_ID);
+        // Must have both input and proceed button visible
+        return captchaInput && proceedBtn && (proceedBtn.offsetParent !== null || proceedBtn.style.display !== 'none');
+    }
     
     function initCaptchaSolver() {
         if (!SETTINGS.enableCaptchaSolver) return;
         
-        // Don't auto-solve if we already had an incorrect attempt
-        if (sessionStorage.getItem("captchaAttemptFailed")) {
-            console.log('[Captcha] Previous attempt failed - not auto-solving again');
+        // Log current retry state
+        const currentRetries = getCaptchaRetryCount();
+        const hasPending = localStorage.getItem(CAPTCHA_PENDING_KEY);
+        const hasFailed = localStorage.getItem(CAPTCHA_FAILED_KEY);
+        console.log(`[Captcha] State: retries=${currentRetries}, pending=${!!hasPending}, failed=${!!hasFailed}`);
+        
+        // FIRST: Check if captcha elements exist on this page
+        if (!hasCaptchaElements()) {
+            console.log('[Captcha] No captcha on this page - skipping');
+            // Clear pending flag if we successfully passed captcha
+            if (hasPending) {
+                console.log('[Captcha] ✓ Previous captcha was correct! Resetting retry count.');
+                localStorage.removeItem(CAPTCHA_PENDING_KEY);
+                resetCaptchaRetry();
+            }
+            return;
+        }
+        
+        // We ARE on a captcha page
+        console.log('[Captcha] Captcha page detected');
+        
+        // Check for Incorrect Captcha error on page
+        const errors = document.getElementsByClassName(ERROR_CLASS);
+        let hasIncorrectCaptchaError = false;
+        for (let err of errors) {
+            if (err.textContent && err.textContent.includes("Incorrect Captcha")) {
+                hasIncorrectCaptchaError = true;
+                console.log('[Captcha] Found "Incorrect Captcha" error message');
+                break;
+            }
+        }
+        
+        // If we had a pending submit and we're STILL on captcha page, it failed
+        // (Either explicit error OR page just reloaded with new captcha)
+        if (hasPending) {
+            localStorage.removeItem(CAPTCHA_PENDING_KEY);
+            
+            // Being back on captcha page after submit = failure
+            const newCount = incrementCaptchaRetry();
+            console.log(`[Captcha] ✗ Previous attempt FAILED - back on captcha page (${newCount}/${CAPTCHA_MAX_AUTO_RETRIES})`);
+            
+            // Check if we've exceeded max retries
+            if (newCount >= CAPTCHA_MAX_AUTO_RETRIES) {
+                console.log('[Captcha] ⚠️ Max retries reached - requesting manual input');
+                localStorage.setItem(CAPTCHA_FAILED_KEY, 'true');
+                handleIncorrectCaptcha();
+                return;
+            }
+        }
+        
+        // Don't auto-solve if marked as failed
+        if (hasFailed || localStorage.getItem(CAPTCHA_FAILED_KEY)) {
+            console.log('[Captcha] Manual mode - not auto-solving (max retries exceeded)');
+            // Show prompt for manual input
+            handleIncorrectCaptcha();
             return;
         }
         
@@ -2041,13 +2236,6 @@
                 const oldBtn = document.getElementById(oldBtnId);
                 if (oldBtn) oldBtn.click();
             }
-            return;
-        }
-    
-        const errors = document.getElementsByClassName(ERROR_CLASS);
-        if (errors.length > 0 && errors[0].textContent.includes("Incorrect Captcha")) {
-            console.log('[Captcha] Incorrect captcha error found on page');
-            handleIncorrectCaptcha();
             return;
         }
         
@@ -2072,9 +2260,9 @@
                 }
             }
             
-            // Only clear flag if there's no error (meaning previous attempt was successful)
+            // Only clear flags if there's no error (meaning previous attempt was successful)
             if (!hasIncorrectCaptchaError) {
-                sessionStorage.removeItem('captchaAttemptFailed');
+                resetCaptchaRetry();
             }
             
             const img = findCaptchaImage();
@@ -2871,4 +3059,623 @@ Return ONLY the code in a code block. No explanations.
             aiObserver.observe(document.body, { childList: true, subtree: true });
         });
     }
+
+    // ============================================
+    // 11. AUTO SOLVER - Automatic problem solving
+    // ============================================
+    
+    const AutoSolver = (function() {
+        'use strict';
+        
+        const CONFIG = {
+            maxRetries: 3,
+            genTimeout: 120000,    // 2 minutes max for AI generation
+            runTimeout: 30000,    // 30 seconds max for code execution
+            resultTimeout: 15000, // 15 seconds to wait for result
+            delayAfterGen: 500,   // Delay after generation before run
+            delayBetweenRetries: 1000,
+            delayBeforeNext: 1500
+        };
+        
+        let isRunning = false;
+        let shouldStop = false;
+        let currentRetries = 0;
+        let statusIndicator = null;
+        
+        // Helper: Sleep function (checks shouldStop)
+        const sleep = ms => new Promise(r => {
+            const checkInterval = setInterval(() => {
+                if (shouldStop) {
+                    clearInterval(checkInterval);
+                    r();
+                }
+            }, 100);
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                r();
+            }, ms);
+        });
+        
+        // Helper: Check if we should abort
+        function checkStop() {
+            if (shouldStop) {
+                throw new Error('STOPPED_BY_USER');
+            }
+        }
+        
+        // Helper: Wait for element to appear
+        async function waitFor(selector, timeout = 15000) {
+            const start = Date.now();
+            while (Date.now() - start < timeout) {
+                if (shouldStop) return null;
+                const el = document.querySelector(selector);
+                if (el && el.offsetParent !== null) return el;
+                await sleep(50);
+            }
+            return null;
+        }
+        
+        // Helper: Force click with fallback
+        function forceClick(el, name) {
+            if (!el) {
+                console.warn(`[AutoSolver] ❌ ${name} not found`);
+                return false;
+            }
+            try {
+                el.click();
+                el.dispatchEvent(new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                }));
+                console.log(`[AutoSolver] ✅ Clicked: ${name}`);
+                return true;
+            } catch (e) {
+                console.error(`[AutoSolver] ❌ Click failed: ${name}`, e);
+                return false;
+            }
+        }
+        
+        // Helper: Check if element contains text
+        function hasText(selector, text) {
+            const el = document.querySelector(selector);
+            return el && el.innerText && el.innerText.toLowerCase().includes(text.toLowerCase());
+        }
+        
+        // Helper: Update status indicator
+        function updateStatus(message, type = 'info') {
+            console.log(`[AutoSolver] ${message}`);
+            if (statusIndicator) {
+                const colors = {
+                    info: '#2196F3',
+                    success: '#4CAF50',
+                    warning: '#FF9800',
+                    error: '#f44336'
+                };
+                statusIndicator.style.background = colors[type] || colors.info;
+                if (statusText) {
+                    statusText.textContent = `⚡ ${message}`;
+                }
+            }
+        }
+        
+        // Create floating status indicator with stop button
+        let stopButton = null;
+        let statusText = null;
+        
+        function createStatusIndicator() {
+            if (statusIndicator) return;
+            
+            statusIndicator = document.createElement('div');
+            statusIndicator.id = 'auto-solver-status';
+            statusIndicator.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                z-index: 999999;
+                padding: 10px 16px;
+                background: #2196F3;
+                color: white;
+                border-radius: 8px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 13px;
+                font-weight: 500;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                display: none;
+                align-items: center;
+                gap: 10px;
+            `;
+            
+            // Status text span
+            statusText = document.createElement('span');
+            statusText.id = 'auto-solver-text';
+            statusText.textContent = '⚡ Initializing...';
+            statusIndicator.appendChild(statusText);
+            
+            // Stop button
+            stopButton = document.createElement('button');
+            stopButton.id = 'auto-solver-stop';
+            stopButton.textContent = '⏹ STOP';
+            stopButton.style.cssText = `
+                background: #f44336;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 4px 10px;
+                font-size: 11px;
+                font-weight: bold;
+                cursor: pointer;
+                margin-left: 8px;
+                transition: background 0.2s;
+            `;
+            stopButton.addEventListener('mouseover', () => {
+                stopButton.style.background = '#d32f2f';
+            });
+            stopButton.addEventListener('mouseout', () => {
+                stopButton.style.background = '#f44336';
+            });
+            stopButton.addEventListener('click', () => {
+                stop();
+                updateStatus('Stopped by user', 'warning');
+                setTimeout(hideStatus, 2000);
+            });
+            statusIndicator.appendChild(stopButton);
+            
+            // Wait for body to exist before appending
+            if (document.body) {
+                document.body.appendChild(statusIndicator);
+            } else {
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.body.appendChild(statusIndicator);
+                });
+            }
+        }
+        
+        function showStatus() {
+            if (statusIndicator) statusIndicator.style.display = 'flex';
+        }
+        
+        function hideStatus() {
+            if (statusIndicator) statusIndicator.style.display = 'none';
+        }
+        
+        // Wait for AI generation to complete
+        async function waitForAIGeneration() {
+            const start = Date.now();
+            updateStatus('Generating solution...', 'info');
+            
+            while (Date.now() - start < CONFIG.genTimeout) {
+                const btn = document.querySelector('#ai-solution-btn');
+                
+                if (btn) {
+                    const text = btn.innerText || btn.textContent || '';
+                    const isDisabled = btn.disabled || btn.hasAttribute('disabled');
+                    const opacity = parseFloat(btn.style.opacity || '1');
+                    
+                    // Check if still generating
+                    if (text.includes('Generating') || text.includes('Fixing') || 
+                        isDisabled || opacity < 1) {
+                        await sleep(200);
+                        continue;
+                    }
+                    
+                    // Generation complete
+                    return true;
+                }
+                await sleep(200);
+            }
+            
+            updateStatus('Generation timeout!', 'warning');
+            return false;
+        }
+        
+        // Wait for execution result
+        async function waitForResult() {
+            const start = Date.now();
+            updateStatus('Waiting for result...', 'info');
+            
+            while (Date.now() - start < CONFIG.resultTimeout) {
+                // Check for success
+                if (hasText('#successmsg', 'passed') || hasText('.ui-panel-title', 'passed')) {
+                    return 'success';
+                }
+                
+                // Check for failure
+                if (hasText('#errormsg', 'did not pass') || hasText('#errormsg', 'execution')) {
+                    return 'failed';
+                }
+                
+                // Check for compilation error
+                if (hasText('#errormsg', 'error:') || hasText('#errormsg', 'compilation')) {
+                    return 'compilation_error';
+                }
+                
+                // Check for runtime error
+                if (hasText('#errormsg', 'segmentation') || hasText('#errormsg', 'runtime')) {
+                    return 'runtime_error';
+                }
+                
+                await sleep(100);
+            }
+            
+            return 'timeout';
+        }
+        
+        // Check if we're on a problem page URL
+        function isOnProblemPageURL() {
+            return window.location.href.includes('codeprogram') || 
+                   window.location.href.includes('tutorprogram');
+        }
+        
+        // Check if we're on the problem LIST page (shows "Solve" buttons)
+        function isOnProblemListPage() {
+            // Look for datagrid with Solve buttons
+            const solveButtons = document.querySelectorAll('button span.ui-button-text');
+            for (const span of solveButtons) {
+                if (span.textContent === 'Solve') {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        // Check if we're on the actual CODING page (with code editor)
+        function isOnCodingPage() {
+            return hasCodeEditor() || hasCaptcha();
+        }
+        
+        // Check if there's a captcha to solve first (but NOT if we're already on coding page)
+        function hasCaptcha() {
+            // If Run/Save/Submit buttons exist, we're on coding page, NOT captcha
+            const buttons = document.querySelectorAll('button');
+            for (const btn of buttons) {
+                const text = btn.textContent || '';
+                if (text.includes('Run') || text.includes('Submit')) {
+                    return false; // On coding page, not captcha
+                }
+            }
+            
+            const captchaInput = document.getElementById('capval');
+            const proceedBtn = document.getElementById('proceedbtn');
+            return captchaInput && proceedBtn && (proceedBtn.offsetParent !== null || window.getComputedStyle(proceedBtn).display !== 'none');
+        }
+        
+        // Check if code editor is visible
+        function hasCodeEditor() {
+            return document.getElementById('txtCode') !== null || 
+                   document.querySelector('.ace_editor') !== null;
+        }
+        
+        // Main auto-solve function
+        async function solve() {
+            if (!SETTINGS.enableAutoSolver || !SETTINGS.enableAISolver) {
+                console.log('[AutoSolver] Disabled in settings');
+                return;
+            }
+            
+            if (isRunning) {
+                console.log('[AutoSolver] Already running');
+                return;
+            }
+            
+            if (!isOnProblemPageURL()) {
+                console.log('[AutoSolver] Not on a problem page URL');
+                return;
+            }
+            
+            // Create and show status indicator early
+            createStatusIndicator();
+            showStatus();
+            updateStatus('Analyzing page...', 'info');
+            
+            // Check if we're on problem LIST page (need to click Solve first)
+            if (isOnProblemListPage() && !isOnCodingPage()) {
+                updateStatus('Finding Solve button...', 'info');
+                console.log('[AutoSolver] On problem list page - looking for Solve button...');
+                const solveButtons = document.querySelectorAll('button');
+                for (const btn of solveButtons) {
+                    const span = btn.querySelector('span.ui-button-text');
+                    if (span && span.textContent === 'Solve') {
+                        console.log('[AutoSolver] Found Solve button, clicking...');
+                        updateStatus('Clicking Solve...', 'info');
+                        forceClick(btn, 'Solve Problem');
+                        // Wait for page transition, then re-check
+                        await sleep(3000);
+                        hideStatus();
+                        // Re-trigger solve after page loads
+                        setTimeout(() => solve(), 2000);
+                        return;
+                    }
+                }
+                console.log('[AutoSolver] No Solve button found on list page');
+                updateStatus('No Solve button found', 'warning');
+                setTimeout(hideStatus, 3000);
+                return;
+            }
+            
+            // Wait for captcha to be solved first
+            if (hasCaptcha()) {
+                updateStatus('Waiting for captcha...', 'info');
+                console.log('[AutoSolver] Captcha detected, waiting for it to be solved...');
+                // Wait up to 60 seconds for captcha to be solved
+                let waitTime = 0;
+                const maxWait = 60000;
+                while (hasCaptcha() && waitTime < maxWait) {
+                    await sleep(1000);
+                    waitTime += 1000;
+                    if (waitTime % 5000 === 0) {
+                        updateStatus(`Captcha... (${waitTime/1000}s)`, 'info');
+                        console.log(`[AutoSolver] Still waiting for captcha... (${waitTime/1000}s)`);
+                    }
+                }
+                if (hasCaptcha()) {
+                    console.log('[AutoSolver] Captcha still present after 60s, aborting');
+                    updateStatus('Captcha timeout!', 'error');
+                    setTimeout(hideStatus, 3000);
+                    return;
+                }
+                console.log('[AutoSolver] Captcha solved! Continuing...');
+                updateStatus('Captcha solved!', 'success');
+                await sleep(1000);
+            }
+            
+            // Wait for code editor
+            if (!hasCodeEditor()) {
+                updateStatus('Waiting for editor...', 'info');
+                console.log('[AutoSolver] Code editor not found, waiting...');
+                await sleep(3000);
+                if (!hasCodeEditor()) {
+                    console.log('[AutoSolver] Code editor still not found, aborting');
+                    updateStatus('Editor not found', 'error');
+                    setTimeout(hideStatus, 3000);
+                    return;
+                }
+            }
+            
+            isRunning = true;
+            shouldStop = false;  // Reset stop flag
+            currentRetries = 0;
+            
+            try {
+                await runSolveLoop();
+            } catch (e) {
+                if (e.message === 'STOPPED_BY_USER') {
+                    console.log('[AutoSolver] Stopped by user');
+                    updateStatus('Stopped', 'warning');
+                } else {
+                    console.error('[AutoSolver] Error:', e);
+                    updateStatus('Error occurred!', 'error');
+                }
+            } finally {
+                isRunning = false;
+                setTimeout(hideStatus, 3000);
+            }
+        }
+        
+        // Main solve loop with retries
+        async function runSolveLoop() {
+            const maxRetries = SETTINGS.autoSolverMaxRetries || CONFIG.maxRetries;
+            
+            while (currentRetries < maxRetries && !shouldStop) {
+                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                
+                updateStatus(`Attempt ${currentRetries + 1}/${maxRetries}`, 'info');
+                
+                // Step 1: Click AI Solution button
+                await sleep(500);
+                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                
+                const aiBtn = await waitFor('#ai-solution-btn', 5000);
+                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                
+                if (!aiBtn) {
+                    updateStatus('AI button not found', 'error');
+                    return;
+                }
+                
+                forceClick(aiBtn, 'AI Solution');
+                
+                // Step 2: Wait for generation to complete
+                const generated = await waitForAIGeneration();
+                if (!generated) {
+                    currentRetries++;
+                    updateStatus('Generation failed, retrying...', 'warning');
+                    await sleep(CONFIG.delayBetweenRetries);
+                    continue;
+                }
+                
+                updateStatus('Solution generated!', 'success');
+                await sleep(SETTINGS.autoSolverDelay || CONFIG.delayAfterGen);
+                
+                // Step 3: Click Run button
+                const runBtn = await waitFor('#j_id_bg, button[id*="_bg"]', 5000);
+                if (!runBtn) {
+                    // Try alternative selectors
+                    const buttons = document.querySelectorAll('button');
+                    let foundRun = false;
+                    for (const btn of buttons) {
+                        if (btn.textContent.includes('Run')) {
+                            forceClick(btn, 'Run');
+                            foundRun = true;
+                            break;
+                        }
+                    }
+                    if (!foundRun) {
+                        updateStatus('Run button not found', 'error');
+                        return;
+                    }
+                } else {
+                    forceClick(runBtn, 'Run');
+                }
+                
+                // Step 4: Wait for result
+                const result = await waitForResult();
+                
+                if (result === 'success') {
+                    updateStatus('✅ PASSED!', 'success');
+                    
+                    // Click Proceed to Next
+                    await sleep(CONFIG.delayBeforeNext);
+                    const nextBtn = await waitFor('#j_id_9i, button[id*="_9i"]', 10000);
+                    if (nextBtn) {
+                        forceClick(nextBtn, 'Proceed Next');
+                        updateStatus('Moving to next...', 'info');
+                        
+                        // Wait for page to change, then trigger auto-solve again
+                        await sleep(3000);
+                        setTimeout(() => solve(), 2000);
+                    }
+                    return;
+                    
+                } else if (result === 'failed' || result === 'compilation_error' || result === 'runtime_error') {
+                    currentRetries++;
+                    updateStatus(`${result} - Retry ${currentRetries}/${maxRetries}`, 'warning');
+                    
+                    if (currentRetries < maxRetries) {
+                        await sleep(CONFIG.delayBetweenRetries);
+                        // The AI should now detect the error and try to fix it
+                        continue;
+                    }
+                } else {
+                    // Timeout or unknown
+                    currentRetries++;
+                    updateStatus('Result timeout, retrying...', 'warning');
+                    await sleep(CONFIG.delayBetweenRetries);
+                    continue;
+                }
+            }
+            
+            updateStatus(`Failed after ${maxRetries} attempts`, 'error');
+        }
+        
+        // Stop auto solver
+        function stop() {
+            shouldStop = true;
+            isRunning = false;
+            console.log('[AutoSolver] Stop requested');
+            updateStatus('Stopping...', 'warning');
+            setTimeout(() => {
+                hideStatus();
+                console.log('[AutoSolver] Stopped');
+            }, 1000);
+        }
+        
+        // Track failed attempts to prevent infinite loops
+        let consecutiveFailures = 0;
+        const MAX_CONSECUTIVE_FAILURES = 3;
+        let lastSolveAttempt = 0;
+        const MIN_SOLVE_INTERVAL = 5000; // Minimum 5 seconds between solve attempts
+        
+        // Check if all problems are completed
+        function isAllCompleted() {
+            // Look for completion messages
+            const pageText = document.body?.innerText || '';
+            if (pageText.includes('Congratulations') || 
+                pageText.includes('All problems completed') ||
+                pageText.includes('completed all')) {
+                return true;
+            }
+            // Check if there's no Solve button and no code editor
+            const hasSolveBtn = isOnProblemListPage();
+            const hasEditor = hasCodeEditor();
+            const hasCaptchaPage = hasCaptcha();
+            
+            // If we're on the URL but none of these exist, probably completed
+            if (!hasSolveBtn && !hasEditor && !hasCaptchaPage) {
+                return true;
+            }
+            return false;
+        }
+        
+        // Initialize
+        function init() {
+            if (!SETTINGS.enableAutoSolver || !SETTINGS.enableAISolver) {
+                return;
+            }
+            
+            console.log('[AutoSolver] Starting...');
+            
+            // Start immediately if on problem page
+            if (isOnProblemPageURL()) {
+                console.log('[AutoSolver] On problem page, starting auto-solve...');
+                solve();
+            }
+            
+            // Debounced solve trigger
+            let solveTimeout = null;
+            const debouncedSolve = () => {
+                if (solveTimeout) clearTimeout(solveTimeout);
+                solveTimeout = setTimeout(() => {
+                    const now = Date.now();
+                    
+                    // Prevent rapid retries
+                    if (now - lastSolveAttempt < MIN_SOLVE_INTERVAL) {
+                        return;
+                    }
+                    
+                    // Check if all completed
+                    if (isAllCompleted()) {
+                        console.log('[AutoSolver] All problems completed!');
+                        updateStatus('All completed! 🎉', 'success');
+                        setTimeout(hideStatus, 5000);
+                        return;
+                    }
+                    
+                    // Check consecutive failures
+                    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                        console.log('[AutoSolver] Too many failures, stopping');
+                        updateStatus('Stopped - too many failures', 'error');
+                        setTimeout(hideStatus, 5000);
+                        return;
+                    }
+                    
+                    if (isOnProblemPageURL() && !isRunning) {
+                        lastSolveAttempt = now;
+                        solve().then(() => {
+                            consecutiveFailures = 0; // Reset on success
+                        }).catch(() => {
+                            consecutiveFailures++;
+                        });
+                    }
+                }, 1000); // Wait 1 second before triggering
+            };
+            
+            // Throttled observer - only check every 2 seconds max
+            let lastObserverTrigger = 0;
+            const navObserver = new MutationObserver(() => {
+                const now = Date.now();
+                if (now - lastObserverTrigger < 2000) return; // Throttle
+                lastObserverTrigger = now;
+                
+                if (isOnProblemPageURL() && !isRunning) {
+                    debouncedSolve();
+                }
+            });
+            
+            if (document.body) {
+                navObserver.observe(document.body, { childList: true, subtree: true });
+            }
+        }
+        
+        return {
+            solve,
+            stop,
+            init,
+            isRunning: () => isRunning,
+            resetFailures: () => { consecutiveFailures = 0; }
+        };
+    })();
+    
+    // Initialize Auto Solver when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(AutoSolver.init, 500);
+        });
+    } else {
+        setTimeout(AutoSolver.init, 300);
+    }
+    
+    // Expose for manual control
+    window.AutoSolver = AutoSolver;
+
 })();
