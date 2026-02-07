@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.7
+// @version      4.8
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
