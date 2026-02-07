@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.4
+// @version      4.6
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -15,6 +15,393 @@
 
 (function() {
     'use strict';
+
+    // ============================================
+    // SCRIPT VERSION & REMOTE URLS
+    // ============================================
+    const SCRIPT_VERSION = '4.6';
+    const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
+    const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
+    const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
+    const SCRIPT_DISABLED_KEY = 'skillrack_bypass_disabled_by_killswitch';
+
+    // ============================================
+    // UTILITY: Compare version strings (e.g., "4.5" vs "4.6")
+    // ============================================
+    const compareVersions = (local, remote) => {
+        const localParts = local.split('.').map(Number);
+        const remoteParts = remote.split('.').map(Number);
+        
+        for (let i = 0; i < Math.max(localParts.length, remoteParts.length); i++) {
+            const l = localParts[i] || 0;
+            const r = remoteParts[i] || 0;
+            if (r > l) return -1; // Remote is newer
+            if (l > r) return 1;  // Local is newer
+        }
+        return 0; // Equal
+    };
+
+    // ============================================
+    // KILL SWITCH CHECK
+    // ============================================
+    const checkKillSwitch = async () => {
+        try {
+            const response = await fetch(KILL_SWITCH_URL + '?t=' + Date.now(), {
+                cache: 'no-store'
+            });
+            if (!response.ok) {
+                console.log('[SkillRack Bypass] Kill switch check failed, allowing script to run');
+                return true; // Allow if can't fetch
+            }
+            const text = (await response.text()).trim().toLowerCase();
+            if (text === 'false') {
+                console.log('[SkillRack Bypass] Kill switch activated - script disabled');
+                localStorage.setItem(SCRIPT_DISABLED_KEY, 'true');
+                return false;
+            }
+            localStorage.removeItem(SCRIPT_DISABLED_KEY);
+            return true;
+        } catch (e) {
+            console.log('[SkillRack Bypass] Kill switch check error:', e);
+            return true; // Allow if error
+        }
+    };
+
+    // ============================================
+    // VERSION CHECK
+    // ============================================
+    const checkForUpdate = async () => {
+        try {
+            const response = await fetch(REMOTE_SCRIPT_URL + '?t=' + Date.now(), {
+                cache: 'no-store'
+            });
+            if (!response.ok) return null;
+            
+            const scriptText = await response.text();
+            // Extract version from @version line
+            const versionMatch = scriptText.match(/@version\s+(\d+\.\d+(?:\.\d+)?)/);
+            if (versionMatch) {
+                return versionMatch[1];
+            }
+        } catch (e) {
+            console.log('[SkillRack Bypass] Version check error:', e);
+        }
+        return null;
+    };
+
+    // ============================================
+    // SHOW MANDATORY UPDATE DIALOG
+    // ============================================
+    const showUpdateDialog = (remoteVersion) => {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.id = 'bypass-update-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.9);
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="
+                    background: #1e1e1e;
+                    border-radius: 16px;
+                    padding: 32px;
+                    max-width: 450px;
+                    text-align: center;
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                    border: 2px solid #f44336;
+                ">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                    <h2 style="color: #f44336; margin: 0 0 16px 0; font-size: 24px;">Update Required</h2>
+                    <p style="color: #fff; margin: 0 0 8px 0; font-size: 14px;">
+                        A new version of SkillRack Bypass is available!
+                    </p>
+                    <p style="color: #888; margin: 0 0 24px 0; font-size: 13px;">
+                        Your version: <span style="color: #ff9800;">${SCRIPT_VERSION}</span><br>
+                        Latest version: <span style="color: #4CAF50;">${remoteVersion}</span>
+                    </p>
+                    <p style="color: #ff9800; margin: 0 0 24px 0; font-size: 12px;">
+                        ⚠️ You must update to continue using this script.
+                    </p>
+                    <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button id="bypass-update-btn" style="
+                            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                            color: white;
+                            border: none;
+                            padding: 12px 32px;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            transition: transform 0.2s;
+                        ">🔄 Update Now</button>
+                        <button id="bypass-update-close" style="
+                            background: #333;
+                            color: #888;
+                            border: 1px solid #444;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            cursor: pointer;
+                        ">Close (Disable Script)</button>
+                    </div>
+                </div>
+            `;
+            
+            const addToBody = () => {
+                document.body.appendChild(overlay);
+                
+                document.getElementById('bypass-update-btn').addEventListener('click', () => {
+                    window.open(REMOTE_SCRIPT_URL, '_blank');
+                    // Keep dialog open so they can update
+                });
+                
+                document.getElementById('bypass-update-close').addEventListener('click', () => {
+                    overlay.remove();
+                    resolve(false); // User chose not to update
+                });
+            };
+            
+            if (document.body) {
+                addToBody();
+            } else {
+                document.addEventListener('DOMContentLoaded', addToBody);
+            }
+        });
+    };
+
+    // ============================================
+    // SHOW KILL SWITCH DISABLED MESSAGE
+    // ============================================
+    const showKillSwitchMessage = () => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+        
+        overlay.innerHTML = `
+            <div style="
+                background: #1e1e1e;
+                border-radius: 16px;
+                padding: 32px;
+                max-width: 400px;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                border: 2px solid #f44336;
+            ">
+                <div style="font-size: 48px; margin-bottom: 16px;">🚫</div>
+                <h2 style="color: #f44336; margin: 0 0 16px 0; font-size: 24px;">Script Disabled</h2>
+                <p style="color: #fff; margin: 0 0 16px 0; font-size: 14px;">
+                    This script has been temporarily disabled by the author.
+                </p>
+                <p style="color: #888; margin: 0; font-size: 12px;">
+                    Please check back later or visit the GitHub repository for updates.
+                </p>
+            </div>
+        `;
+        
+        if (document.body) {
+            document.body.appendChild(overlay);
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                document.body.appendChild(overlay);
+            });
+        }
+    };
+
+    // ============================================
+    // SHOW FIRST-TIME DISCLAIMER
+    // ============================================
+    const showDisclaimer = () => {
+        return new Promise((resolve) => {
+            // Check if already accepted
+            if (localStorage.getItem(DISCLAIMER_ACCEPTED_KEY) === 'true') {
+                resolve(true);
+                return;
+            }
+            
+            const overlay = document.createElement('div');
+            overlay.id = 'bypass-disclaimer-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.95);
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="
+                    background: #1e1e1e;
+                    border-radius: 16px;
+                    padding: 32px;
+                    max-width: 500px;
+                    text-align: center;
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+                    border: 2px solid #ff9800;
+                ">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⚖️</div>
+                    <h2 style="color: #ff9800; margin: 0 0 16px 0; font-size: 22px;">Disclaimer & Terms of Use</h2>
+                    <div style="
+                        background: #2d2d2d;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin-bottom: 20px;
+                        text-align: left;
+                        max-height: 200px;
+                        overflow-y: auto;
+                        font-size: 12px;
+                        color: #ccc;
+                        line-height: 1.6;
+                    ">
+                        <p style="margin: 0 0 12px 0;"><strong style="color: #f44336;">⚠️ IMPORTANT - READ CAREFULLY:</strong></p>
+                        <ul style="margin: 0; padding-left: 20px;">
+                            <li style="margin-bottom: 8px;">This script is provided <strong>"AS IS"</strong> without any warranty of any kind.</li>
+                            <li style="margin-bottom: 8px;">The author(s) are <strong>NOT RESPONSIBLE</strong> for any consequences arising from the use of this script, including but not limited to:
+                                <ul style="margin-top: 4px; padding-left: 16px;">
+                                    <li>Academic penalties or disciplinary actions</li>
+                                    <li>Account suspension or termination</li>
+                                    <li>Legal consequences</li>
+                                    <li>Any damage to your academic record</li>
+                                </ul>
+                            </li>
+                            <li style="margin-bottom: 8px;">By using this script, you acknowledge that bypassing anti-cheat measures may violate your institution's academic integrity policies.</li>
+                            <li style="margin-bottom: 8px;">You are <strong>solely responsible</strong> for your actions and any consequences that may result.</li>
+                            <li style="margin-bottom: 8px;">This script is for <strong>educational purposes only</strong>.</li>
+                        </ul>
+                    </div>
+                    <p style="color: #888; margin: 0 0 20px 0; font-size: 11px;">
+                        By clicking "I Accept", you confirm that you have read, understood, and agree to these terms.
+                    </p>
+                    <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button id="bypass-accept-btn" style="
+                            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                            color: white;
+                            border: none;
+                            padding: 12px 32px;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: bold;
+                            cursor: pointer;
+                        ">✓ I Accept & Understand</button>
+                        <button id="bypass-decline-btn" style="
+                            background: #333;
+                            color: #888;
+                            border: 1px solid #444;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            cursor: pointer;
+                        ">Decline</button>
+                    </div>
+                </div>
+            `;
+            
+            const addToBody = () => {
+                document.body.appendChild(overlay);
+                
+                document.getElementById('bypass-accept-btn').addEventListener('click', () => {
+                    localStorage.setItem(DISCLAIMER_ACCEPTED_KEY, 'true');
+                    overlay.remove();
+                    resolve(true);
+                });
+                
+                document.getElementById('bypass-decline-btn').addEventListener('click', () => {
+                    overlay.remove();
+                    resolve(false);
+                });
+            };
+            
+            if (document.body) {
+                addToBody();
+            } else {
+                document.addEventListener('DOMContentLoaded', addToBody);
+            }
+        });
+    };
+
+    // ============================================
+    // INITIALIZATION CHECK (Kill Switch, Update, Disclaimer)
+    // ============================================
+    const initializeScript = async () => {
+        // Step 1: Check kill switch
+        const killSwitchOk = await checkKillSwitch();
+        if (!killSwitchOk) {
+            showKillSwitchMessage();
+            return false;
+        }
+        
+        // Step 2: Check for updates
+        const remoteVersion = await checkForUpdate();
+        if (remoteVersion && compareVersions(SCRIPT_VERSION, remoteVersion) < 0) {
+            const userAcceptedUpdate = await showUpdateDialog(remoteVersion);
+            if (!userAcceptedUpdate) {
+                console.log('[SkillRack Bypass] User declined update - script disabled');
+                return false;
+            }
+        }
+        
+        // Step 3: Show disclaimer (first time only)
+        const disclaimerAccepted = await showDisclaimer();
+        if (!disclaimerAccepted) {
+            console.log('[SkillRack Bypass] User declined disclaimer - script disabled');
+            return false;
+        }
+        
+        return true;
+    };
+
+    // Run initialization and only continue if all checks pass
+    let scriptEnabled = false;
+    let initCallbacks = [];
+    
+    // Register a callback to run when script is enabled
+    const onScriptEnabled = (callback) => {
+        if (scriptEnabled) {
+            callback();
+        } else {
+            initCallbacks.push(callback);
+        }
+    };
+    
+    // We need to run async initialization but continue with the rest of the script
+    // For features that run at document-start, we'll check scriptEnabled flag
+    (async () => {
+        scriptEnabled = await initializeScript();
+        if (scriptEnabled) {
+            console.log('[SkillRack Bypass] All checks passed - script enabled');
+            // Run all registered callbacks
+            initCallbacks.forEach(cb => {
+                try { cb(); } catch(e) { console.error('[SkillRack Bypass] Callback error:', e); }
+            });
+            initCallbacks = [];
+        }
+    })();
 
     // ============================================
     // SETTINGS - Toggle features on/off
@@ -76,6 +463,237 @@
     };
 
     let SETTINGS = loadSettings();
+
+    // ============================================
+    // OPENROUTER PROVIDER MODULE (DYNAMIC MODEL LOADING)
+    // ============================================
+    
+    const OpenRouterProvider = (function() {
+        'use strict';
+
+        const CONFIG = {
+            // Use official API endpoint which has proper CORS support
+            API_URL: 'https://openrouter.ai/api/v1/models',
+            CACHE_KEY: 'openrouter_models_cache',
+            CACHE_TTL: 6 * 60 * 60 * 1000, // 6 hours cache
+            DEFAULT_MODEL: 'google/gemini-2.0-flash-001'
+        };
+
+        // Get API key from settings
+        function getApiKey() {
+            return SETTINGS.openrouterApiKey || null;
+        }
+
+        function normalizeModel(rawModel) {
+            // Handle official API response format
+            const pricing = rawModel.pricing || {};
+            const promptPrice = parseFloat(pricing.prompt || 0);
+            const completionPrice = parseFloat(pricing.completion || 0);
+            const isFree = promptPrice === 0 && completionPrice === 0;
+            
+            // Extract author from model ID (e.g., "google/gemini-2.0-flash" -> "google")
+            const idParts = (rawModel.id || '').split('/');
+            const author = idParts.length > 1 ? idParts[0] : 'unknown';
+            const shortName = idParts.length > 1 ? idParts[idParts.length - 1] : rawModel.id;
+            
+            // Determine group based on author
+            const groupMap = {
+                'google': 'Google',
+                'anthropic': 'Anthropic',
+                'openai': 'OpenAI',
+                'meta-llama': 'Meta',
+                'meta': 'Meta',
+                'mistralai': 'Mistral',
+                'deepseek': 'DeepSeek',
+                'qwen': 'Qwen',
+                'nvidia': 'NVIDIA',
+                'cohere': 'Cohere',
+                'perplexity': 'Perplexity',
+                'x-ai': 'xAI'
+            };
+            const group = groupMap[author.toLowerCase()] || 'Other';
+            
+            return {
+                id: rawModel.id || '',
+                name: rawModel.name || shortName || 'Unknown',
+                fullName: rawModel.name || rawModel.id || 'Unknown',
+                author: author,
+                group: group,
+                description: rawModel.description || '',
+                context_length: rawModel.context_length || null,
+                isFree: isFree,
+                supportsReasoning: false,
+                inputModalities: ['text'],
+                outputModalities: ['text']
+            };
+        }
+
+        function getCachedModels() {
+            try {
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                if (!cached) return null;
+
+                const { models, timestamp } = JSON.parse(cached);
+                const age = Date.now() - timestamp;
+                
+                if (age > CONFIG.CACHE_TTL) {
+                    localStorage.removeItem(CONFIG.CACHE_KEY);
+                    return null;
+                }
+
+                return models;
+            } catch (error) {
+                try { localStorage.removeItem(CONFIG.CACHE_KEY); } catch (e) {}
+                return null;
+            }
+        }
+
+        function setCachedModels(models) {
+            try {
+                localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({
+                    models: models,
+                    timestamp: Date.now()
+                }));
+            } catch (error) {
+                console.error('[OpenRouter] Cache write error:', error);
+            }
+        }
+
+        function clearCache() {
+            try {
+                localStorage.removeItem(CONFIG.CACHE_KEY);
+            } catch (error) {}
+        }
+
+        async function fetchModels(forceRefresh = false) {
+            if (!forceRefresh) {
+                const cachedModels = getCachedModels();
+                if (cachedModels && cachedModels.length > 0) {
+                    console.log('[OpenRouter] Using cached models:', cachedModels.length);
+                    return cachedModels;
+                }
+            }
+
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                console.log('[OpenRouter] No API key, using fallback models');
+                return getFallbackModels();
+            }
+
+            console.log('[OpenRouter] Fetching models from API...');
+            const response = await fetch(CONFIG.API_URL, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': window.location.href,
+                    'X-Title': 'SkillRack Bypass'
+                }
+            });
+
+            if (!response.ok) {
+                console.warn('[OpenRouter] API request failed, using fallback models');
+                return getFallbackModels();
+            }
+
+            const rawResponse = await response.json();
+            let modelArray = [];
+            
+            // API returns { data: [...] }
+            if (rawResponse.data && Array.isArray(rawResponse.data)) {
+                modelArray = rawResponse.data;
+            } else if (Array.isArray(rawResponse)) {
+                modelArray = rawResponse;
+            }
+
+            // Filter and normalize models
+            const normalizedModels = modelArray
+                .filter(m => m && m.id)
+                .map(m => normalizeModel(m))
+                .sort((a, b) => {
+                    // Sort: Free first, then by group, then by name
+                    if (a.isFree !== b.isFree) return a.isFree ? -1 : 1;
+                    if (a.group !== b.group) return a.group.localeCompare(b.group);
+                    return a.name.localeCompare(b.name);
+                });
+
+            console.log('[OpenRouter] Fetched models:', normalizedModels.length);
+            
+            if (normalizedModels.length > 0) {
+                setCachedModels(normalizedModels);
+            }
+
+            return normalizedModels;
+        }
+
+        // Fallback models when API is unavailable or no API key
+        function getFallbackModels() {
+            return [
+                { id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash Exp', author: 'google', group: 'Google', isFree: true },
+                { id: 'google/gemini-2.5-flash-preview', name: 'Gemini 2.5 Flash', author: 'google', group: 'Google', isFree: false },
+                { id: 'google/gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro', author: 'google', group: 'Google', isFree: false },
+                { id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1', author: 'deepseek', group: 'DeepSeek', isFree: true },
+                { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3', author: 'deepseek', group: 'DeepSeek', isFree: false },
+                { id: 'qwen/qwen3-235b-a22b:free', name: 'Qwen3 235B', author: 'qwen', group: 'Qwen', isFree: true },
+                { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', author: 'meta-llama', group: 'Meta', isFree: true },
+                { id: 'anthropic/claude-sonnet-4', name: 'Claude Sonnet 4', author: 'anthropic', group: 'Anthropic', isFree: false },
+                { id: 'anthropic/claude-3.5-haiku', name: 'Claude 3.5 Haiku', author: 'anthropic', group: 'Anthropic', isFree: false },
+                { id: 'openai/gpt-4o', name: 'GPT-4o', author: 'openai', group: 'OpenAI', isFree: false },
+                { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', author: 'openai', group: 'OpenAI', isFree: false },
+                { id: 'openai/o3-mini', name: 'o3-mini', author: 'openai', group: 'OpenAI', isFree: false },
+                { id: 'mistralai/mistral-large', name: 'Mistral Large', author: 'mistralai', group: 'Mistral', isFree: false },
+                { id: 'mistralai/codestral-latest', name: 'Codestral', author: 'mistralai', group: 'Mistral', isFree: false },
+            ].map(m => ({ ...m, fullName: m.name, description: '', context_length: null, supportsReasoning: false, inputModalities: ['text'], outputModalities: ['text'] }));
+        }
+
+        function filterModels(models, query) {
+            if (!query || typeof query !== 'string' || !Array.isArray(models)) {
+                return models || [];
+            }
+
+            const lowerQuery = query.toLowerCase().trim();
+            if (!lowerQuery) return models;
+
+            return models.filter(model => {
+                const id = (model.id || '').toLowerCase();
+                const name = (model.name || '').toLowerCase();
+                const fullName = (model.fullName || '').toLowerCase();
+                const author = (model.author || '').toLowerCase();
+                const group = (model.group || '').toLowerCase();
+                return id.includes(lowerQuery) || 
+                       name.includes(lowerQuery) || 
+                       fullName.includes(lowerQuery) ||
+                       author.includes(lowerQuery) ||
+                       group.includes(lowerQuery);
+            });
+        }
+
+        function groupModels(models) {
+            const groups = {};
+            const freeModels = [];
+            
+            for (const model of models) {
+                if (model.isFree) {
+                    freeModels.push(model);
+                } else {
+                    const group = model.group || 'Other';
+                    if (!groups[group]) groups[group] = [];
+                    groups[group].push(model);
+                }
+            }
+            
+            return { freeModels, groups };
+        }
+
+        return {
+            CONFIG,
+            fetchModels,
+            filterModels,
+            groupModels,
+            clearCache,
+            normalizeModel
+        };
+    })();
 
     // ============================================
     // G4F PROVIDER MODULE (NEW)
@@ -629,99 +1247,190 @@
         panelContent.appendChild(createTextInput('openaiApiKey', 'OpenAI API Key', SETTINGS.openaiApiKey, 'Enter your OpenAI API key'));
         panelContent.appendChild(createTextInput('openrouterApiKey', 'OpenRouter API Key', SETTINGS.openrouterApiKey, 'Enter your OpenRouter API key'));
         
-        // OpenRouter Model selector
-        const orModelWrapper = document.createElement('div');
-        orModelWrapper.id = 'openrouter-model-wrapper';
-        orModelWrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'openrouter' ? 'block' : 'none'};`;
-        orModelWrapper.innerHTML = `
-            <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">OpenRouter Model</div>
-            <select id="openrouterModel" style="
-                width: 100%;
-                padding: 8px;
-                border: 1px solid #444;
-                border-radius: 6px;
-                background: #2d2d2d;
-                color: #fff;
-                font-size: 11px;
-                box-sizing: border-box;
-            ">
-                <optgroup label="⭐ Free Models">
-                    <option value="google/gemini-2.0-flash-exp:free" ${SETTINGS.openrouterModel === 'google/gemini-2.0-flash-exp:free' ? 'selected' : ''}>Gemini 2.0 Flash Exp (Free)</option>
-                    <option value="deepseek/deepseek-r1-0528:free" ${SETTINGS.openrouterModel === 'deepseek/deepseek-r1-0528:free' ? 'selected' : ''}>DeepSeek R1 0528 (Free)</option>
-                    <option value="qwen/qwen3-coder-480b-a35b:free" ${SETTINGS.openrouterModel === 'qwen/qwen3-coder-480b-a35b:free' ? 'selected' : ''}>Qwen3 Coder 480B (Free)</option>
-                    <option value="qwen/qwen3-next-80b-a3b-instruct:free" ${SETTINGS.openrouterModel === 'qwen/qwen3-next-80b-a3b-instruct:free' ? 'selected' : ''}>Qwen3 Next 80B (Free)</option>
-                    <option value="openai/gpt-oss-120b:free" ${SETTINGS.openrouterModel === 'openai/gpt-oss-120b:free' ? 'selected' : ''}>GPT-OSS 120B (Free)</option>
-                    <option value="openai/gpt-oss-20b:free" ${SETTINGS.openrouterModel === 'openai/gpt-oss-20b:free' ? 'selected' : ''}>GPT-OSS 20B (Free)</option>
-                    <option value="meta-llama/llama-3.3-70b-instruct:free" ${SETTINGS.openrouterModel === 'meta-llama/llama-3.3-70b-instruct:free' ? 'selected' : ''}>Llama 3.3 70B (Free)</option>
-                    <option value="google/gemma-3-27b:free" ${SETTINGS.openrouterModel === 'google/gemma-3-27b:free' ? 'selected' : ''}>Gemma 3 27B (Free)</option>
-                    <option value="nvidia/nemotron-3-nano-30b-a3b:free" ${SETTINGS.openrouterModel === 'nvidia/nemotron-3-nano-30b-a3b:free' ? 'selected' : ''}>Nemotron 3 Nano 30B (Free)</option>
-                    <option value="nvidia/nemotron-nano-12b-2-vl:free" ${SETTINGS.openrouterModel === 'nvidia/nemotron-nano-12b-2-vl:free' ? 'selected' : ''}>Nemotron Nano 12B VL (Free)</option>
-                    <option value="z-ai/glm-4.5-air:free" ${SETTINGS.openrouterModel === 'z-ai/glm-4.5-air:free' ? 'selected' : ''}>GLM 4.5 Air (Free)</option>
-                    <option value="arcee-ai/trinity-mini:free" ${SETTINGS.openrouterModel === 'arcee-ai/trinity-mini:free' ? 'selected' : ''}>Trinity Mini (Free)</option>
-                    <option value="tngtech/deepseek-r1t2-chimera:free" ${SETTINGS.openrouterModel === 'tngtech/deepseek-r1t2-chimera:free' ? 'selected' : ''}>DeepSeek R1T2 Chimera (Free)</option>
-                    <option value="tngtech/deepseek-r1t-chimera:free" ${SETTINGS.openrouterModel === 'tngtech/deepseek-r1t-chimera:free' ? 'selected' : ''}>DeepSeek R1T Chimera (Free)</option>
-                    <option value="tngtech/r1t-chimera:free" ${SETTINGS.openrouterModel === 'tngtech/r1t-chimera:free' ? 'selected' : ''}>R1T Chimera (Free)</option>
-                </optgroup>
-                <optgroup label="Google">
-                    <option value="google/gemini-2.0-flash-001" ${SETTINGS.openrouterModel === 'google/gemini-2.0-flash-001' ? 'selected' : ''}>Gemini 2.0 Flash</option>
-                    <option value="google/gemini-2.5-pro-preview" ${SETTINGS.openrouterModel === 'google/gemini-2.5-pro-preview' ? 'selected' : ''}>Gemini 2.5 Pro</option>
-                    <option value="google/gemini-2.5-flash-preview" ${SETTINGS.openrouterModel === 'google/gemini-2.5-flash-preview' ? 'selected' : ''}>Gemini 2.5 Flash</option>
-                </optgroup>
-                <optgroup label="Anthropic">
-                    <option value="anthropic/claude-sonnet-4" ${SETTINGS.openrouterModel === 'anthropic/claude-sonnet-4' ? 'selected' : ''}>Claude Sonnet 4</option>
-                    <option value="anthropic/claude-3.5-haiku" ${SETTINGS.openrouterModel === 'anthropic/claude-3.5-haiku' ? 'selected' : ''}>Claude 3.5 Haiku</option>
-                </optgroup>
-                <optgroup label="OpenAI">
-                    <option value="openai/gpt-4o" ${SETTINGS.openrouterModel === 'openai/gpt-4o' ? 'selected' : ''}>GPT-4o</option>
-                    <option value="openai/gpt-4o-mini" ${SETTINGS.openrouterModel === 'openai/gpt-4o-mini' ? 'selected' : ''}>GPT-4o Mini</option>
-                    <option value="openai/o3-mini" ${SETTINGS.openrouterModel === 'openai/o3-mini' ? 'selected' : ''}>o3-mini</option>
-                </optgroup>
-                <optgroup label="Meta">
-                    <option value="meta-llama/llama-3.3-70b-instruct" ${SETTINGS.openrouterModel === 'meta-llama/llama-3.3-70b-instruct' ? 'selected' : ''}>Llama 3.3 70B</option>
-                    <option value="meta-llama/llama-4-scout" ${SETTINGS.openrouterModel === 'meta-llama/llama-4-scout' ? 'selected' : ''}>Llama 4 Scout</option>
-                </optgroup>
-                <optgroup label="DeepSeek">
-                    <option value="deepseek/deepseek-chat" ${SETTINGS.openrouterModel === 'deepseek/deepseek-chat' ? 'selected' : ''}>DeepSeek V3</option>
-                    <option value="deepseek/deepseek-r1" ${SETTINGS.openrouterModel === 'deepseek/deepseek-r1' ? 'selected' : ''}>DeepSeek R1</option>
-                </optgroup>
-                <optgroup label="Qwen">
-                    <option value="qwen/qwen-2.5-coder-32b-instruct" ${SETTINGS.openrouterModel === 'qwen/qwen-2.5-coder-32b-instruct' ? 'selected' : ''}>Qwen 2.5 Coder 32B</option>
-                    <option value="qwen/qwen3-235b-a22b" ${SETTINGS.openrouterModel === 'qwen/qwen3-235b-a22b' ? 'selected' : ''}>Qwen3 235B</option>
-                </optgroup>
-                <optgroup label="Mistral">
-                    <option value="mistralai/mistral-large" ${SETTINGS.openrouterModel === 'mistralai/mistral-large' ? 'selected' : ''}>Mistral Large</option>
-                    <option value="mistralai/codestral-latest" ${SETTINGS.openrouterModel === 'mistralai/codestral-latest' ? 'selected' : ''}>Codestral</option>
-                </optgroup>
-                <optgroup label="Other">
-                    <option value="nvidia/llama-3.1-nemotron-70b-instruct" ${SETTINGS.openrouterModel === 'nvidia/llama-3.1-nemotron-70b-instruct' ? 'selected' : ''}>Nemotron 70B</option>
-                </optgroup>
-            </select>
-            <input type="text" id="openrouterCustomModel" placeholder="Or enter custom model ID" value="" style="
-                width: 100%;
-                padding: 8px;
-                margin-top: 6px;
-                border: 1px solid #444;
-                border-radius: 6px;
-                background: #2d2d2d;
-                color: #fff;
-                font-size: 11px;
-                box-sizing: border-box;
-            ">
-        `;
-        const orModelSelect = orModelWrapper.querySelector('select');
-        const orCustomInput = orModelWrapper.querySelector('input');
-        orModelSelect.addEventListener('change', () => {
-            SETTINGS.openrouterModel = orModelSelect.value;
-            saveSettings(SETTINGS);
-        });
-        orCustomInput.addEventListener('change', () => {
-            if (orCustomInput.value.trim()) {
-                SETTINGS.openrouterModel = orCustomInput.value.trim();
-                orModelSelect.value = '';
-                saveSettings(SETTINGS);
-            }
-        });
-        panelContent.appendChild(orModelWrapper);
+        // ========== DYNAMIC OPENROUTER MODEL SELECTOR ==========
+        const createOpenRouterModelSelector = () => {
+            const wrapper = document.createElement('div');
+            wrapper.id = 'openrouter-model-wrapper';
+            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'openrouter' ? 'block' : 'none'};`;
+            
+            wrapper.innerHTML = `
+                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">OpenRouter Model</div>
+                <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+                    <input type="text" id="orModelSearch" placeholder="Search models (e.g., gemini, claude, free)" style="
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #2d2d2d;
+                        color: #fff;
+                        font-size: 11px;
+                        box-sizing: border-box;
+                    ">
+                    <button id="orRefreshModels" title="Refresh models list" style="
+                        padding: 8px 12px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #3d3d3d;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">🔄</button>
+                </div>
+                <select id="openrouterModel" style="
+                    width: 100%;
+                    padding: 8px;
+                    border: 1px solid #444;
+                    border-radius: 6px;
+                    background: #2d2d2d;
+                    color: #fff;
+                    font-size: 11px;
+                    box-sizing: border-box;
+                ">
+                    <option value="google/gemini-2.0-flash-001">Loading models...</option>
+                </select>
+                <div id="orModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    <label style="display: flex; align-items: center; gap: 4px; color: #888; font-size: 10px; cursor: pointer;">
+                        <input type="checkbox" id="orShowFreeOnly" style="margin: 0;">
+                        Show free only
+                    </label>
+                </div>
+            `;
+
+            setTimeout(() => {
+                const select = document.getElementById('openrouterModel');
+                const searchInput = document.getElementById('orModelSearch');
+                const refreshBtn = document.getElementById('orRefreshModels');
+                const statusDiv = document.getElementById('orModelStatus');
+                const freeOnlyCheckbox = document.getElementById('orShowFreeOnly');
+                
+                let allModels = [];
+                let showFreeOnly = false;
+
+                const populateSelect = (models) => {
+                    if (!select) return;
+                    const currentValue = SETTINGS.openrouterModel || 'google/gemini-2.0-flash-001';
+                    select.innerHTML = '';
+                    
+                    // Group models
+                    const { freeModels, groups } = OpenRouterProvider.groupModels(models);
+                    
+                    // Add free models first
+                    if (freeModels.length > 0) {
+                        const freeGroup = document.createElement('optgroup');
+                        freeGroup.label = `⭐ Free Models (${freeModels.length})`;
+                        freeModels.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.id;
+                            option.textContent = `${model.name} (${model.author})`;
+                            option.title = model.description || '';
+                            option.selected = model.id === currentValue;
+                            freeGroup.appendChild(option);
+                        });
+                        select.appendChild(freeGroup);
+                    }
+                    
+                    // Add other groups (skip if showing free only)
+                    if (!showFreeOnly) {
+                        const sortedGroups = Object.keys(groups).sort();
+                        for (const groupName of sortedGroups) {
+                            const groupModels = groups[groupName];
+                            if (groupModels.length === 0) continue;
+                            
+                            const optgroup = document.createElement('optgroup');
+                            optgroup.label = `${groupName} (${groupModels.length})`;
+                            groupModels.forEach(model => {
+                                const option = document.createElement('option');
+                                option.value = model.id;
+                                option.textContent = `${model.name} (${model.author})`;
+                                option.title = model.description || '';
+                                option.selected = model.id === currentValue;
+                                optgroup.appendChild(option);
+                            });
+                            select.appendChild(optgroup);
+                        }
+                    }
+                    
+                    const totalCount = showFreeOnly ? freeModels.length : models.length;
+                    if (statusDiv) statusDiv.textContent = `${totalCount} models available`;
+                };
+
+                const applyFilters = () => {
+                    let filtered = allModels;
+                    
+                    // Apply search filter
+                    const searchQuery = searchInput?.value?.trim() || '';
+                    if (searchQuery) {
+                        filtered = OpenRouterProvider.filterModels(filtered, searchQuery);
+                    }
+                    
+                    // Apply free-only filter
+                    if (showFreeOnly) {
+                        filtered = filtered.filter(m => m.isFree);
+                    }
+                    
+                    populateSelect(filtered);
+                };
+
+                const loadModels = async (forceRefresh = false) => {
+                    if (statusDiv) statusDiv.textContent = 'Loading models...';
+                    if (refreshBtn) {
+                        refreshBtn.disabled = true;
+                        refreshBtn.textContent = '⏳';
+                    }
+                    
+                    try {
+                        allModels = await OpenRouterProvider.fetchModels(forceRefresh);
+                        applyFilters();
+                        if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
+                    } catch (error) {
+                        console.error('[OpenRouter] Failed to load models:', error);
+                        if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
+                        // Fallback to default model
+                        select.innerHTML = '<option value="google/gemini-2.0-flash-001" selected>Gemini 2.0 Flash (Default)</option>';
+                    } finally {
+                        if (refreshBtn) {
+                            refreshBtn.disabled = false;
+                            refreshBtn.textContent = '🔄';
+                        }
+                    }
+                };
+
+                if (searchInput) {
+                    let searchTimeout;
+                    searchInput.addEventListener('input', () => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(applyFilters, 150);
+                    });
+                }
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => loadModels(true));
+                }
+                
+                if (freeOnlyCheckbox) {
+                    freeOnlyCheckbox.addEventListener('change', () => {
+                        showFreeOnly = freeOnlyCheckbox.checked;
+                        applyFilters();
+                    });
+                }
+
+                if (select) {
+                    select.addEventListener('change', () => {
+                        SETTINGS.openrouterModel = select.value;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                // Load models on init
+                loadModels();
+            }, 100);
+
+            return wrapper;
+        };
+        
+        panelContent.appendChild(createOpenRouterModelSelector());
+        // ========================================================
 
         // ========== G4F API KEY AND MODEL SELECTOR (NEW) ==========
         panelContent.appendChild(createTextInput('g4fApiKey', 'G4F API Key', SETTINGS.g4fApiKey, 'Enter your G4F API key'));
@@ -760,8 +1469,10 @@
         }
     };
 
-    // Create settings UI after a delay to ensure page is loaded
-    setTimeout(createSettingsUI, 1000);
+    // Create settings UI after a delay to ensure page is loaded AND script is enabled
+    onScriptEnabled(() => {
+        setTimeout(createSettingsUI, 500);
+    });
 
     // Store original functions
     const originalAddEventListener = EventTarget.prototype.addEventListener;
@@ -2242,40 +2953,43 @@
         handleCaptcha();
     }
     
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initCaptchaSolver);
-    } else {
-        setTimeout(initCaptchaSolver, 100);
-    }
-    
-    window.addEventListener("load", function() {
-        setTimeout(() => {
-            // Clear the failure flag when page reloads after successful submission
-            const errors = document.getElementsByClassName(ERROR_CLASS);
-            let hasIncorrectCaptchaError = false;
-            for (let err of errors) {
-                if (err.textContent.includes("Incorrect Captcha")) {
-                    hasIncorrectCaptchaError = true;
-                    break;
+    // Initialize captcha solver only if script is enabled
+    onScriptEnabled(() => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initCaptchaSolver);
+        } else {
+            setTimeout(initCaptchaSolver, 100);
+        }
+        
+        window.addEventListener("load", function() {
+            setTimeout(() => {
+                // Clear the failure flag when page reloads after successful submission
+                const errors = document.getElementsByClassName(ERROR_CLASS);
+                let hasIncorrectCaptchaError = false;
+                for (let err of errors) {
+                    if (err.textContent.includes("Incorrect Captcha")) {
+                        hasIncorrectCaptchaError = true;
+                        break;
+                    }
                 }
-            }
-            
-            // Only clear flags if there's no error (meaning previous attempt was successful)
-            if (!hasIncorrectCaptchaError) {
-                resetCaptchaRetry();
-            }
-            
-            const img = findCaptchaImage();
-            const textbox = document.getElementById(CAPTCHA_INPUT_ID);
-            if (img && textbox && !textbox.value) {
-                console.log('[Captcha] Backup initialization triggered');
-                handleCaptcha();
-            }
-        }, 500);
+                
+                // Only clear flags if there's no error (meaning previous attempt was successful)
+                if (!hasIncorrectCaptchaError) {
+                    resetCaptchaRetry();
+                }
+                
+                const img = findCaptchaImage();
+                const textbox = document.getElementById(CAPTCHA_INPUT_ID);
+                if (img && textbox && !textbox.value) {
+                    console.log('[Captcha] Backup initialization triggered');
+                    handleCaptcha();
+                }
+            }, 500);
+        });
+        
+        console.log('Anti-cheat bypass script v4.6 loaded successfully');
+        console.log('Settings:', SETTINGS);
     });
-    
-    console.log('Anti-cheat bypass script v4.2 loaded successfully');
-    console.log('Settings:', SETTINGS);
 
     // ============================================
     // 10. AI SOLUTION GENERATOR
@@ -3034,31 +3748,33 @@ Return ONLY the code in a code block. No explanations.
         }
     };
 
-    // Initialize AI button when page is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
+    // Initialize AI button when page is ready AND script is enabled
+    onScriptEnabled(() => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(addAISolutionButton, 1000);
+                setTimeout(addAISolutionButton, 3000);
+            });
+        } else {
             setTimeout(addAISolutionButton, 1000);
             setTimeout(addAISolutionButton, 3000);
-        });
-    } else {
-        setTimeout(addAISolutionButton, 1000);
-        setTimeout(addAISolutionButton, 3000);
-    }
+        }
 
-    // Also watch for dynamic content changes
-    const aiObserver = new MutationObserver((mutations) => {
-        if (!document.getElementById('ai-solution-btn')) {
-            setTimeout(addAISolutionButton, 500);
+        // Also watch for dynamic content changes
+        const aiObserver = new MutationObserver((mutations) => {
+            if (!document.getElementById('ai-solution-btn')) {
+                setTimeout(addAISolutionButton, 500);
+            }
+        });
+        
+        if (document.body) {
+            aiObserver.observe(document.body, { childList: true, subtree: true });
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                aiObserver.observe(document.body, { childList: true, subtree: true });
+            });
         }
     });
-    
-    if (document.body) {
-        aiObserver.observe(document.body, { childList: true, subtree: true });
-    } else {
-        document.addEventListener('DOMContentLoaded', () => {
-            aiObserver.observe(document.body, { childList: true, subtree: true });
-        });
-    }
 
     // ============================================
     // 11. AUTO SOLVER - Automatic problem solving
@@ -3077,10 +3793,35 @@ Return ONLY the code in a code block. No explanations.
             delayBeforeNext: 1500
         };
         
+        const STOP_PERSIST_KEY = 'autosolver_stopped';
+        
         let isRunning = false;
         let shouldStop = false;
         let currentRetries = 0;
         let statusIndicator = null;
+        
+        // Load persistent stop state
+        function loadStopState() {
+            try {
+                return localStorage.getItem(STOP_PERSIST_KEY) === 'true';
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // Save persistent stop state
+        function saveStopState(stopped) {
+            try {
+                if (stopped) {
+                    localStorage.setItem(STOP_PERSIST_KEY, 'true');
+                } else {
+                    localStorage.removeItem(STOP_PERSIST_KEY);
+                }
+            } catch (e) {}
+        }
+        
+        // Initialize stop state from localStorage
+        shouldStop = loadStopState();
         
         // Helper: Sleep function (checks shouldStop)
         const sleep = ms => new Promise(r => {
@@ -3140,6 +3881,78 @@ Return ONLY the code in a code block. No explanations.
         function hasText(selector, text) {
             const el = document.querySelector(selector);
             return el && el.innerText && el.innerText.toLowerCase().includes(text.toLowerCase());
+        }
+        
+        // Helper: Click Proceed Next button robustly (similar to AI Solution button)
+        async function clickProceedNext() {
+            updateStatus('Looking for Proceed Next...', 'info');
+            
+            // Method 1: Try by ID (j_id_9i)
+            let nextBtn = document.querySelector('#j_id_9i');
+            
+            // Method 2: Try by partial ID match
+            if (!nextBtn) {
+                nextBtn = document.querySelector('button[id*="_9i"]');
+            }
+            
+            // Method 3: Find by button text "Proceed Next"
+            if (!nextBtn) {
+                const buttons = document.querySelectorAll('button');
+                for (const btn of buttons) {
+                    const span = btn.querySelector('span.ui-button-text');
+                    if (span && span.textContent.includes('Proceed Next')) {
+                        nextBtn = btn;
+                        break;
+                    }
+                    if (btn.textContent.includes('Proceed Next')) {
+                        nextBtn = btn;
+                        break;
+                    }
+                }
+            }
+            
+            if (!nextBtn) {
+                console.log('[AutoSolver] Proceed Next button not found');
+                updateStatus('Proceed Next not found', 'warning');
+                return false;
+            }
+            
+            console.log('[AutoSolver] Found Proceed Next button:', nextBtn.id || nextBtn.className);
+            updateStatus('Clicking Proceed Next...', 'info');
+            
+            // Try multiple click methods
+            try {
+                // Method 1: Direct click
+                nextBtn.click();
+                
+                // Method 2: Dispatch click event
+                nextBtn.dispatchEvent(new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                }));
+                
+                // Method 3: If PrimeFaces widget exists, try using it
+                if (typeof PrimeFaces !== 'undefined' && nextBtn.onclick) {
+                    try {
+                        nextBtn.onclick({ preventDefault: () => {} });
+                    } catch (e) {}
+                }
+                
+                console.log('[AutoSolver] ✅ Clicked: Proceed Next');
+                updateStatus('Moving to next...', 'info');
+                
+            } catch (e) {
+                console.error('[AutoSolver] ❌ Click failed: Proceed Next', e);
+                return false;
+            }
+            
+            // Wait for page to change, then trigger auto-solve again
+            await sleep(3000);
+            if (!shouldStop) {
+                setTimeout(() => solve(), 2000);
+            }
+            return true;
         }
         
         // Helper: Update status indicator
@@ -3245,6 +4058,9 @@ Return ONLY the code in a code block. No explanations.
             updateStatus('Generating solution...', 'info');
             
             while (Date.now() - start < CONFIG.genTimeout) {
+                // Check for stop request
+                if (shouldStop) return false;
+                
                 const btn = document.querySelector('#ai-solution-btn');
                 
                 if (btn) {
@@ -3256,6 +4072,7 @@ Return ONLY the code in a code block. No explanations.
                     if (text.includes('Generating') || text.includes('Fixing') || 
                         isDisabled || opacity < 1) {
                         await sleep(200);
+                        if (shouldStop) return false;
                         continue;
                     }
                     
@@ -3263,6 +4080,7 @@ Return ONLY the code in a code block. No explanations.
                     return true;
                 }
                 await sleep(200);
+                if (shouldStop) return false;
             }
             
             updateStatus('Generation timeout!', 'warning');
@@ -3275,6 +4093,9 @@ Return ONLY the code in a code block. No explanations.
             updateStatus('Waiting for result...', 'info');
             
             while (Date.now() - start < CONFIG.resultTimeout) {
+                // Check for stop request
+                if (shouldStop) return 'stopped';
+                
                 // Check for success
                 if (hasText('#successmsg', 'passed') || hasText('.ui-panel-title', 'passed')) {
                     return 'success';
@@ -3296,6 +4117,7 @@ Return ONLY the code in a code block. No explanations.
                 }
                 
                 await sleep(100);
+                if (shouldStop) return 'stopped';
             }
             
             return 'timeout';
@@ -3353,6 +4175,16 @@ Return ONLY the code in a code block. No explanations.
                 return;
             }
             
+            // Check for persistent stop state
+            if (loadStopState()) {
+                console.log('[AutoSolver] Persistent stop active - not solving');
+                return;
+            }
+            
+            // Reset stop flag when starting a new solve
+            shouldStop = false;
+            saveStopState(false);
+            
             if (isRunning) {
                 console.log('[AutoSolver] Already running');
                 return;
@@ -3374,6 +4206,11 @@ Return ONLY the code in a code block. No explanations.
                 console.log('[AutoSolver] On problem list page - looking for Solve button...');
                 const solveButtons = document.querySelectorAll('button');
                 for (const btn of solveButtons) {
+                    if (shouldStop) {
+                        updateStatus('Stopped', 'warning');
+                        setTimeout(hideStatus, 2000);
+                        return;
+                    }
                     const span = btn.querySelector('span.ui-button-text');
                     if (span && span.textContent === 'Solve') {
                         console.log('[AutoSolver] Found Solve button, clicking...');
@@ -3381,9 +4218,15 @@ Return ONLY the code in a code block. No explanations.
                         forceClick(btn, 'Solve Problem');
                         // Wait for page transition, then re-check
                         await sleep(3000);
+                        if (shouldStop) {
+                            hideStatus();
+                            return;
+                        }
                         hideStatus();
                         // Re-trigger solve after page loads
-                        setTimeout(() => solve(), 2000);
+                        if (!shouldStop) {
+                            setTimeout(() => solve(), 2000);
+                        }
                         return;
                     }
                 }
@@ -3400,13 +4243,23 @@ Return ONLY the code in a code block. No explanations.
                 // Wait up to 60 seconds for captcha to be solved
                 let waitTime = 0;
                 const maxWait = 60000;
-                while (hasCaptcha() && waitTime < maxWait) {
+                while (hasCaptcha() && waitTime < maxWait && !shouldStop) {
                     await sleep(1000);
+                    if (shouldStop) {
+                        updateStatus('Stopped', 'warning');
+                        setTimeout(hideStatus, 2000);
+                        return;
+                    }
                     waitTime += 1000;
                     if (waitTime % 5000 === 0) {
                         updateStatus(`Captcha... (${waitTime/1000}s)`, 'info');
                         console.log(`[AutoSolver] Still waiting for captcha... (${waitTime/1000}s)`);
                     }
+                }
+                if (shouldStop) {
+                    updateStatus('Stopped', 'warning');
+                    setTimeout(hideStatus, 2000);
+                    return;
                 }
                 if (hasCaptcha()) {
                     console.log('[AutoSolver] Captcha still present after 60s, aborting');
@@ -3417,6 +4270,11 @@ Return ONLY the code in a code block. No explanations.
                 console.log('[AutoSolver] Captcha solved! Continuing...');
                 updateStatus('Captcha solved!', 'success');
                 await sleep(1000);
+                if (shouldStop) {
+                    updateStatus('Stopped', 'warning');
+                    setTimeout(hideStatus, 2000);
+                    return;
+                }
             }
             
             // Wait for code editor
@@ -3424,6 +4282,11 @@ Return ONLY the code in a code block. No explanations.
                 updateStatus('Waiting for editor...', 'info');
                 console.log('[AutoSolver] Code editor not found, waiting...');
                 await sleep(3000);
+                if (shouldStop) {
+                    updateStatus('Stopped', 'warning');
+                    setTimeout(hideStatus, 2000);
+                    return;
+                }
                 if (!hasCodeEditor()) {
                     console.log('[AutoSolver] Code editor still not found, aborting');
                     updateStatus('Editor not found', 'error');
@@ -3477,18 +4340,23 @@ Return ONLY the code in a code block. No explanations.
                 
                 // Step 2: Wait for generation to complete
                 const generated = await waitForAIGeneration();
+                if (shouldStop) throw new Error('STOPPED_BY_USER');
                 if (!generated) {
                     currentRetries++;
                     updateStatus('Generation failed, retrying...', 'warning');
                     await sleep(CONFIG.delayBetweenRetries);
+                    if (shouldStop) throw new Error('STOPPED_BY_USER');
                     continue;
                 }
                 
                 updateStatus('Solution generated!', 'success');
                 await sleep(SETTINGS.autoSolverDelay || CONFIG.delayAfterGen);
+                if (shouldStop) throw new Error('STOPPED_BY_USER');
                 
                 // Step 3: Click Run button
                 const runBtn = await waitFor('#j_id_bg, button[id*="_bg"]', 5000);
+                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                
                 if (!runBtn) {
                     // Try alternative selectors
                     const buttons = document.querySelectorAll('button');
@@ -3510,21 +4378,21 @@ Return ONLY the code in a code block. No explanations.
                 
                 // Step 4: Wait for result
                 const result = await waitForResult();
+                if (shouldStop) throw new Error('STOPPED_BY_USER');
+                
+                // Handle stopped result
+                if (result === 'stopped') {
+                    throw new Error('STOPPED_BY_USER');
+                }
                 
                 if (result === 'success') {
                     updateStatus('✅ PASSED!', 'success');
                     
-                    // Click Proceed to Next
+                    // Click Proceed to Next using robust method
                     await sleep(CONFIG.delayBeforeNext);
-                    const nextBtn = await waitFor('#j_id_9i, button[id*="_9i"]', 10000);
-                    if (nextBtn) {
-                        forceClick(nextBtn, 'Proceed Next');
-                        updateStatus('Moving to next...', 'info');
-                        
-                        // Wait for page to change, then trigger auto-solve again
-                        await sleep(3000);
-                        setTimeout(() => solve(), 2000);
-                    }
+                    if (shouldStop) throw new Error('STOPPED_BY_USER');
+                    
+                    await clickProceedNext();
                     return;
                     
                 } else if (result === 'failed' || result === 'compilation_error' || result === 'runtime_error') {
@@ -3533,6 +4401,7 @@ Return ONLY the code in a code block. No explanations.
                     
                     if (currentRetries < maxRetries) {
                         await sleep(CONFIG.delayBetweenRetries);
+                        if (shouldStop) throw new Error('STOPPED_BY_USER');
                         // The AI should now detect the error and try to fix it
                         continue;
                     }
@@ -3541,6 +4410,7 @@ Return ONLY the code in a code block. No explanations.
                     currentRetries++;
                     updateStatus('Result timeout, retrying...', 'warning');
                     await sleep(CONFIG.delayBetweenRetries);
+                    if (shouldStop) throw new Error('STOPPED_BY_USER');
                     continue;
                 }
             }
@@ -3552,12 +4422,20 @@ Return ONLY the code in a code block. No explanations.
         function stop() {
             shouldStop = true;
             isRunning = false;
-            console.log('[AutoSolver] Stop requested');
+            saveStopState(true);  // Persist stop state
+            console.log('[AutoSolver] Stop requested (persistent)');
             updateStatus('Stopping...', 'warning');
             setTimeout(() => {
                 hideStatus();
                 console.log('[AutoSolver] Stopped');
             }, 1000);
+        }
+        
+        // Resume auto solver (clear persistent stop)
+        function resume() {
+            shouldStop = false;
+            saveStopState(false);
+            console.log('[AutoSolver] Resumed');
         }
         
         // Track failed attempts to prevent infinite loops
@@ -3594,6 +4472,38 @@ Return ONLY the code in a code block. No explanations.
             }
             
             console.log('[AutoSolver] Starting...');
+            
+            // Check for persistent stop state
+            if (loadStopState()) {
+                console.log('[AutoSolver] Persistent stop detected - not auto-starting');
+                // Show a resume button/notification
+                createStatusIndicator();
+                showStatus();
+                updateStatus('Stopped (click to resume)', 'warning');
+                
+                // Modify stop button to be a resume button
+                if (stopButton) {
+                    stopButton.textContent = '▶ RESUME';
+                    stopButton.style.background = '#4CAF50';
+                    stopButton.onclick = () => {
+                        resume();
+                        stopButton.textContent = '⏹ STOP';
+                        stopButton.style.background = '#f44336';
+                        stopButton.onclick = () => {
+                            stop();
+                            updateStatus('Stopped by user', 'warning');
+                            setTimeout(hideStatus, 2000);
+                        };
+                        updateStatus('Resumed!', 'success');
+                        setTimeout(() => {
+                            if (isOnProblemPageURL()) {
+                                solve();
+                            }
+                        }, 1000);
+                    };
+                }
+                return;
+            }
             
             // Start immediately if on problem page
             if (isOnProblemPageURL()) {
@@ -3666,16 +4576,18 @@ Return ONLY the code in a code block. No explanations.
         };
     })();
     
-    // Initialize Auto Solver when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(AutoSolver.init, 500);
-        });
-    } else {
-        setTimeout(AutoSolver.init, 300);
-    }
-    
-    // Expose for manual control
-    window.AutoSolver = AutoSolver;
+    // Initialize Auto Solver when DOM is ready AND script is enabled
+    onScriptEnabled(() => {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(AutoSolver.init, 500);
+            });
+        } else {
+            setTimeout(AutoSolver.init, 300);
+        }
+        
+        // Expose for manual control
+        window.AutoSolver = AutoSolver;
+    });
 
 })();
