@@ -325,16 +325,26 @@
             const addToBody = () => {
                 document.body.appendChild(overlay);
                 
-                document.getElementById('bypass-accept-btn').addEventListener('click', () => {
-                    localStorage.setItem(DISCLAIMER_ACCEPTED_KEY, 'true');
-                    overlay.remove();
-                    resolve(true);
-                });
-                
-                document.getElementById('bypass-decline-btn').addEventListener('click', () => {
-                    overlay.remove();
-                    resolve(false);
-                });
+                // Use setTimeout to ensure elements are fully rendered (Firefox compatibility)
+                setTimeout(() => {
+                    const acceptBtn = document.getElementById('bypass-accept-btn');
+                    const declineBtn = document.getElementById('bypass-decline-btn');
+                    
+                    if (acceptBtn) {
+                        acceptBtn.addEventListener('click', () => {
+                            localStorage.setItem(DISCLAIMER_ACCEPTED_KEY, 'true');
+                            overlay.remove();
+                            resolve(true);
+                        });
+                    }
+                    
+                    if (declineBtn) {
+                        declineBtn.addEventListener('click', () => {
+                            overlay.remove();
+                            resolve(false);
+                        });
+                    }
+                }, 0);
             };
             
             if (document.body) {
