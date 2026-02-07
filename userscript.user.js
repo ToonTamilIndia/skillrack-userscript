@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.6
+// @version      4.7
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -19,7 +19,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '4.6';
+    const SCRIPT_VERSION = '4.7';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -425,7 +425,9 @@
         enableAISolver: false,
         aiProvider: "gemini",
         geminiApiKey: "",
+        geminiModel: "gemini-2.5-flash",
         openaiApiKey: "",
+        openaiModel: "gpt-4o-mini",
         openrouterApiKey: "",
         openrouterModel: "google/gemini-2.5-flash-001",
         
@@ -463,6 +465,353 @@
     };
 
     let SETTINGS = loadSettings();
+
+    // ============================================
+    // GEMINI PROVIDER MODULE (DYNAMIC MODEL LOADING)
+    // ============================================
+    
+    const GeminiProvider = (function() {
+        'use strict';
+
+        const CONFIG = {
+            API_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
+            CACHE_KEY: 'gemini_models_cache',
+            CACHE_TTL: 6 * 60 * 60 * 1000, // 6 hours cache
+            DEFAULT_MODEL: 'gemini-2.5-flash'
+        };
+
+        function getApiKey() {
+            return SETTINGS.geminiApiKey || null;
+        }
+
+        function normalizeModel(rawModel) {
+            const name = rawModel.name || '';
+            const id = name.replace('models/', '');
+            const displayName = rawModel.displayName || id;
+            const description = rawModel.description || '';
+            
+            // Categorize models
+            let category = 'Other';
+            if (id.includes('gemini-2')) category = 'Gemini 2.x';
+            else if (id.includes('gemini-1.5')) category = 'Gemini 1.5';
+            else if (id.includes('gemini-1.0') || id.includes('gemini-pro')) category = 'Gemini 1.0';
+            else if (id.includes('text-embedding') || id.includes('embedding')) category = 'Embeddings';
+            else if (id.includes('aqa')) category = 'AQA';
+            
+            return {
+                id: id,
+                name: displayName,
+                description: description,
+                category: category,
+                supportedMethods: rawModel.supportedGenerationMethods || [],
+                inputTokenLimit: rawModel.inputTokenLimit || 0,
+                outputTokenLimit: rawModel.outputTokenLimit || 0
+            };
+        }
+
+        function getCachedModels() {
+            try {
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                if (cached) {
+                    const { models, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < CONFIG.CACHE_TTL) {
+                        return models;
+                    }
+                }
+            } catch (e) {
+                console.log('[Gemini] Cache read error:', e);
+            }
+            return null;
+        }
+
+        function setCachedModels(models) {
+            try {
+                localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({
+                    models: models,
+                    timestamp: Date.now()
+                }));
+            } catch (e) {
+                console.log('[Gemini] Cache write error:', e);
+            }
+        }
+
+        function clearCache() {
+            localStorage.removeItem(CONFIG.CACHE_KEY);
+        }
+
+        async function fetchModels(forceRefresh = false) {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                console.log('[Gemini] No API key, using fallback models');
+                return getFallbackModels();
+            }
+
+            if (!forceRefresh) {
+                const cached = getCachedModels();
+                if (cached) {
+                    console.log('[Gemini] Using cached models:', cached.length);
+                    return cached;
+                }
+            }
+
+            try {
+                const response = await fetch(`${CONFIG.API_URL}?key=${apiKey}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                const rawModels = data.models || [];
+                
+                // Filter to only generative models (exclude embeddings, etc.)
+                const models = rawModels
+                    .filter(m => {
+                        const methods = m.supportedGenerationMethods || [];
+                        return methods.includes('generateContent');
+                    })
+                    .map(normalizeModel)
+                    .sort((a, b) => {
+                        // Sort by category priority, then by name
+                        const categoryOrder = ['Gemini 2.x', 'Gemini 1.5', 'Gemini 1.0', 'Other'];
+                        const aIdx = categoryOrder.indexOf(a.category);
+                        const bIdx = categoryOrder.indexOf(b.category);
+                        if (aIdx !== bIdx) return aIdx - bIdx;
+                        return a.name.localeCompare(b.name);
+                    });
+
+                console.log('[Gemini] Fetched models:', models.length);
+                setCachedModels(models);
+                return models;
+            } catch (error) {
+                console.error('[Gemini] Fetch error:', error);
+                return getFallbackModels();
+            }
+        }
+
+        function getFallbackModels() {
+            return [
+                { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', category: 'Gemini 2.x', description: 'Fast and efficient' },
+                { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', category: 'Gemini 2.x', description: 'Most capable model' },
+                { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', category: 'Gemini 2.x', description: 'Previous generation flash' },
+                { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', category: 'Gemini 1.5', description: 'Fast multimodal model' },
+                { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', category: 'Gemini 1.5', description: 'Advanced reasoning' },
+            ];
+        }
+
+        function filterModels(models, query) {
+            if (!query) return models;
+            const lowerQuery = query.toLowerCase();
+            return models.filter(m => 
+                m.id.toLowerCase().includes(lowerQuery) ||
+                m.name.toLowerCase().includes(lowerQuery) ||
+                m.category.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        function groupModels(models) {
+            const groups = {};
+            models.forEach(model => {
+                if (!groups[model.category]) groups[model.category] = [];
+                groups[model.category].push(model);
+            });
+            return groups;
+        }
+
+        return {
+            CONFIG,
+            fetchModels,
+            filterModels,
+            groupModels,
+            clearCache,
+            normalizeModel
+        };
+    })();
+
+    // ============================================
+    // OPENAI PROVIDER MODULE (DYNAMIC MODEL LOADING)
+    // ============================================
+    
+    const OpenAIProvider = (function() {
+        'use strict';
+
+        const CONFIG = {
+            API_URL: 'https://api.openai.com/v1/models',
+            CACHE_KEY: 'openai_models_cache',
+            CACHE_TTL: 6 * 60 * 60 * 1000, // 6 hours cache
+            DEFAULT_MODEL: 'gpt-4o-mini'
+        };
+
+        function getApiKey() {
+            return SETTINGS.openaiApiKey || null;
+        }
+
+        function normalizeModel(rawModel) {
+            const id = rawModel.id || '';
+            
+            // Categorize models
+            let category = 'Other';
+            let displayName = id;
+            
+            if (id.startsWith('gpt-4o')) {
+                category = 'GPT-4o';
+                displayName = id.replace('gpt-4o', 'GPT-4o').replace(/-/g, ' ');
+            } else if (id.startsWith('gpt-4')) {
+                category = 'GPT-4';
+                displayName = id.replace('gpt-4', 'GPT-4').replace(/-/g, ' ');
+            } else if (id.startsWith('gpt-3.5')) {
+                category = 'GPT-3.5';
+                displayName = id.replace('gpt-3.5', 'GPT-3.5').replace(/-/g, ' ');
+            } else if (id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4')) {
+                category = 'Reasoning (o-series)';
+                displayName = id.toUpperCase().replace(/-/g, ' ');
+            } else if (id.includes('davinci') || id.includes('curie') || id.includes('babbage') || id.includes('ada')) {
+                category = 'Legacy';
+            }
+            
+            return {
+                id: id,
+                name: displayName,
+                category: category,
+                ownedBy: rawModel.owned_by || 'openai'
+            };
+        }
+
+        function getCachedModels() {
+            try {
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                if (cached) {
+                    const { models, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < CONFIG.CACHE_TTL) {
+                        return models;
+                    }
+                }
+            } catch (e) {
+                console.log('[OpenAI] Cache read error:', e);
+            }
+            return null;
+        }
+
+        function setCachedModels(models) {
+            try {
+                localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({
+                    models: models,
+                    timestamp: Date.now()
+                }));
+            } catch (e) {
+                console.log('[OpenAI] Cache write error:', e);
+            }
+        }
+
+        function clearCache() {
+            localStorage.removeItem(CONFIG.CACHE_KEY);
+        }
+
+        async function fetchModels(forceRefresh = false) {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                console.log('[OpenAI] No API key, using fallback models');
+                return getFallbackModels();
+            }
+
+            if (!forceRefresh) {
+                const cached = getCachedModels();
+                if (cached) {
+                    console.log('[OpenAI] Using cached models:', cached.length);
+                    return cached;
+                }
+            }
+
+            try {
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                const rawModels = data.data || [];
+                
+                // Filter to only chat completion models
+                const chatModelPatterns = ['gpt-4', 'gpt-3.5', 'o1', 'o3', 'o4', 'chatgpt'];
+                const excludePatterns = ['instruct', 'vision', 'audio', 'realtime', 'tts', 'whisper', 'dall-e', 'embedding', 'moderation'];
+                
+                const models = rawModels
+                    .filter(m => {
+                        const id = m.id.toLowerCase();
+                        const isChat = chatModelPatterns.some(p => id.includes(p));
+                        const isExcluded = excludePatterns.some(p => id.includes(p));
+                        return isChat && !isExcluded;
+                    })
+                    .map(normalizeModel)
+                    .sort((a, b) => {
+                        // Sort by category priority, then by name
+                        const categoryOrder = ['GPT-4o', 'Reasoning (o-series)', 'GPT-4', 'GPT-3.5', 'Legacy', 'Other'];
+                        const aIdx = categoryOrder.indexOf(a.category);
+                        const bIdx = categoryOrder.indexOf(b.category);
+                        if (aIdx !== bIdx) return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+                        return a.name.localeCompare(b.name);
+                    });
+
+                console.log('[OpenAI] Fetched models:', models.length);
+                setCachedModels(models);
+                return models;
+            } catch (error) {
+                console.error('[OpenAI] Fetch error:', error);
+                return getFallbackModels();
+            }
+        }
+
+        function getFallbackModels() {
+            return [
+                { id: 'gpt-4o', name: 'GPT-4o', category: 'GPT-4o', ownedBy: 'openai' },
+                { id: 'gpt-4o-mini', name: 'GPT-4o Mini', category: 'GPT-4o', ownedBy: 'openai' },
+                { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', category: 'GPT-4', ownedBy: 'openai' },
+                { id: 'gpt-4', name: 'GPT-4', category: 'GPT-4', ownedBy: 'openai' },
+                { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', category: 'GPT-3.5', ownedBy: 'openai' },
+                { id: 'o1', name: 'O1', category: 'Reasoning (o-series)', ownedBy: 'openai' },
+                { id: 'o1-mini', name: 'O1 Mini', category: 'Reasoning (o-series)', ownedBy: 'openai' },
+                { id: 'o3-mini', name: 'O3 Mini', category: 'Reasoning (o-series)', ownedBy: 'openai' },
+            ];
+        }
+
+        function filterModels(models, query) {
+            if (!query) return models;
+            const lowerQuery = query.toLowerCase();
+            return models.filter(m => 
+                m.id.toLowerCase().includes(lowerQuery) ||
+                m.name.toLowerCase().includes(lowerQuery) ||
+                m.category.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        function groupModels(models) {
+            const groups = {};
+            models.forEach(model => {
+                if (!groups[model.category]) groups[model.category] = [];
+                groups[model.category].push(model);
+            });
+            return groups;
+        }
+
+        return {
+            CONFIG,
+            fetchModels,
+            filterModels,
+            groupModels,
+            clearCache,
+            normalizeModel
+        };
+    })();
 
     // ============================================
     // OPENROUTER PROVIDER MODULE (DYNAMIC MODEL LOADING)
@@ -1231,8 +1580,16 @@
             SETTINGS.aiProvider = providerSelect.value;
             saveSettings(SETTINGS);
             // Show/hide model selectors based on provider
+            const geminiModelWrapper = document.getElementById('gemini-model-wrapper');
+            const openaiModelWrapper = document.getElementById('openai-model-wrapper');
             const orModelWrapper = document.getElementById('openrouter-model-wrapper');
             const g4fModelWrapper = document.getElementById('g4f-model-wrapper');
+            if (geminiModelWrapper) {
+                geminiModelWrapper.style.display = providerSelect.value === 'gemini' ? 'block' : 'none';
+            }
+            if (openaiModelWrapper) {
+                openaiModelWrapper.style.display = providerSelect.value === 'openai' ? 'block' : 'none';
+            }
             if (orModelWrapper) {
                 orModelWrapper.style.display = providerSelect.value === 'openrouter' ? 'block' : 'none';
             }
@@ -1244,7 +1601,278 @@
         // ================================================================================
         
         panelContent.appendChild(createTextInput('geminiApiKey', 'Gemini API Key', SETTINGS.geminiApiKey, 'Enter your Gemini API key'));
+        
+        // ========== DYNAMIC GEMINI MODEL SELECTOR ==========
+        const createGeminiModelSelector = () => {
+            const wrapper = document.createElement('div');
+            wrapper.id = 'gemini-model-wrapper';
+            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'gemini' ? 'block' : 'none'};`;
+            
+            wrapper.innerHTML = `
+                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">Gemini Model</div>
+                <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+                    <input type="text" id="geminiModelSearch" placeholder="Search models (e.g., 2.5, flash, pro)" style="
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #2d2d2d;
+                        color: #fff;
+                        font-size: 11px;
+                        box-sizing: border-box;
+                    ">
+                    <button id="geminiRefreshModels" title="Refresh models list" style="
+                        padding: 8px 12px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #3d3d3d;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">🔄</button>
+                </div>
+                <select id="geminiModel" style="
+                    width: 100%;
+                    padding: 8px;
+                    border: 1px solid #444;
+                    border-radius: 6px;
+                    background: #2d2d2d;
+                    color: #fff;
+                    font-size: 11px;
+                    box-sizing: border-box;
+                ">
+                    <option value="gemini-2.5-flash">Loading models...</option>
+                </select>
+                <div id="geminiModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+            `;
+
+            setTimeout(() => {
+                const select = document.getElementById('geminiModel');
+                const searchInput = document.getElementById('geminiModelSearch');
+                const refreshBtn = document.getElementById('geminiRefreshModels');
+                const statusDiv = document.getElementById('geminiModelStatus');
+                
+                let allModels = [];
+
+                const populateSelect = (models) => {
+                    if (!select) return;
+                    const currentValue = SETTINGS.geminiModel || 'gemini-2.5-flash';
+                    select.innerHTML = '';
+                    
+                    // Group models by category
+                    const groups = GeminiProvider.groupModels(models);
+                    const categoryOrder = ['Gemini 2.x', 'Gemini 1.5', 'Gemini 1.0', 'Other'];
+                    
+                    for (const category of categoryOrder) {
+                        const categoryModels = groups[category];
+                        if (!categoryModels || categoryModels.length === 0) continue;
+                        
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = `${category} (${categoryModels.length})`;
+                        categoryModels.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.id;
+                            option.textContent = model.name;
+                            option.title = model.description || '';
+                            option.selected = model.id === currentValue;
+                            optgroup.appendChild(option);
+                        });
+                        select.appendChild(optgroup);
+                    }
+                    
+                    if (statusDiv) statusDiv.textContent = `${models.length} models available`;
+                };
+
+                const loadModels = async (forceRefresh = false) => {
+                    if (statusDiv) statusDiv.textContent = 'Loading models...';
+                    if (refreshBtn) {
+                        refreshBtn.disabled = true;
+                        refreshBtn.textContent = '⏳';
+                    }
+                    
+                    try {
+                        allModels = await GeminiProvider.fetchModels(forceRefresh);
+                        populateSelect(allModels);
+                        if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
+                    } catch (error) {
+                        console.error('[Gemini] Failed to load models:', error);
+                        if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
+                        select.innerHTML = '<option value="gemini-2.5-flash" selected>Gemini 2.5 Flash (Default)</option>';
+                    } finally {
+                        if (refreshBtn) {
+                            refreshBtn.disabled = false;
+                            refreshBtn.textContent = '🔄';
+                        }
+                    }
+                };
+
+                if (searchInput) {
+                    let searchTimeout;
+                    searchInput.addEventListener('input', () => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            const filtered = GeminiProvider.filterModels(allModels, searchInput.value.trim());
+                            populateSelect(filtered);
+                        }, 150);
+                    });
+                }
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => loadModels(true));
+                }
+
+                if (select) {
+                    select.addEventListener('change', () => {
+                        SETTINGS.geminiModel = select.value;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                loadModels();
+            }, 100);
+
+            return wrapper;
+        };
+        
+        panelContent.appendChild(createGeminiModelSelector());
+        // ========================================================
+        
         panelContent.appendChild(createTextInput('openaiApiKey', 'OpenAI API Key', SETTINGS.openaiApiKey, 'Enter your OpenAI API key'));
+        
+        // ========== DYNAMIC OPENAI MODEL SELECTOR ==========
+        const createOpenAIModelSelector = () => {
+            const wrapper = document.createElement('div');
+            wrapper.id = 'openai-model-wrapper';
+            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'openai' ? 'block' : 'none'};`;
+            
+            wrapper.innerHTML = `
+                <div style="color: #fff; font-size: 13px; margin-bottom: 6px;">OpenAI Model</div>
+                <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+                    <input type="text" id="openaiModelSearch" placeholder="Search models (e.g., gpt-4, o1, turbo)" style="
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #2d2d2d;
+                        color: #fff;
+                        font-size: 11px;
+                        box-sizing: border-box;
+                    ">
+                    <button id="openaiRefreshModels" title="Refresh models list" style="
+                        padding: 8px 12px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #3d3d3d;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 11px;
+                    ">🔄</button>
+                </div>
+                <select id="openaiModel" style="
+                    width: 100%;
+                    padding: 8px;
+                    border: 1px solid #444;
+                    border-radius: 6px;
+                    background: #2d2d2d;
+                    color: #fff;
+                    font-size: 11px;
+                    box-sizing: border-box;
+                ">
+                    <option value="gpt-4o-mini">Loading models...</option>
+                </select>
+                <div id="openaiModelStatus" style="color: #666; font-size: 10px; margin-top: 4px;"></div>
+            `;
+
+            setTimeout(() => {
+                const select = document.getElementById('openaiModel');
+                const searchInput = document.getElementById('openaiModelSearch');
+                const refreshBtn = document.getElementById('openaiRefreshModels');
+                const statusDiv = document.getElementById('openaiModelStatus');
+                
+                let allModels = [];
+
+                const populateSelect = (models) => {
+                    if (!select) return;
+                    const currentValue = SETTINGS.openaiModel || 'gpt-4o-mini';
+                    select.innerHTML = '';
+                    
+                    // Group models by category
+                    const groups = OpenAIProvider.groupModels(models);
+                    const categoryOrder = ['GPT-4o', 'Reasoning (o-series)', 'GPT-4', 'GPT-3.5', 'Legacy', 'Other'];
+                    
+                    for (const category of categoryOrder) {
+                        const categoryModels = groups[category];
+                        if (!categoryModels || categoryModels.length === 0) continue;
+                        
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = `${category} (${categoryModels.length})`;
+                        categoryModels.forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.id;
+                            option.textContent = model.name;
+                            option.selected = model.id === currentValue;
+                            optgroup.appendChild(option);
+                        });
+                        select.appendChild(optgroup);
+                    }
+                    
+                    if (statusDiv) statusDiv.textContent = `${models.length} models available`;
+                };
+
+                const loadModels = async (forceRefresh = false) => {
+                    if (statusDiv) statusDiv.textContent = 'Loading models...';
+                    if (refreshBtn) {
+                        refreshBtn.disabled = true;
+                        refreshBtn.textContent = '⏳';
+                    }
+                    
+                    try {
+                        allModels = await OpenAIProvider.fetchModels(forceRefresh);
+                        populateSelect(allModels);
+                        if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
+                    } catch (error) {
+                        console.error('[OpenAI] Failed to load models:', error);
+                        if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
+                        select.innerHTML = '<option value="gpt-4o-mini" selected>GPT-4o Mini (Default)</option>';
+                    } finally {
+                        if (refreshBtn) {
+                            refreshBtn.disabled = false;
+                            refreshBtn.textContent = '🔄';
+                        }
+                    }
+                };
+
+                if (searchInput) {
+                    let searchTimeout;
+                    searchInput.addEventListener('input', () => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            const filtered = OpenAIProvider.filterModels(allModels, searchInput.value.trim());
+                            populateSelect(filtered);
+                        }, 150);
+                    });
+                }
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => loadModels(true));
+                }
+
+                if (select) {
+                    select.addEventListener('change', () => {
+                        SETTINGS.openaiModel = select.value;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                loadModels();
+            }, 100);
+
+            return wrapper;
+        };
+        
+        panelContent.appendChild(createOpenAIModelSelector());
+        // ========================================================
+        
         panelContent.appendChild(createTextInput('openrouterApiKey', 'OpenRouter API Key', SETTINGS.openrouterApiKey, 'Enter your OpenRouter API key'));
         
         // ========== DYNAMIC OPENROUTER MODEL SELECTOR ==========
@@ -3274,7 +3902,8 @@
             throw new Error('Gemini API key not configured. Please add it in settings.');
         }
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        const model = SETTINGS.geminiModel || 'gemini-2.5-flash';
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3312,7 +3941,7 @@
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model: SETTINGS.openaiModel || 'gpt-4o-mini',
                 messages: [{
                     role: 'user',
                     content: prompt
