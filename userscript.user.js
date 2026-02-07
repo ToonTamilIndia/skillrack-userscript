@@ -3519,8 +3519,14 @@
         // FIRST: Check if captcha elements exist on this page
         if (!hasCaptchaElements()) {
             console.log('[Captcha] No captcha on this page - skipping');
-            // Clear pending flag if we successfully passed captcha
-            if (hasPending) {
+            
+            // If we're on the coding page (AI solution page), ALWAYS reset captcha state
+            // This ensures fresh start when user navigates back to solve another problem
+            if (isOnCodingPageGlobal()) {
+                console.log('[Captcha] On coding page - resetting all captcha state for fresh start');
+                resetCaptchaRetry();
+            } else if (hasPending) {
+                // Clear pending flag if we successfully passed captcha (on other pages)
                 console.log('[Captcha] ✓ Previous captcha was correct! Resetting retry count.');
                 localStorage.removeItem(CAPTCHA_PENDING_KEY);
                 resetCaptchaRetry();
