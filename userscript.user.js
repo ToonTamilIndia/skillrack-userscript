@@ -4232,11 +4232,8 @@ ${problem.description}
 ${problem.preCode ? `\n=== PRE-DEFINED STRUCTURE ===\n\`\`\`${language.toLowerCase()}\n${problem.preCode}\n\`\`\`` : ''}
 
 === CRITICAL RULES ===
-1. Do NOT write main() - it is provided by the system
-2. Implement ONLY the function mentioned in the problem
-3. Match the EXACT function signature
-4. Read the problem examples carefully to understand the logic
-5. Handle edge cases (size < minimum, empty input, etc.)
+1. Read the problem examples carefully to understand the logic
+2. Handle edge cases (size < minimum, empty input, etc.)
 ${language === 'C' || language === 'C++' || language === 'C++23' ? '6. Include necessary headers (#include <stdio.h>, etc.)' : ''}
 
 === ALGORITHM TIPS ===
