@@ -10,9 +10,25 @@ A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanism
 
 ---
 
-## Version 4.6 Features
+## Version 4.9 Features
 
-### 🆕 New in v4.6
+### 🆕 New in v4.9
+
+#### 🦆 DuckDuckGo AI Provider (FREE!)
+- **Completely FREE** AI solution generator
+- Uses a Cloudflare Workers proxy to bypass CSP restrictions
+- Powered by DuckDuckGo AI Chat
+- Available models:
+  - **GPT-4o Mini** (OpenAI) - General-purpose
+  - **GPT-5 Mini** (OpenAI) - Reasoning
+  - **GPT-OSS 120B** (OpenAI) - Open source reasoning
+  - **Llama 4 Scout** (Meta) - Open source
+  - **Claude 3.5 Haiku** (Anthropic) - Fast responses
+  - **Mixtral Small 3** (Mistral AI) - Open source
+- No API key required!
+- Custom proxy URL support for self-hosted instances
+
+### 🆕 Previous Updates (v4.6-4.8)
 
 #### 🔄 Mandatory Update Check
 - Automatically checks for updates from GitHub
@@ -177,13 +193,15 @@ Click the **⚙️ gear button** in the bottom-right corner to open settings:
 |---------|-------------|---------|
 | Enable AI Solver | Show AI solution button | ❌ Off |
 | ⚡ Auto Solver | Auto-solve & submit (experimental) | ❌ Off |
-| AI Provider | Choose Gemini, OpenAI, OpenRouter, or G4F | Gemini |
+| AI Provider | Choose Gemini, OpenAI, OpenRouter, G4F, or **DuckDuckGo** | Gemini |
 | Gemini API Key | Your Google Gemini API key | (empty) |
 | OpenAI API Key | Your OpenAI API key | (empty) |
 | OpenRouter API Key | Your OpenRouter API key | (empty) |
 | OpenRouter Model | Dynamic model selection with search | Gemini 2.0 Flash |
 | G4F API Key | Your G4F API key | (empty) |
 | G4F Model | Dynamic model selection | Auto |
+| DuckDuckGo Model | Select from 6 free models | GPT-4o Mini |
+| DuckDuckGo API URL | Custom proxy URL (optional) | (default proxy) |
 
 ---
 
@@ -223,6 +241,27 @@ Click the **⚙️ gear button** in the bottom-right corner to open settings:
 3. Paste it in the settings panel under "G4F API Key"
 4. Change "AI Provider" to "G4F (g4f.space)"
 5. Select a model or use "Auto" for automatic selection
+
+### Using DuckDuckGo AI (FREE - No API Key!) ⭐ Recommended
+1. Change "AI Provider" to "🦆 DuckDuckGo AI (FREE!)"
+2. Select a model from the dropdown
+3. **No API key needed!**
+
+#### Available DuckDuckGo Models:
+| Model | Provider | Specialty |
+|-------|----------|-----------|
+| GPT-4o Mini | OpenAI | General purpose |
+| GPT-5 Mini | OpenAI | Reasoning (Beta) |
+| GPT-OSS 120B | OpenAI | Open source reasoning |
+| Llama 4 Scout | Meta | Open source |
+| Claude 3.5 Haiku | Anthropic | Fast responses |
+| Mixtral Small 3 | Mistral AI | Open source |
+
+#### Self-Hosting the Proxy
+If you want to host your own proxy:
+1. Clone the `duckduckgo-api` folder
+2. Run `npm install && wrangler deploy`
+3. Update the "DuckDuckGo API URL" in settings
 
 ---
 
