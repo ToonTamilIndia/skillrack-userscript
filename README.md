@@ -1,8 +1,14 @@
+
 # Anti-Cheat Bypass Userscript
 
 A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanisms on SkillRack.
 
 ## ⚠️ Important Warnings
+
+
+*This repository contains vibe-coded scripts intended for personal use. 
+Contributions are welcome, but breakages are expected 
+and if something breaks, it’s a feature, not a bug.*
 
 > **⚠️ Please disable the script if you are attending a test as it might lead to unintended effects.**
 
