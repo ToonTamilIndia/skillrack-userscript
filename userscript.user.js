@@ -4807,7 +4807,7 @@
         const errorPanel = document.getElementById('errormsg');
         if (!errorPanel) return errorInfo;
 
-        const panelContent = errorPanel.querySelector('#errormsg_content');
+        const panelContent = document.getElementById('errormsg_content');
         if (!panelContent) return errorInfo;
 
         // Check if it's visible/has content
@@ -5074,8 +5074,9 @@
         const lines = code.split('\n');
         code = lines.filter(line => {
             const trimmed = line.trim();
-            // Skip lines that are ONLY language tags
-            if (/^[a-z0-9+]{1,10}$/.test(trimmed)) {
+            // Skip lines that are ONLY language tags (case-insensitive, support c++, cpp, cpp23, ++, ++23, etc.)
+            // Language tags: c, c++, cpp, cpp23, ++, ++23, python, java, javascript, typescript, etc.
+            if (/^(c\+\+|cpp\d*|\+\+\d*|[a-z]+\d*|[a-z]+\+\+)$/i.test(trimmed)) {
                 return false; // This is likely a language tag, skip it
             }
             return true;
@@ -5084,6 +5085,13 @@
         // Remove any backticks that leaked in (at line start/end only)
         code = code.replace(/^```[a-zA-Z0-9+]*\s*/gm, '');
         code = code.replace(/\s*```$/gm, '');
+        
+        // Also remove any standalone language tags on their own lines (more aggressive)
+        code = code.split('\n').filter(line => {
+            const trimmed = line.trim();
+            return !(/^(c\+\+|cpp\d*|\+\+\d*|[a-z]+\d*|[a-z]+\+\+)$/i.test(trimmed));
+        }).join('\n');
+        
         code = code.trim();
 
         code = stripComments(code, language);
@@ -5148,19 +5156,15 @@
         // Helper: build full code by wrapping middle code with pre/post code
         const hasPrePost = problem.preCode || problem.postCode;
         const wrapWithPrePost = (middleCode) => {
-            // If includePrePostCode is enabled, wrap with pre/post code
-            if (SETTINGS.includePrePostCode && hasPrePost) {
+            // If includePrePostCode is disabled, include the pre/post code in the AI request
+            if (!SETTINGS.includePrePostCode && hasPrePost) {
                 let full = '';
-                if (problem.preCode && problem.preCode.trim()) {
-                    full += problem.preCode + '\n';
-                }
+                if (problem.preCode) full += problem.preCode + '\n';
                 full += middleCode;
-                if (problem.postCode && problem.postCode.trim()) {
-                    full += '\n' + problem.postCode;
-                }
+                if (problem.postCode) full += '\n' + problem.postCode;
                 return full;
             }
-            // If includePrePostCode is disabled, only send middle code to AI
+            // If includePrePostCode is enabled, only send middle code to AI
             return middleCode;
         };
 
