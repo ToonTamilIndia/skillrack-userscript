@@ -5148,15 +5148,19 @@
         // Helper: build full code by wrapping middle code with pre/post code
         const hasPrePost = problem.preCode || problem.postCode;
         const wrapWithPrePost = (middleCode) => {
-            // If includePrePostCode is disabled, include the pre/post code in the AI request
-            if (!SETTINGS.includePrePostCode && hasPrePost) {
+            // If includePrePostCode is enabled, wrap with pre/post code
+            if (SETTINGS.includePrePostCode && hasPrePost) {
                 let full = '';
-                if (problem.preCode) full += problem.preCode + '\n';
+                if (problem.preCode && problem.preCode.trim()) {
+                    full += problem.preCode + '\n';
+                }
                 full += middleCode;
-                if (problem.postCode) full += '\n' + problem.postCode;
+                if (problem.postCode && problem.postCode.trim()) {
+                    full += '\n' + problem.postCode;
+                }
                 return full;
             }
-            // If includePrePostCode is enabled, only send middle code to AI
+            // If includePrePostCode is disabled, only send middle code to AI
             return middleCode;
         };
 
