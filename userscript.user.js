@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      4.9
+// @version      5.0
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -19,7 +19,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '4.9';
+    const SCRIPT_VERSION = '5.0';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -4582,7 +4582,7 @@
             }, 500);
         });
 
-        console.log('Anti-cheat bypass script v4.6 loaded successfully');
+        console.log('Anti-cheat bypass script v5.0 loaded successfully');
         console.log('Settings:', SETTINGS);
     });
 
@@ -5011,42 +5011,82 @@
     };
 
     const extractCode = (response, language) => {
-        const normalizedResponse = typeof response === 'string' ? response : String(response || '');
-        const sanitizedResponse = normalizedResponse.replace(/```(?:[a-zA-Z0-9_+-]+)?/g, '');
-        const codeBlockRegex = /```(?:\w+)?\n?([\s\S]*?)```/g;
-        const matches = [...normalizedResponse.matchAll(codeBlockRegex)];
+        let normalizedResponse = typeof response === 'string' ? response : String(response || '');
+        
+        // Handle JSON responses (strip JSON wrapper if present)
+        try {
+            // Check if response looks like JSON
+            if (normalizedResponse.trim().startsWith('{') && normalizedResponse.includes('"content"')) {
+                const jsonData = JSON.parse(normalizedResponse);
+                // Try to extract content from various JSON structures
+                if (jsonData.choices && jsonData.choices[0]?.message?.content) {
+                    normalizedResponse = jsonData.choices[0].message.content;
+                } else if (jsonData.content) {
+                    normalizedResponse = jsonData.content;
+                } else if (jsonData.text) {
+                    normalizedResponse = jsonData.text;
+                }
+            }
+        } catch (e) {
+            // Not JSON, continue with string processing
+        }
 
         let code = '';
+        
+        // Match code blocks with language specifiers (c++, ++23, cpp, c, python, etc.)
+        // Pattern: ```languageName followed by code and closing ```
+        const codeBlockRegex = /```(?:[a-zA-Z0-9_+-]*)?\n?([\s\S]*?)```/g;
+        const matches = [...normalizedResponse.matchAll(codeBlockRegex)];
 
         if (matches.length > 0) {
+            // Find the longest match (most likely the actual code)
             let bestMatch = matches[0][1].trim();
             for (const match of matches) {
-                if (match[1].trim().length > bestMatch.length) {
-                    bestMatch = match[1].trim();
+                const trimmed = match[1].trim();
+                if (trimmed.length > bestMatch.length) {
+                    bestMatch = trimmed;
                 }
             }
             code = bestMatch;
         } else {
-            const openBlockRegex = /```(?:\w+)?\n([\s\S]+)/;
+            // Fallback: look for unclosed code block
+            const openBlockRegex = /```(?:[a-zA-Z0-9_+-]*)?\n?([\s\S]+?)(?=```|$)/;
             const openMatch = normalizedResponse.match(openBlockRegex);
             if (openMatch) {
                 code = openMatch[1].trim();
             } else {
-                code = sanitizedResponse.trim();
-                const nonCodePrefixes = ['Here is', 'Here\'s', 'The fixed code', 'The solution', 'Fixed code:', 'Solution:'];
-                for (const prefix of nonCodePrefixes) {
-                    if (code.toLowerCase().startsWith(prefix.toLowerCase())) {
+                // Last resort: use entire response and clean it
+                code = normalizedResponse.trim();
+                // Remove common explanatory prefixes
+                const prefixes = ['Here is', 'Here\'s', 'The fixed code', 'The solution', 'Fixed code:', 'Solution:', 'Here\'s the code:', 'Here is the code:'];
+                for (const prefix of prefixes) {
+                    const lowerCode = code.toLowerCase();
+                    if (lowerCode.startsWith(prefix.toLowerCase())) {
                         code = code.substring(prefix.length).trim();
+                        break;
                     }
                 }
             }
         }
 
-        code = stripComments(code, language);
+        // CRITICAL FIX: Remove language specifiers that might have leaked in
+        // Remove lines that only contain language tags like "c++", "++23", "cpp", etc.
+        const lines = code.split('\n');
+        code = lines.filter(line => {
+            const trimmed = line.trim();
+            // Skip lines that are ONLY language tags
+            if (/^[a-z0-9+]{1,10}$/.test(trimmed)) {
+                return false; // This is likely a language tag, skip it
+            }
+            return true;
+        }).join('\n');
 
-        // Final safety: strip any triple backticks (and optional language tags) that leaked in
-        // We only strip them if they are at the beginning/end or on their own line to avoid breaking strings
-        code = code.replace(/```(?:[a-zA-Z0-9_+-]+)?/g, '').trim();
+        // Remove any backticks that leaked in (at line start/end only)
+        code = code.replace(/^```[a-zA-Z0-9+]*\s*/gm, '');
+        code = code.replace(/\s*```$/gm, '');
+        code = code.trim();
+
+        code = stripComments(code, language);
 
         return code;
     };
@@ -5056,6 +5096,32 @@
     }
 
     let isAiGenerationInProgress = false;
+
+    // ========== UTILITY: Compare code similarity ==========
+    const calculateCodeSimilarity = (code1, code2) => {
+        // Simple similarity check: compare normalized code strings
+        const normalize = (code) => {
+            return code
+                .replace(/\s+/g, ' ')
+                .replace(/[{}();]/g, '')
+                .toLowerCase()
+                .trim();
+        };
+        
+        const norm1 = normalize(code1);
+        const norm2 = normalize(code2);
+        
+        if (norm1 === norm2) return 1.0; // Identical
+        
+        // Simple character-based similarity
+        const minLen = Math.min(norm1.length, norm2.length);
+        let matches = 0;
+        for (let i = 0; i < minLen; i++) {
+            if (norm1[i] === norm2[i]) matches++;
+        }
+        
+        return matches / Math.max(norm1.length, norm2.length);
+    };
 
     // ==========  generateAISolution FUNCTION ==========
     const generateAISolution = async () => {
@@ -5082,12 +5148,16 @@
         // Helper: build full code by wrapping middle code with pre/post code
         const hasPrePost = problem.preCode || problem.postCode;
         const wrapWithPrePost = (middleCode) => {
-            if (!hasPrePost || SETTINGS.includePrePostCode) return middleCode;
-            let full = '';
-            if (problem.preCode) full += problem.preCode + '\n';
-            full += middleCode;
-            if (problem.postCode) full += '\n' + problem.postCode;
-            return full;
+            // If includePrePostCode is disabled, include the pre/post code in the AI request
+            if (!SETTINGS.includePrePostCode && hasPrePost) {
+                let full = '';
+                if (problem.preCode) full += problem.preCode + '\n';
+                full += middleCode;
+                if (problem.postCode) full += '\n' + problem.postCode;
+                return full;
+            }
+            // If includePrePostCode is enabled, only send middle code to AI
+            return middleCode;
         };
 
         // ========== Error fix mode ==========
@@ -5324,6 +5394,24 @@ SOLVING APPROACH:
 
             const code = extractCode(response, language);
 
+            // Validate code is not empty
+            if (!code || code.trim().length < 10) {
+                alert('Failed to extract valid code from AI response. Please try again.');
+                return;
+            }
+
+            // Check if code is similar to existing code
+            let existingCode = '';
+            if (window.txtCode && window.txtCode.getSession) {
+                existingCode = window.txtCode.getSession().getValue();
+            }
+
+            if (existingCode && calculateCodeSimilarity(code, existingCode) > 0.95) {
+                console.warn('Generated code is too similar to existing code, skipping insertion');
+                alert('⚠️ Generated code is identical or too similar to the existing code. AI returned the same solution. Try again or modify your prompt.');
+                return;
+            }
+
             if (code && window.txtCode) {
                 // Insert the code into ACE editor
                 window.txtCode.getSession().setValue(code);
@@ -5336,7 +5424,7 @@ SOLVING APPROACH:
 
                 console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
             } else {
-                alert('Failed to generate solution. Please try again.');
+                alert('Failed to insert code into editor. Please try again.');
             }
         } catch (error) {
             console.error('AI generation error:', error);
