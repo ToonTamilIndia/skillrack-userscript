@@ -4974,6 +4974,53 @@ Compare the output character-by-character against the expected sample outputs (i
         return false;
     }
 
+    // Fix ACE editors rendered at 0 height (occurs when ACE initializes while its
+    // container is hidden during the Daily Challenge "Proceed to Solve" AJAX).
+    const fixAceEditorHeight = (editor) => {
+        try {
+            const container = editor.container || editor.textInput?.getElement();
+            if (!container) return;
+            const current = container.clientHeight || 0;
+            if (current >= 80) {
+                if (typeof editor.resize === 'function') editor.resize(true);
+                return;
+            }
+            // Pick a sane height: at least 380px, cap at viewport minus header space
+            const target = Math.min(Math.max(380, window.innerHeight - 250), 700);
+
+            // Un-collapse the container and any tiny fixed-height ancestors so the
+            // editor isn't clipped by a 30px parent (Daily Challenge grid collapse).
+            const ancestors = [];
+            let node = container.parentElement;
+            for (let i = 0; i < 8 && node; i++) {
+                const cs = getComputedStyle(node);
+                if (cs.display !== 'none' && node.clientHeight < 80 && parseFloat(cs.height || '0') < 80) {
+                    ancestors.push(node);
+                }
+                node = node.parentElement;
+            }
+            ancestors.forEach(p => {
+                p.style.minHeight = '420px';
+                p.style.height = 'auto';
+                p.style.overflow = 'visible';
+            });
+
+            container.style.height = target + 'px';
+            container.style.minHeight = '380px';
+            if (typeof editor.resize === 'function') {
+                editor.resize(true);
+            } else if (editor.renderer && typeof editor.renderer.onResize === 'function') {
+                editor.renderer.onResize(true);
+            }
+            if (editor.renderer && typeof editor.renderer.updateFull === 'function') {
+                editor.renderer.updateFull(true);
+            }
+            console.log('[SkillRack] Fixed zero-height ACE editor (' + current + 'px -> ' + target + 'px, ancestors: ' + ancestors.length + ')');
+        } catch (e) {
+            console.warn('[SkillRack] fixAceEditorHeight error:', e);
+        }
+    };
+
     // 2.5 ACE EDITOR BYPASS - Handle all ACE-specific restrictions (post-load cleanup)
     const bypassAceEditor = () => {
         if (!SETTINGS.bypassCopyPaste) return;
@@ -5107,6 +5154,8 @@ Compare the output character-by-character against the expected sample outputs (i
                 }, true);
             }
 
+            fixAceEditorHeight(editor);
+
             console.log('ACE editor bypass applied successfully');
         });
 
@@ -5182,6 +5231,35 @@ Compare the output character-by-character against the expected sample outputs (i
             aceObserver.observe(document.body, { childList: true, subtree: true });
         });
     }
+
+    // Watch for ACE editors that are present but collapsed to 0 height.
+    // Happens when the editor initializes while its container is hidden
+    // (Daily Challenge "Proceed to Solve" AJAX). Re-check on a short interval.
+    const fixZeroHeightLoop = setInterval(() => {
+        const editors = document.querySelectorAll('.ace_editor');
+        if (!editors.length) return;
+        let fixed = false;
+        editors.forEach(el => {
+            const editor = (el.env && el.env.editor) || null;
+            if (el.clientHeight < 80) {
+                if (editor) {
+                    fixAceEditorHeight(editor);
+                } else {
+                    // No ACE instance attached yet — force a min-height on the container
+                    el.style.minHeight = '380px';
+                }
+                fixed = true;
+            }
+        });
+        if (fixed && !document.querySelector('#codediv textarea') && !document.getElementById('txtCode')) {
+            // Also nudge layout in case a parent grid cell collapsed
+            const pg = document.getElementById('programgrid');
+            if (pg && pg.clientHeight < 200) {
+                pg.style.minHeight = '500px';
+            }
+        }
+    }, 1200);
+    setTimeout(() => clearInterval(fixZeroHeightLoop), 60000);
 
     // 3. BYPASS FULL-SCREEN ENFORCEMENT
     // Store original for document specifically
@@ -5287,33 +5365,44 @@ Compare the output character-by-character against the expected sample outputs (i
         // that should work. But we also intercept the screenfull global directly.
         // ============================================
         const spoofScreenfull = () => {
-            if (window.screenfull) {
-                try {
-                    Object.defineProperty(window.screenfull, 'isFullscreen', {
-                        get: function () { return true; },
-                        configurable: true
-                    });
-                    Object.defineProperty(window.screenfull, 'isEnabled', {
-                        get: function () { return true; },
-                        configurable: true
-                    });
-                    // Make request/exit/toggle no-ops
-                    window.screenfull.request = function () {
-                        console.log('[SkillRack Bypass] screenfull.request() intercepted');
-                        return Promise.resolve();
-                    };
-                    window.screenfull.exit = function () {
-                        console.log('[SkillRack Bypass] screenfull.exit() intercepted');
-                        return Promise.resolve();
-                    };
-                    window.screenfull.toggle = function () {
-                        console.log('[SkillRack Bypass] screenfull.toggle() intercepted');
-                        return Promise.resolve();
-                    };
-                    console.log('[SkillRack Bypass] Spoofed screenfull.js library');
-                } catch (e) {
-                    console.warn('[SkillRack Bypass] Could not spoof screenfull:', e);
-                }
+            if (!window.screenfull) return;
+            try {
+                // screenfull defines isFullscreen/isEnabled as getters that read
+                // document.fullscreenElement / document.fullscreenEnabled, both of
+                // which we already spoof above — so those getters already return true.
+                // Only replace them if they are configurable; otherwise skip silently.
+                const redefineIfConfigurable = (prop, val) => {
+                    try {
+                        const desc = Object.getOwnPropertyDescriptor(window.screenfull, prop);
+                        if (desc && desc.configurable === false) return false;
+                        Object.defineProperty(window.screenfull, prop, {
+                            get: function () { return val; },
+                            configurable: true
+                        });
+                        return true;
+                    } catch (e) {
+                        return false;
+                    }
+                };
+                redefineIfConfigurable('isFullscreen', true);
+                redefineIfConfigurable('isEnabled', true);
+
+                // Make request/exit/toggle no-ops
+                window.screenfull.request = function () {
+                    console.log('[SkillRack Bypass] screenfull.request() intercepted');
+                    return Promise.resolve();
+                };
+                window.screenfull.exit = function () {
+                    console.log('[SkillRack Bypass] screenfull.exit() intercepted');
+                    return Promise.resolve();
+                };
+                window.screenfull.toggle = function () {
+                    console.log('[SkillRack Bypass] screenfull.toggle() intercepted');
+                    return Promise.resolve();
+                };
+                console.log('[SkillRack Bypass] Spoofed screenfull.js library');
+            } catch (e) {
+                console.warn('[SkillRack Bypass] Could not spoof screenfull:', e);
             }
         };
 
