@@ -630,11 +630,11 @@ Compare the output character-by-character against the expected sample outputs (i
         duckduckgoReasoningEffort: "low",
         // ================================================
 
-        // ========== YUPPBRIDGE SETTINGS (NEW) ==========
-        yuppbridgeApiUrl: "",
-        yuppbridgeApiKey: "",
-        yuppbridgeModel: "gpt-4o",
-        // ================================================
+        // ========== OPENAI-COMPATIBLE API SETTINGS ==========
+        openaiCompatApiUrl: "",
+        openaiCompatApiKey: "",
+        openaiCompatModel: "gpt-4o",
+        // =============================================
 
         // ========== AUTO SOLVER SETTINGS ==========
         enableAutoSolver: false,
@@ -655,6 +655,11 @@ Compare the output character-by-character against the expected sample outputs (i
                 const merged = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
                 // Migrate: old default was 1 which made retry loop never fire — bump to 5
                 if (merged.autoSolverMaxRetries < 2) merged.autoSolverMaxRetries = 5;
+                // Migrate: old "yuppbridge" provider/settings renamed to "openai-compatible"/"openaiCompat*"
+                if (merged.aiProvider === 'yuppbridge') merged.aiProvider = 'openai-compatible';
+                if (merged.openaiCompatApiUrl === undefined && merged.yuppbridgeApiUrl !== undefined) merged.openaiCompatApiUrl = merged.yuppbridgeApiUrl;
+                if (merged.openaiCompatApiKey === undefined && merged.yuppbridgeApiKey !== undefined) merged.openaiCompatApiKey = merged.yuppbridgeApiKey;
+                if (merged.openaiCompatModel === undefined && merged.yuppbridgeModel !== undefined) merged.openaiCompatModel = merged.yuppbridgeModel;
                 return merged;
             }
         } catch (e) {
@@ -1842,22 +1847,22 @@ Compare the output character-by-character against the expected sample outputs (i
     };
 
     // ============================================
-    // YUPPBRIDGE PROVIDER MODULE (200+ Models from Yupp AI)
-    // Self-hosted OpenAI-compatible API
-    // https://github.com/cloudWaddie/yuppbridge
+    // OPENAI-COMPATIBLE API PROVIDER MODULE
+    // Works with any OpenAI-compatible endpoint
+    // (OpenAI, OpenRouter, LM Studio, Ollama, local servers, etc.)
     // ============================================
 
-    const YuppBridgeProvider = (function () {
+    const OpenAICompatProvider = (function () {
         'use strict';
 
         const CONFIG = {
-            CACHE_KEY: 'yuppbridge_models_cache',
+            CACHE_KEY: 'openai_compat_models_cache',
             CACHE_TTL: 6 * 60 * 60 * 1000, // 6 hours cache
             DEFAULT_MODEL: 'gpt-4o'
         };
 
-        // Clean up YuppBridge response artifacts (removes <yapp> tags, [Variant] markers, etc.)
-        function cleanYuppBridgeResponse(content) {
+        // Clean up provider response artifacts (removes <yapp> tags, [Variant] markers, etc.)
+        function cleanOpenAICompatResponse(content) {
             if (!content || typeof content !== 'string') return content;
 
             // Remove [Variant] markers and everything after
@@ -1874,7 +1879,7 @@ Compare the output character-by-character against the expected sample outputs (i
 
             // If we stripped everything, return original content with basic cleanup
             if (!cleaned) {
-                console.warn('[YuppBridge] Response was completely stripped, using original');
+                console.warn('[OpenAI-API] Response was completely stripped, using original');
                 return content.replace(/<yapp[^>]*>[\s\S]*?<\/yapp>/gi, '').trim();
             }
 
@@ -1882,11 +1887,22 @@ Compare the output character-by-character against the expected sample outputs (i
         }
 
         function getApiUrl() {
-            return SETTINGS.yuppbridgeApiUrl || '';
+            return SETTINGS.openaiCompatApiUrl || '';
         }
 
         function getApiKey() {
-            return SETTINGS.yuppbridgeApiKey || '';
+            return SETTINGS.openaiCompatApiKey || '';
+        }
+
+        // Build an endpoint URL from the configured base URL, supporting any
+        // OpenAI-compatible API layout (e.g. https://host/v1/chat/completions)
+        function buildEndpoint(path) {
+            let base = (getApiUrl() || '').trim().replace(/\/+$/, '');
+            if (!base) return '';
+            if (/\/(v1|api\/v1)$/i.test(base)) {
+                return `${base}/${path}`;
+            }
+            return `${base}/v1/${path}`;
         }
 
         function normalizeModel(rawModel) {
@@ -1927,7 +1943,7 @@ Compare the output character-by-character against the expected sample outputs (i
                     }
                 }
             } catch (e) {
-                console.log('[YuppBridge] Cache read error:', e);
+                console.log('[OpenAI-API] Cache read error:', e);
             }
             return null;
         }
@@ -1939,7 +1955,7 @@ Compare the output character-by-character against the expected sample outputs (i
                     timestamp: Date.now()
                 }));
             } catch (e) {
-                console.log('[YuppBridge] Cache write error:', e);
+                console.log('[OpenAI-API] Cache write error:', e);
             }
         }
 
@@ -1950,14 +1966,14 @@ Compare the output character-by-character against the expected sample outputs (i
         async function fetchModels(forceRefresh = false) {
             const apiUrl = getApiUrl();
             if (!apiUrl) {
-                console.log('[YuppBridge] No API URL configured, using fallback models');
+                console.log('[OpenAI-API] No API URL configured, using fallback models');
                 return getFallbackModels();
             }
 
             if (!forceRefresh) {
                 const cached = getCachedModels();
                 if (cached) {
-                    console.log('[YuppBridge] Using cached models:', cached.length);
+                    console.log('[OpenAI-API] Using cached models:', cached.length);
                     return cached;
                 }
             }
@@ -1972,8 +1988,8 @@ Compare the output character-by-character against the expected sample outputs (i
                     headers['Authorization'] = `Bearer ${apiKey}`;
                 }
 
-                console.log('[YuppBridge] Fetching models from:', `${apiUrl}/api/v1/models`);
-                const response = await fetch(`${apiUrl}/api/v1/models`, {
+                console.log('[OpenAI-API] Fetching models from:', buildEndpoint('models'));
+                const response = await fetch(buildEndpoint('models'), {
                     method: 'GET',
                     headers: headers
                 });
@@ -1997,11 +2013,11 @@ Compare the output character-by-character against the expected sample outputs (i
                         return a.name.localeCompare(b.name);
                     });
 
-                console.log('[YuppBridge] Fetched models:', models.length);
+                console.log('[OpenAI-API] Fetched models:', models.length);
                 setCachedModels(models);
                 return models;
             } catch (error) {
-                console.error('[YuppBridge] Fetch error:', error);
+                console.error('[OpenAI-API] Fetch error:', error);
                 return getFallbackModels();
             }
         }
@@ -2047,14 +2063,14 @@ Compare the output character-by-character against the expected sample outputs (i
             const apiKey = getApiKey();
 
             if (!apiUrl) {
-                throw new Error('YuppBridge API URL not configured. Please set it in settings.');
+                throw new Error('OpenAI-compatible API URL not configured. Please set it in settings.');
             }
 
             if (!Array.isArray(messages) || messages.length === 0) {
                 throw new Error('Messages array is required');
             }
 
-            const model = options.model || SETTINGS.yuppbridgeModel || CONFIG.DEFAULT_MODEL;
+            const model = options.model || SETTINGS.openaiCompatModel || CONFIG.DEFAULT_MODEL;
             const payload = {
                 model: model,
                 messages: messages
@@ -2068,20 +2084,20 @@ Compare the output character-by-character against the expected sample outputs (i
 
             if (apiKey) {
                 headers['Authorization'] = `Bearer ${apiKey}`;
-                console.log('[YuppBridge] Using API key (first 10 chars):', apiKey.substring(0, 10) + '...');
+                console.log('[OpenAI-API] Using API key (first 10 chars):', apiKey.substring(0, 10) + '...');
             } else {
-                console.warn('[YuppBridge] WARNING: No API key configured!');
+                console.log('[OpenAI-API] No API key configured — sending unauthenticated request');
             }
 
-            console.log('[YuppBridge] Sending chat request to:', `${apiUrl}/api/v1/chat/completions`, 'with model:', model);
-            const response = await fetch(`${apiUrl}/api/v1/chat/completions`, {
+            console.log('[OpenAI-API] Sending chat request to:', buildEndpoint('chat/completions'), 'with model:', model);
+            const response = await fetch(buildEndpoint('chat/completions'), {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
-                let errorMessage = `YuppBridge API request failed: ${response.status}`;
+                let errorMessage = `OpenAI-compatible API request failed: ${response.status}`;
                 try {
                     const errorData = await response.json();
                     if (errorData.error?.message) errorMessage = errorData.error.message;
@@ -2094,11 +2110,12 @@ Compare the output character-by-character against the expected sample outputs (i
             let content = data.choices?.[0]?.message?.content;
 
             if (!content) {
-                throw new Error('YuppBridge returned empty response');
+                throw new Error('OpenAI-compatible API returned empty response');
             }
 
-            // Clean up YuppBridge response artifacts
-            content = cleanYuppBridgeResponse(content);
+
+            // Clean up provider response artifacts
+            content = cleanOpenAICompatResponse(content);
 
             return content;
         }
@@ -2108,10 +2125,15 @@ Compare the output character-by-character against the expected sample outputs (i
             if (!apiUrl) return { ok: false, error: 'No API URL configured' };
 
             try {
-                const response = await fetch(`${apiUrl}/health`);
+                const headers = {};
+                const apiKey = getApiKey();
+                if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+                const response = await fetch(buildEndpoint('models'), { headers });
                 if (response.ok) {
                     const data = await response.json();
-                    return { ok: true, data };
+                    const modelCount = (data.data || []).length;
+                    return { ok: true, data: { modelCount } };
                 }
                 return { ok: false, error: `HTTP ${response.status}` };
             } catch (e) {
@@ -2133,10 +2155,10 @@ Compare the output character-by-character against the expected sample outputs (i
         };
     })();
 
-    // YuppBridge wrapper function
-    const generateWithYuppBridge = async (prompt) => {
-        const model = SETTINGS.yuppbridgeModel || 'gpt-4o';
-        return await YuppBridgeProvider.generateCompletion(
+    // OpenAI-Compatible API wrapper function
+    const generateWithOpenAICompat = async (prompt) => {
+        const model = SETTINGS.openaiCompatModel || 'gpt-4o';
+        return await OpenAICompatProvider.generateCompletion(
             [{ role: 'user', content: prompt }],
             { model: model, temperature: SETTINGS.aiTemperature, max_tokens: 2048 }
         );
@@ -2188,7 +2210,7 @@ Compare the output character-by-character against the expected sample outputs (i
             document.head.appendChild(ks);
         }
 
-         // Create settings button with custom pixel-art icon
+        // Create settings button with custom pixel-art icon
         const settingsBtn = document.createElement('button');
         settingsBtn.title = 'Bypass Settings';
         settingsBtn.innerHTML = `<img src="data:image/png;base64,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" alt="Settings" style="width:46px;height:46px;object-fit:cover;border-radius:50%;display:block;transition:transform 0.3s ease,filter 0.3s ease;">`;
@@ -2640,7 +2662,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 <option value="puter" ${SETTINGS.aiProvider === 'puter' ? 'selected' : ''}>Puter.js (Free, Unlimited)</option>
                 <option value="g4f" ${SETTINGS.aiProvider === 'g4f' ? 'selected' : ''}>G4F (g4f.space)</option>
                 <option value="duckduckgo" ${SETTINGS.aiProvider === 'duckduckgo' ? 'selected' : ''}>DuckDuckGo AI (FREE!)</option>
-                <option value="yuppbridge" ${SETTINGS.aiProvider === 'yuppbridge' ? 'selected' : ''}>YuppBridge (200+ Models)</option>
+                <option value="openai-compatible" ${SETTINGS.aiProvider === 'openai-compatible' ? 'selected' : ''}>OpenAI-Compatible API (Any)</option>
             </select>
         `;
         const providerSelect = providerWrapper.querySelector('select');
@@ -2672,9 +2694,9 @@ Compare the output character-by-character against the expected sample outputs (i
             if (ddgModelWrapper) {
                 ddgModelWrapper.style.display = providerSelect.value === 'duckduckgo' ? 'block' : 'none';
             }
-            const yuppbridgeModelWrapper = document.getElementById('yuppbridge-model-wrapper');
-            if (yuppbridgeModelWrapper) {
-                yuppbridgeModelWrapper.style.display = providerSelect.value === 'yuppbridge' ? 'block' : 'none';
+            const openaiCompatModelWrapper = document.getElementById('openai-compat-model-wrapper');
+            if (openaiCompatModelWrapper) {
+                openaiCompatModelWrapper.style.display = providerSelect.value === 'openai-compatible' ? 'block' : 'none';
             }
         });
         panelContent.appendChild(providerWrapper);
@@ -3590,28 +3612,25 @@ Compare the output character-by-character against the expected sample outputs (i
         panelContent.appendChild(createDuckDuckGoModelSelector());
         // ==============================================================
 
-        // ========== YUPPBRIDGE MODEL SELECTOR (200+ Models) ==========
-        const createYuppBridgeModelSelector = () => {
+        // ========== OPENAI-COMPATIBLE API MODEL SELECTOR ==========
+        const createOpenAICompatModelSelector = () => {
             const wrapper = document.createElement('div');
-            wrapper.id = 'yuppbridge-model-wrapper';
-            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'yuppbridge' ? 'block' : 'none'};`;
+            wrapper.id = 'openai-compat-model-wrapper';
+            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'openai-compatible' ? 'block' : 'none'};`;
 
-            const currentApiUrl = SETTINGS.yuppbridgeApiUrl || '';
-            const currentApiKey = SETTINGS.yuppbridgeApiKey || '';
-            const currentModel = SETTINGS.yuppbridgeModel || 'gpt-4o';
+            const currentApiUrl = SETTINGS.openaiCompatApiUrl || '';
+            const currentApiKey = SETTINGS.openaiCompatApiKey || '';
+            const currentModel = SETTINGS.openaiCompatModel || 'gpt-4o';
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;"><svg viewBox="0 0 24 24" width="13" height="13" fill="#3b82f6" style="display:inline-block;vertical-align:middle;margin-right:5px"><path d="M4 13h16v-2H4v2zm-2 4h20v-2H2v2zM2 7v2h20V7H2z"/></svg>YuppBridge (200+ Models)</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;"><svg viewBox="0 0 24 24" width="13" height="13" fill="#3b82f6" style="display:inline-block;vertical-align:middle;margin-right:5px"><path d="M4 13h16v-2H4v2zm-2 4h20v-2H2v2zM2 7v2h20V7H2z"/></svg>OpenAI-Compatible API</div>
                 <div style="background: #1a2a3a; border: 1px solid #2196F3; border-radius: 6px; padding: 8px; margin-bottom: 8px;">
-                    <div style="color: #2196F3; font-size: 15px; font-weight: bold;"><svg viewBox="0 0 24 24" width="12" height="12" fill="#3b82f6" style="display:inline-block;vertical-align:middle;margin-right:4px"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Self-hosted Yupp AI Proxy</div>
-                    <div style="color: #888; font-size: 14px; margin-top: 4px;">OpenAI-compatible API with 200+ models</div>
-                    <div style="color: #666; font-size: 13px; margin-top: 2px;">
-                        <a href="https://github.com/cloudWaddie/yuppbridge" target="_blank" style="color:#64B5F6;">Self-host Guide</a>
-                    </div>
+                    <div style="color: #2196F3; font-size: 15px; font-weight: bold;"><svg viewBox="0 0 24 24" width="12" height="12" fill="#3b82f6" style="display:inline-block;vertical-align:middle;margin-right:4px"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Any OpenAI-compatible API</div>
+                    <div style="color: #888; font-size: 14px; margin-top: 4px;">Works with OpenAI, OpenRouter, LM Studio, Ollama, local servers, YuppBridge (or any), etc.</div>
                 </div>
                 <div style="margin-bottom: 8px;">
                     <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">API URL <span style="color:#f44336;">*</span></label>
-                    <input type="text" id="yuppbridgeApiUrl" value="${currentApiUrl}" placeholder="https://your-yuppbridge-instance.com" style="
+                    <input type="text" id="openaiCompatApiUrl" value="${currentApiUrl}" placeholder="https://host/v1 (e.g. https://api.openai.com/v1)" style="
                         width: 100%;
                         padding: 6px 8px;
                         border: 1px solid #444;
@@ -3623,8 +3642,8 @@ Compare the output character-by-character against the expected sample outputs (i
                     ">
                 </div>
                 <div style="margin-bottom: 8px;">
-                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">API Key <span style="color:#f44336;">*</span></label>
-                    <input type="password" id="yuppbridgeApiKey" value="${currentApiKey}" placeholder="Your YuppBridge API key" style="
+                    <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">API Key <span style="color:#4CAF50;">(optional)</span></label>
+                    <input type="password" id="openaiCompatApiKey" value="${currentApiKey}" placeholder="Optional — leave blank for keyless/local APIs" style="
                         width: 100%;
                         padding: 6px 8px;
                         border: 1px solid #444;
@@ -3638,7 +3657,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 <div style="margin-bottom: 6px;">
                     <label style="color: #aaa; font-size: 15px; display: block; margin-bottom: 4px;">Model</label>
                     <div style="display: flex; gap: 6px; margin-bottom: 6px;">
-                        <input type="text" id="yuppbridgeModelSearch" placeholder="Search models (e.g., gpt-4, claude, gemini)" style="
+                        <input type="text" id="openaiCompatModelSearch" placeholder="Search models (e.g., gpt-4, claude, gemini)" style="
                             flex: 1;
                             padding: 6px 8px;
                             border: 1px solid #444;
@@ -3648,7 +3667,7 @@ Compare the output character-by-character against the expected sample outputs (i
                             font-size: 15px;
                             box-sizing: border-box;
                         ">
-                        <button id="yuppbridgeRefreshModels" title="Refresh models list" style="
+                        <button id="openaiCompatRefreshModels" title="Refresh models list" style="
                             padding: 6px 10px;
                             border: 1px solid #444;
                             border-radius: 4px;
@@ -3657,7 +3676,7 @@ Compare the output character-by-character against the expected sample outputs (i
                             cursor: pointer;
                             font-size: 15px;
                         "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
-                        <button id="yuppbridgeHealthCheck" title="Check API health" style="
+                        <button id="openaiCompatHealthCheck" title="Check API health" style="
                             padding: 6px 10px;
                             border: 1px solid #444;
                             border-radius: 4px;
@@ -3667,7 +3686,7 @@ Compare the output character-by-character against the expected sample outputs (i
                             font-size: 15px;
                         "><svg viewBox="0 0 24 24" width="13" height="13" fill="#ef4444" style="display:block;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></button>
                     </div>
-                    <select id="yuppbridgeModelSelect" style="
+                    <select id="openaiCompatModelSelect" style="
                         width: 100%;
                         padding: 8px;
                         border: 1px solid #444;
@@ -3679,28 +3698,28 @@ Compare the output character-by-character against the expected sample outputs (i
                     ">
                         <option value="${currentModel}">${currentModel}</option>
                     </select>
-                    <div id="yuppbridgeModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
+                    <div id="openaiCompatModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
                 </div>
             `;
 
             setTimeout(() => {
-                const select = document.getElementById('yuppbridgeModelSelect');
-                const apiUrlInput = document.getElementById('yuppbridgeApiUrl');
-                const apiKeyInput = document.getElementById('yuppbridgeApiKey');
-                const searchInput = document.getElementById('yuppbridgeModelSearch');
-                const refreshBtn = document.getElementById('yuppbridgeRefreshModels');
-                const healthBtn = document.getElementById('yuppbridgeHealthCheck');
-                const statusDiv = document.getElementById('yuppbridgeModelStatus');
+                const select = document.getElementById('openaiCompatModelSelect');
+                const apiUrlInput = document.getElementById('openaiCompatApiUrl');
+                const apiKeyInput = document.getElementById('openaiCompatApiKey');
+                const searchInput = document.getElementById('openaiCompatModelSearch');
+                const refreshBtn = document.getElementById('openaiCompatRefreshModels');
+                const healthBtn = document.getElementById('openaiCompatHealthCheck');
+                const statusDiv = document.getElementById('openaiCompatModelStatus');
 
                 let allModels = [];
 
                 const populateSelect = (models) => {
                     if (!select) return;
-                    const currentValue = SETTINGS.yuppbridgeModel || 'gpt-4o';
+                    const currentValue = SETTINGS.openaiCompatModel || 'gpt-4o';
                     select.innerHTML = '';
 
                     // Group models by category
-                    const groups = YuppBridgeProvider.groupModels(models);
+                    const groups = OpenAICompatProvider.groupModels(models);
                     const categoryOrder = ['GPT-4o', 'Reasoning (o-series)', 'GPT-4', 'GPT-3.5', 'Claude', 'Gemini', 'Llama', 'Mistral', 'DeepSeek', 'Qwen', 'Other'];
 
                     for (const category of categoryOrder) {
@@ -3723,7 +3742,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 };
 
                 const loadModels = async (forceRefresh = false) => {
-                    if (!SETTINGS.yuppbridgeApiUrl) {
+                    if (!SETTINGS.openaiCompatApiUrl) {
                         if (statusDiv) statusDiv.textContent = 'Enter API URL to load models';
                         return;
                     }
@@ -3735,11 +3754,11 @@ Compare the output character-by-character against the expected sample outputs (i
                     }
 
                     try {
-                        allModels = await YuppBridgeProvider.fetchModels(forceRefresh);
+                        allModels = await OpenAICompatProvider.fetchModels(forceRefresh);
                         populateSelect(allModels);
                         if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
                     } catch (error) {
-                        console.error('[YuppBridge] Failed to load models:', error);
+                        console.error('[OpenAI-API] Failed to load models:', error);
                         if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
                     } finally {
                         if (refreshBtn) {
@@ -3751,17 +3770,17 @@ Compare the output character-by-character against the expected sample outputs (i
 
                 if (apiUrlInput) {
                     apiUrlInput.addEventListener('change', () => {
-                        SETTINGS.yuppbridgeApiUrl = apiUrlInput.value.trim();
+                        SETTINGS.openaiCompatApiUrl = apiUrlInput.value.trim();
                         saveSettings(SETTINGS);
-                        console.log('[YuppBridge] API URL updated:', SETTINGS.yuppbridgeApiUrl);
+                        console.log('[OpenAI-API] API URL updated:', SETTINGS.openaiCompatApiUrl);
                         loadModels(true);
                     });
                     // Also capture on blur for better UX
                     apiUrlInput.addEventListener('blur', () => {
-                        if (apiUrlInput.value.trim() !== SETTINGS.yuppbridgeApiUrl) {
-                            SETTINGS.yuppbridgeApiUrl = apiUrlInput.value.trim();
+                        if (apiUrlInput.value.trim() !== SETTINGS.openaiCompatApiUrl) {
+                            SETTINGS.openaiCompatApiUrl = apiUrlInput.value.trim();
                             saveSettings(SETTINGS);
-                            console.log('[YuppBridge] API URL updated (blur):', SETTINGS.yuppbridgeApiUrl);
+                            console.log('[OpenAI-API] API URL updated (blur):', SETTINGS.openaiCompatApiUrl);
                             loadModels(true);
                         }
                     });
@@ -3769,20 +3788,20 @@ Compare the output character-by-character against the expected sample outputs (i
 
                 if (apiKeyInput) {
                     apiKeyInput.addEventListener('change', () => {
-                        SETTINGS.yuppbridgeApiKey = apiKeyInput.value;
+                        SETTINGS.openaiCompatApiKey = apiKeyInput.value;
                         saveSettings(SETTINGS);
-                        console.log('[YuppBridge] API Key updated, length:', SETTINGS.yuppbridgeApiKey.length);
+                        console.log('[OpenAI-API] API Key updated, length:', SETTINGS.openaiCompatApiKey.length);
                         // Clear cache and reload models with new API key
-                        YuppBridgeProvider.clearCache();
+                        OpenAICompatProvider.clearCache();
                         loadModels(true);
                     });
                     // Also capture on blur
                     apiKeyInput.addEventListener('blur', () => {
-                        if (apiKeyInput.value !== SETTINGS.yuppbridgeApiKey) {
-                            SETTINGS.yuppbridgeApiKey = apiKeyInput.value;
+                        if (apiKeyInput.value !== SETTINGS.openaiCompatApiKey) {
+                            SETTINGS.openaiCompatApiKey = apiKeyInput.value;
                             saveSettings(SETTINGS);
-                            console.log('[YuppBridge] API Key updated (blur), length:', SETTINGS.yuppbridgeApiKey.length);
-                            YuppBridgeProvider.clearCache();
+                            console.log('[OpenAI-API] API Key updated (blur), length:', SETTINGS.openaiCompatApiKey.length);
+                            OpenAICompatProvider.clearCache();
                             loadModels(true);
                         }
                     });
@@ -3790,7 +3809,7 @@ Compare the output character-by-character against the expected sample outputs (i
 
                 if (select) {
                     select.addEventListener('change', () => {
-                        SETTINGS.yuppbridgeModel = select.value;
+                        SETTINGS.openaiCompatModel = select.value;
                         saveSettings(SETTINGS);
                     });
                 }
@@ -3800,7 +3819,7 @@ Compare the output character-by-character against the expected sample outputs (i
                     searchInput.addEventListener('input', () => {
                         clearTimeout(searchTimeout);
                         searchTimeout = setTimeout(() => {
-                            const filtered = YuppBridgeProvider.filterModels(allModels, searchInput.value.trim());
+                            const filtered = OpenAICompatProvider.filterModels(allModels, searchInput.value.trim());
                             populateSelect(filtered);
                         }, 150);
                     });
@@ -3816,12 +3835,12 @@ Compare the output character-by-character against the expected sample outputs (i
                         healthBtn.disabled = true;
                         healthBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;animation:bypassSpin 1s linear infinite"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
 
-                        const result = await YuppBridgeProvider.checkHealth();
+                        const result = await OpenAICompatProvider.checkHealth();
 
                         if (result.ok) {
                             if (statusDiv) {
-                                const uptime = result.data?.uptime ? ` (uptime: ${Math.floor(result.data.uptime)}s)` : '';
-                                statusDiv.innerHTML = `<span style="color:#4CAF50;">✓ API is healthy${uptime}</span>`;
+                                const modelCount = result.data?.modelCount ? ` (${result.data.modelCount} models)` : '';
+                                statusDiv.innerHTML = `<span style="color:#4CAF50;">✓ API is healthy${modelCount}</span>`;
                             }
                         } else {
                             if (statusDiv) statusDiv.innerHTML = `<span style="color:#f44336;">✗ ${result.error}</span>`;
@@ -3833,19 +3852,19 @@ Compare the output character-by-character against the expected sample outputs (i
                 }
 
                 // Load models on init if API URL is set
-                if (SETTINGS.yuppbridgeApiUrl) {
+                if (SETTINGS.openaiCompatApiUrl) {
                     loadModels();
                 }
             }, 100);
 
             return wrapper;
         };
-        panelContent.appendChild(createYuppBridgeModelSelector());
+        panelContent.appendChild(createOpenAICompatModelSelector());
         // ==============================================================
 
         const note = document.createElement('div');
         note.style.cssText = 'color:#3f3f46;font-size:14px;padding:14px 4px;text-align:center;font-family:"VT323",monospace;line-height:1.7;border-top:1px solid rgba(255,255,255,0.05);margin-top:4px;';
-        note.innerHTML = 'Reload page after changing settings<br>Keys: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a><br>Puter.js: no API key required | <a href="https://developer.puter.com/ai/" target="_blank" style="color:#2196F3;">Puter AI docs</a><br>DuckDuckGo AI is FREE! | <a href="https://github.com/cloudWaddie/yuppbridge" target="_blank" style="color:#2196F3;">YuppBridge</a>';
+        note.innerHTML = 'Reload page after changing settings<br>Keys: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a><br>Puter.js: no API key required | <a href="https://developer.puter.com/ai/" target="_blank" style="color:#2196F3;">Puter AI docs</a><br>DuckDuckGo AI is FREE! | OpenAI-Compatible API: works with OpenAI, OpenRouter, LM Studio, Ollama, local servers, etc.';
         panelContent.appendChild(note);
 
         panel.appendChild(panelHeader);
@@ -5802,7 +5821,7 @@ Compare the output character-by-character against the expected sample outputs (i
 
     // ============================================
     // 10. AI SOLUTION GENERATOR
-    // Uses Gemini, OpenAI, OpenRouter, Puter.js, G4F, DuckDuckGo, or YuppBridge to generate code solutions
+    // Uses Gemini, OpenAI, OpenRouter, Puter.js, G4F, DuckDuckGo, or an OpenAI-compatible API to generate code solutions
     // ============================================
 
     const getSelectedLanguage = () => {
@@ -7061,8 +7080,8 @@ SOLVING APPROACH:
                         return await generateWithG4F(promptText);
                     case 'duckduckgo':
                         return await generateWithDuckDuckGo(promptText);
-                    case 'yuppbridge':
-                        return await generateWithYuppBridge(promptText);
+                    case 'openai-compatible':
+                        return await generateWithOpenAICompat(promptText);
                     default:
                         throw new Error(`Unknown AI provider: ${SETTINGS.aiProvider}`);
                 }
@@ -8321,7 +8340,7 @@ SOLVING APPROACH:
                 () => fn(),
                 () => fn()
             );
-            queuePromise = nextLink.catch(() => {});
+            queuePromise = nextLink.catch(() => { });
             return nextLink;
         }
 
@@ -8458,12 +8477,12 @@ SOLVING APPROACH:
                         }
                     }
                 }
-            } catch (_) {}
+            } catch (_) { }
             try {
                 const doc = new DOMParser().parseFromString(html, 'text/html');
                 const el = doc.querySelector('input[name="jakarta.faces.ViewState"]');
                 if (el) return el.value;
-            } catch (_) {}
+            } catch (_) { }
             const m = html.match(/jakarta\.faces\.ViewState.*?value="([^"]+)"/) || html.match(/value="([^"]+)".*?jakarta\.faces\.ViewState/);
             if (m) return m[1];
 
@@ -8478,7 +8497,7 @@ SOLVING APPROACH:
                     if (typeof GM_getValue !== 'undefined') {
                         return GM_getValue(key, def);
                     }
-                } catch (_) {}
+                } catch (_) { }
                 const val = localStorage.getItem(key);
                 return val !== null ? val : def;
             },
@@ -8488,7 +8507,7 @@ SOLVING APPROACH:
                         GM_setValue(key, value);
                         return;
                     }
-                } catch (_) {}
+                } catch (_) { }
                 localStorage.setItem(key, value);
             },
             deleteValue(key) {
@@ -8497,7 +8516,7 @@ SOLVING APPROACH:
                         GM_deleteValue(key);
                         return;
                     }
-                } catch (_) {}
+                } catch (_) { }
                 localStorage.removeItem(key);
             }
         };
@@ -8517,8 +8536,8 @@ SOLVING APPROACH:
             }
             const doc = new DOMParser().parseFromString(tableHtml, 'text/html');
             const tbody = doc.getElementById('solcnt:tbl_data') ||
-                          doc.querySelector('[id$="tbl_data"]') ||
-                          doc.querySelector('.ui-datatable-data');
+                doc.querySelector('[id$="tbl_data"]') ||
+                doc.querySelector('.ui-datatable-data');
             if (!tbody) return [];
 
             // Row count verification
@@ -9161,7 +9180,7 @@ SOLVING APPROACH:
             try {
                 const rawCache = storage.getValue('find_incomplete_cache_v2');
                 if (rawCache) cache = JSON.parse(rawCache);
-            } catch (_) {}
+            } catch (_) { }
 
             if (cache && cache.parts) {
                 renderList(cache.parts, cache.timestamp);
@@ -9328,8 +9347,8 @@ SOLVING APPROACH:
             const header = document.createElement('div');
             header.style.cssText = 'font-weight: 700; font-size: 18px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;';
             header.innerHTML = '<span>Incomplete Tracks</span>' +
-                               `<span style="font-size: 11px; background: rgba(99,179,237,0.15); color: #63b3ed; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">` +
-                               `${incompleteList.length} Tracks | ${remainingQuestions} Qs Left</span>`;
+                `<span style="font-size: 11px; background: rgba(99,179,237,0.15); color: #63b3ed; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">` +
+                `${incompleteList.length} Tracks | ${remainingQuestions} Qs Left</span>`;
             dropdown.appendChild(header);
 
             if (timestamp) {

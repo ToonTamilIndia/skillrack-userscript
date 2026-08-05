@@ -40,23 +40,15 @@ Contribution by **[Aron-2005](https://github.com/Aron-2005)** and **[Vishnu-tppr
   - When **enabled**: Only middle code is sent to AI (useful when you want AI to fill in a function)
 - **Better code wrapping** - Ensures proper code structure in both modes
 
-#### 📋 YuppBridge AI Provider (200+ Models!)
-- **Access 200+ AI models** through Yupp AI
-- **Self-hosted** OpenAI-compatible API proxy
-- Requires your own YuppBridge instance ([self-host guide](https://github.com/cloudWaddie/yuppbridge))
+#### 📋 OpenAI-Compatible API Provider (Any Endpoint!)
+- **Bring your own API** - works with any OpenAI-compatible endpoint
+- **Supports**: OpenAI, OpenRouter, LM Studio, Ollama, local servers, YuppBridge, and more
+- **API key optional** - leave blank for keyless/local APIs (e.g. LM Studio, Ollama)
 - Features:
-  - Dynamic model loading from your instance
+  - Dynamically loads models from any compatible `/v1/models` endpoint
   - Model search & filtering
   - Health check button
   - 6-hour model caching
-- Available endpoints on your instance:
-  - `/health` - Health check with uptime
-  - `/v1/models` - List 200+ models from Yupp AI
-  - `/v1/chat/completions` - OpenAI-compatible chat
-  - `/dashboard` - Admin dashboard with stats
-  - `/api/v1/credits` - Get credit balance
-  - `/metrics` - Prometheus metrics
-  - `/api/v1/config/reload` - Clear caches
 - Supported model categories: GPT-4o, Claude, Gemini, Llama, Mistral, DeepSeek, Qwen, and more!
 
 #### 🦆 DuckDuckGo AI Provider (FREE!)
@@ -313,35 +305,32 @@ If you want to host your own proxy:
 2. Run `npm install && wrangler deploy`
 3. Update the "DuckDuckGo API URL" in settings
 
-### Using YuppBridge (200+ Models - Self-Hosted) ⭐ Power Users
-YuppBridge provides access to 200+ AI models from Yupp AI through a self-hosted OpenAI-compatible proxy.
+### Using the OpenAI-Compatible API Provider ⭐ Power Users
+Works with **any** OpenAI-compatible API endpoint. API key is **optional**.
 
-#### Step 1: Self-Host YuppBridge
-1. Go to [YuppBridge GitHub](https://github.com/cloudWaddie/yuppbridge)
-2. Follow the deployment instructions (Docker, Node.js, or serverless)
-3. Note your deployed instance URL (e.g., `https://your-yuppbridge.example.com`)
+#### Step 1: Pick an Endpoint
+Any OpenAI-compatible host works, for example:
+- **OpenAI** — `https://api.openai.com/v1` (requires key)
+- **OpenRouter** — `https://openrouter.ai/api/v1` (requires key)
+- **LM Studio** (local) — `http://localhost:1234/v1` (no key needed)
+- **Ollama** (local) — `http://localhost:11434/v1` (no key needed)
+- **YuppBridge** (self-hosted) — `https://your-yuppbridge.example.com` ([self-host guide](https://github.com/cloudWaddie/yuppbridge))
 
 #### Step 2: Configure in Settings
-1. Change "AI Provider" to "🌉 YuppBridge (200+ Models)"
-2. Enter your **YuppBridge API URL** (your self-hosted instance URL)
-3. Enter your **API Key** (provided by your YuppBridge instance)
-4. Click 🔄 to load available models
+1. Change "AI Provider" to "OpenAI-Compatible API (Any)"
+2. Enter your **API URL** (base URL, e.g. `https://host/v1`)
+3. Enter your **API Key** — **optional**; leave blank for keyless/local APIs
+4. Click 🔄 to load available models from `/v1/models`
 5. Use the search to find models (e.g., "gpt-4", "claude", "gemini")
 6. Click ❤️ to check API health
 
-#### YuppBridge API Endpoints
-Your self-hosted instance provides:
+#### API Endpoints Used
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check with uptime |
-| `/v1/models` | GET | List 200+ models from Yupp AI |
+| `/v1/models` | GET | List available models |
 | `/v1/chat/completions` | POST | OpenAI-compatible chat |
-| `/dashboard` | GET | Admin dashboard with stats |
-| `/api/v1/credits` | GET | Get credit balance |
-| `/metrics` | GET | Prometheus metrics |
-| `/api/v1/config/reload` | POST | Clear caches |
 
-#### Popular YuppBridge Models:
+#### Popular Models (example):
 | Model | Provider | Specialty |
 |-------|----------|-----------|
 | gpt-4o | OpenAI | Most capable |
