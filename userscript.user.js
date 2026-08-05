@@ -6140,44 +6140,60 @@ Compare the output character-by-character against the expected sample outputs (i
             });
         }
 
-        // ===== TRY ALL OCR METHODS IN SEQUENCE =====
+        // ===== USE ONE OCR METHOD PER RETRY (HIERARCHY) =====
+        // Each failed submit reloads the captcha page and bumps the retry count,
+        // which advances to the next OCR method. If Enhanced keeps misreading,
+        // the retry switches to Inverted, then Original — giving each of the
+        // 3 attempts a genuinely different image processing instead of
+        // re-submitting the same wrong answer every time.
         const processingMethods = [
             { name: "Enhanced", fn: () => processImageForOCR(image) },
             { name: "Inverted", fn: () => invertColors(image) },
             { name: "Original", fn: () => image.src }
         ];
 
-        for (const method of processingMethods) {
-            console.log(`[Captcha] Trying ${method.name} OCR processing...`);
-            try {
-                const processedImg = method.fn();
+        const retryIdx = getCaptchaRetryCount();
+        const methodIdx = Math.min(retryIdx, processingMethods.length - 1);
+        const method = processingMethods[methodIdx];
 
-                const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
-                    tessedit_char_whitelist: "0123456789+= ",
-                    tessedit_pageseg_mode: "7", // Single line
-                });
+        console.log(`[Captcha] Using ${method.name} processing (attempt ${retryIdx + 1}/${CAPTCHA_MAX_AUTO_RETRIES})...`);
 
-                console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
-                const result = solveCaptcha(text);
+        try {
+            const processedImg = method.fn();
 
-                if (result !== null && result >= 1 && result <= 198) {
-                    console.log(`[Captcha] ✓ Solution found (${method.name}): ${result}`);
-                    console.log(`[Captcha] Submitting answer...`);
+            const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
+                tessedit_char_whitelist: "0123456789+= ",
+                tessedit_pageseg_mode: "7", // Single line
+            });
 
-                    // Mark that we're attempting (will be checked on next page load)
-                    localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
+            console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
+            const result = solveCaptcha(text);
 
-                    textbox.value = result;
-                    setTimeout(() => safeButtonClick(button), 100);
+            if (result !== null) {
+                // Validate result is reasonable (1-198 for sum of two 1-99 numbers)
+                if (result < 1 || result > 198) {
+                    console.log(`[Captcha] ⚠️ Result ${result} seems invalid`);
+                    handleIncorrectCaptcha();
                     return;
                 }
-            } catch (error) {
-                console.error(`[Captcha] ${method.name} OCR Error:`, error);
+
+                console.log(`[Captcha] ✓ Solution found: ${result}`);
+                console.log(`[Captcha] Submitting answer...`);
+
+                // Mark that we're attempting (will be checked on next page load)
+                localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
+
+                textbox.value = result;
+                setTimeout(() => safeButtonClick(button), 100);
+                return;
             }
+
+        } catch (error) {
+            console.error(`[Captcha] ${method.name} OCR Error:`, error);
         }
 
-        // All methods failed to produce a valid result
-        console.log(`[Captcha] ✗ All OCR processing methods failed`);
+        // Method failed to produce a valid result
+        console.log(`[Captcha] ✗ ${method.name} OCR method failed`);
         handleIncorrectCaptcha();
     }
 
