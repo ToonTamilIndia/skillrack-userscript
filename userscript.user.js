@@ -636,6 +636,11 @@ Compare the output character-by-character against the expected sample outputs (i
         openaiCompatModel: "gpt-4o",
         // =============================================
 
+        // ========== NVIDIA NIM SETTINGS ==========
+        nvidiaApiKey: "",
+        nvidiaModel: "deepseek-ai/deepseek-v4-pro",
+        // =========================================
+
         // ========== AUTO SOLVER SETTINGS ==========
         enableAutoSolver: false,
         autoSolverMaxRetries: 3,
@@ -2165,6 +2170,320 @@ Compare the output character-by-character against the expected sample outputs (i
     };
 
     // ============================================
+    // NVIDIA NIM PROVIDER MODULE (Dynamic Model Loading)
+    // Free API keys from build.nvidia.com
+    // ============================================
+
+    const NvidiaProvider = (function () {
+        'use strict';
+
+        const CONFIG = {
+            BASE_URL: 'https://integrate.api.nvidia.com/v1',
+            MODELS_URL: 'https://integrate.api.nvidia.com/v1/models',
+            CHAT_URL: 'https://integrate.api.nvidia.com/v1/chat/completions',
+            CACHE_KEY: 'nvidia_models_cache',
+            CACHE_TTL: 6 * 60 * 60 * 1000, // 6 hours
+            DEFAULT_MODEL: 'deepseek-ai/deepseek-v4-pro'
+        };
+
+        // Publisher → category mapping for grouping
+        const PUBLISHER_GROUP = {
+            'z-ai': 'Z.ai',
+            'nvidia': 'NVIDIA',
+            'deepseek-ai': 'DeepSeek',
+            'google': 'Google',
+            'mistralai': 'Mistral',
+            'moonshotai': 'Moonshot',
+            'minimaxai': 'MiniMax',
+            'qwen': 'Qwen',
+            'stepfun-ai': 'StepFun'
+        };
+
+        // Static fallback catalog — used when API key is absent or fetch fails
+        const FALLBACK_MODELS = [
+            { id: "abacusai/dracarys-llama-3.1-70b-instruct", name: "Dracarys Llama 3.1 70B Instruct", group: "Abacus", tags: "", context: "-" },
+            { id: "ai21labs/jamba-1.5-large-instruct", name: "Jamba 1.5 Large Instruct", group: "AI21", tags: "", context: "-" },
+            { id: "bytedance/seed-oss-36b-instruct", name: "Seed Oss 36B Instruct", group: "ByteDance", tags: "", context: "-" },
+            { id: "deepseek-ai/deepseek-v4-flash", name: "Deepseek V4 Flash", group: "DeepSeek", tags: "MoE, Coding, Agents", context: "1M" },
+            { id: "deepseek-ai/deepseek-v4-pro", name: "Deepseek V4 Pro", group: "DeepSeek", tags: "MoE, Coding", context: "1M" },
+            { id: "google/gemma-2-2b-it", name: "Gemma 2 2B It", group: "Google", tags: "", context: "-" },
+            { id: "meta/llama-3.1-70b-instruct", name: "Llama 3.1 70B Instruct", group: "Meta", tags: "", context: "-" },
+            { id: "meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B Instruct", group: "Meta", tags: "", context: "-" },
+            { id: "meta/llama-3.2-11b-vision-instruct", name: "Llama 3.2 11B Vision Instruct", group: "Meta", tags: "", context: "-" },
+            { id: "meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B Instruct", group: "Meta", tags: "", context: "-" },
+            { id: "meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B Instruct", group: "Meta", tags: "", context: "-" },
+            { id: "meta/llama-3.2-90b-vision-instruct", name: "Llama 3.2 90B Vision Instruct", group: "Meta", tags: "", context: "-" },
+            { id: "meta/llama-4-maverick-17b-128e-instruct", name: "Llama 4 Maverick 17B 128E Instruct", group: "Meta", tags: "", context: "-" },
+            { id: "meta/llama2-70b", name: "Llama2 70B", group: "Meta", tags: "", context: "-" },
+            { id: "mistralai/ministral-14b-instruct-2512", name: "Ministral 14B Instruct 2512", group: "Mistral", tags: "", context: "-" },
+            { id: "mistralai/mistral-large-3-675b-instruct-2512", name: "Mistral Large 3 675B Instruct 2512", group: "Mistral", tags: "", context: "-" },
+            { id: "mistralai/mistral-medium-3.5-128b", name: "Mistral Medium 3.5 128B", group: "Mistral", tags: "Text Gen, Coding, Agentic", context: "128K" },
+            { id: "mistralai/mistral-nemotron", name: "Mistral Nemotron", group: "Mistral", tags: "", context: "-" },
+            { id: "mistralai/mistral-small-4-119b-2603", name: "Mistral Small 4 119B 2603", group: "Mistral", tags: "Hybrid MoE, Multimodal", context: "256K" },
+            { id: "mistralai/mixtral-8x7b-instruct-v0.1", name: "Mixtral 8X7B Instruct V0.1", group: "Mistral", tags: "", context: "-" },
+            { id: "moonshotai/kimi-k2.6", name: "Kimi K2.6", group: "Moonshot", tags: "Multimodal MoE, Agentic", context: "-" },
+            { id: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1", name: "Llama 3.1 Nemotron Nano Vl 8B V1", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/llama-3.3-nemotron-super-49b-v1", name: "Llama 3.3 Nemotron Super 49B V1", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/llama-3.3-nemotron-super-49b-v1.5", name: "Llama 3.3 Nemotron Super 49B V1.5", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/nemotron-3-nano-30b-a3b", name: "Nemotron 3 Nano 30B A3B", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", name: "Nemotron 3 Nano Omni 30B A3B Reasoning", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/nemotron-3-super-120b-a12b", name: "Nemotron 3 Super 120B A12B", group: "NVIDIA", tags: "MoE, Coding, Planning", context: "1M" },
+            { id: "nvidia/nemotron-3-ultra-550b-a55b", name: "Nemotron 3 Ultra 550B A55B", group: "NVIDIA", tags: "Agent, MoE, Tool Calling", context: "1M" },
+            { id: "nvidia/nemotron-mini-4b-instruct", name: "Nemotron Mini 4B Instruct", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/nemotron-nano-12b-v2-vl", name: "Nemotron Nano 12B V2 Vl", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/nvidia-nemotron-nano-9b-v2", name: "Nvidia Nemotron Nano 9B V2", group: "NVIDIA", tags: "", context: "-" },
+            { id: "nvidia/vila", name: "Vila", group: "NVIDIA", tags: "", context: "-" },
+            { id: "openai/gpt-oss-120b", name: "Gpt Oss 120B", group: "OpenAI", tags: "", context: "-" },
+            { id: "openai/gpt-oss-20b", name: "Gpt Oss 20B", group: "OpenAI", tags: "", context: "-" },
+            { id: "qwen/qwen3.5-122b-a10b", name: "Qwen3.5 122B A10B", group: "Qwen", tags: "", context: "-" },
+            { id: "sarvamai/sarvam-m", name: "Sarvam M", group: "Sarvam", tags: "", context: "-" },
+            { id: "stepfun-ai/step-3.5-flash", name: "Step 3.5 Flash", group: "StepFun", tags: "", context: "-" },
+            { id: "stepfun-ai/step-3.7-flash", name: "Step 3.7 Flash", group: "StepFun", tags: "", context: "-" },
+            { id: "stockmark/stockmark-2-100b-instruct", name: "Stockmark 2 100B Instruct", group: "Stockmark", tags: "", context: "-" },
+            { id: "upstage/solar-10.7b-instruct", name: "Solar 10.7B Instruct", group: "Upstage", tags: "", context: "-" },
+            { id: "z-ai/glm-5.2", name: "Glm 5.2", group: "Z.ai", tags: "Agentic, Coding, Reasoning", context: "16K" }
+        ];
+
+        function getApiKey() {
+            const key = (SETTINGS.nvidiaApiKey || '').trim();
+            return key || null;
+        }
+
+        // Basic key format validation — nvapi- prefix
+        function validateApiKey(key) {
+            if (!key) return false;
+            // NVIDIA NIM API keys start with "nvapi-"
+            return key.startsWith('nvapi-') && key.length > 20;
+        }
+
+        function normalizeModel(rawModel) {
+            const id = rawModel.id || '';
+            const publisher = id.split('/')[0] || 'other';
+            const group = PUBLISHER_GROUP[publisher.toLowerCase()] || 'Other';
+            const shortName = id.includes('/') ? id.split('/').pop() : id;
+
+            // Derive display name — prettify the model ID
+            const displayName = rawModel.name || shortName
+                .replace(/-/g, ' ')
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
+
+            return {
+                id,
+                name: displayName,
+                group,
+                ownedBy: rawModel.owned_by || publisher,
+                tags: '',
+                context: ''
+            };
+        }
+
+        function getCachedModels() {
+            try {
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                if (!cached) return null;
+                const { models, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < CONFIG.CACHE_TTL) return models;
+                localStorage.removeItem(CONFIG.CACHE_KEY);
+            } catch (e) {
+                try { localStorage.removeItem(CONFIG.CACHE_KEY); } catch (_) {}
+            }
+            return null;
+        }
+
+        function setCachedModels(models) {
+            try {
+                localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({ models, timestamp: Date.now() }));
+            } catch (e) {
+                console.warn('[NVIDIA] Cache write error:', e);
+            }
+        }
+
+        function clearCache() {
+            try { localStorage.removeItem(CONFIG.CACHE_KEY); } catch (e) {}
+        }
+
+        async function fetchModels(forceRefresh = false) {
+            const apiKey = getApiKey();
+
+            if (!forceRefresh) {
+                const cached = getCachedModels();
+                if (cached && cached.length > 0) {
+                    console.log('[NVIDIA] Using cached models:', cached.length);
+                    return cached;
+                }
+            }
+
+            if (!apiKey) {
+                console.log('[NVIDIA] No API key — using fallback catalog');
+                return FALLBACK_MODELS.slice();
+            }
+
+            if (!validateApiKey(apiKey)) {
+                console.warn('[NVIDIA] API key format invalid (should start with nvapi-)');
+                return FALLBACK_MODELS.slice();
+            }
+
+            console.log('[NVIDIA] Fetching models from API...');
+            let response;
+            try {
+                response = await fetch(CONFIG.MODELS_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+            } catch (networkErr) {
+                console.warn('[NVIDIA] Network error while fetching models:', networkErr.message);
+                return FALLBACK_MODELS.slice();
+            }
+
+            if (!response.ok) {
+                let detail = '';
+                try {
+                    const errBody = await response.json();
+                    detail = errBody?.detail || errBody?.message || errBody?.error?.message || '';
+                } catch (_) {
+                    try { detail = await response.text(); } catch (_2) {}
+                }
+                if (response.status === 401) {
+                    console.warn('[NVIDIA] 401 Unauthorized — check your API key at build.nvidia.com');
+                } else if (response.status === 429) {
+                    console.warn('[NVIDIA] 429 Rate limit exceeded');
+                } else {
+                    console.warn(`[NVIDIA] Models API HTTP ${response.status}${detail ? ': ' + detail : ''} — using fallback`);
+                }
+                return FALLBACK_MODELS.slice();
+            }
+
+            let rawResponse;
+            try {
+                rawResponse = await response.json();
+            } catch (parseErr) {
+                console.warn('[NVIDIA] Failed to parse models JSON:', parseErr.message);
+                return FALLBACK_MODELS.slice();
+            }
+
+            // OpenAI-compatible: { data: [{id, owned_by}, ...] }
+            const modelArray = Array.isArray(rawResponse?.data)
+                ? rawResponse.data
+                : Array.isArray(rawResponse) ? rawResponse : [];
+
+            if (modelArray.length === 0) {
+                console.warn('[NVIDIA] Fetched 0 models — using fallback catalog');
+                return FALLBACK_MODELS.slice();
+            }
+
+            // Filter to verified free-tier coding models
+            const VERIFIED_FREE_MODELS = new Set(FALLBACK_MODELS.map(m => m.id));
+            const normalized = modelArray
+                .filter(m => m && m.id && VERIFIED_FREE_MODELS.has(m.id))
+                .map(m => normalizeModel(m))
+                .sort((a, b) => {
+                    if (a.group !== b.group) return a.group.localeCompare(b.group);
+                    return a.name.localeCompare(b.name);
+                });
+
+            // Merge tags/context from fallback catalog for known models
+            const fallbackMap = {};
+            FALLBACK_MODELS.forEach(m => { fallbackMap[m.id] = m; });
+            normalized.forEach(m => {
+                const fb = fallbackMap[m.id];
+                if (fb) {
+                    m.tags = fb.tags;
+                    m.context = fb.context;
+                }
+            });
+
+            console.log('[NVIDIA] Fetched models:', normalized.length);
+            setCachedModels(normalized);
+            return normalized;
+        }
+
+        function filterModels(models, query) {
+            if (!query || !Array.isArray(models)) return models || [];
+            const q = query.toLowerCase().trim();
+            if (!q) return models;
+            return models.filter(m =>
+                (m.id || '').toLowerCase().includes(q) ||
+                (m.name || '').toLowerCase().includes(q) ||
+                (m.group || '').toLowerCase().includes(q) ||
+                (m.tags || '').toLowerCase().includes(q)
+            );
+        }
+
+        function groupModels(models) {
+            const groups = {};
+            (models || []).forEach(m => {
+                const g = m.group || 'Other';
+                if (!groups[g]) groups[g] = [];
+                groups[g].push(m);
+            });
+            return groups;
+        }
+
+        return { CONFIG, fetchModels, filterModels, groupModels, clearCache, validateApiKey, FALLBACK_MODELS };
+    })();
+
+    // NVIDIA NIM completion helper
+    const generateWithNvidia = async (prompt) => {
+        const apiKey = (SETTINGS.nvidiaApiKey || '').trim();
+        if (!apiKey) {
+            throw new Error('NVIDIA NIM API key not configured. Get a free key at build.nvidia.com.');
+        }
+        if (!NvidiaProvider.validateApiKey(apiKey)) {
+            throw new Error('NVIDIA NIM API key appears invalid (should start with nvapi-). Check settings.');
+        }
+
+        const model = SETTINGS.nvidiaModel || NvidiaProvider.CONFIG.DEFAULT_MODEL;
+
+        let response;
+        try {
+            response = await fetch(NvidiaProvider.CONFIG.CHAT_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: SETTINGS.aiTemperature || 0.1,
+                    top_p: 1,
+                    max_tokens: 16384,
+                    stream: false
+                })
+            });
+        } catch (networkErr) {
+            throw new Error(`NVIDIA NIM network error: ${networkErr.message}`);
+        }
+
+        if (!response.ok) {
+            let detail = '';
+            try {
+                const errBody = await response.json();
+                detail = errBody?.detail || errBody?.message || errBody?.error?.message || '';
+            } catch (_) {
+                try { detail = await response.text(); } catch (_2) {}
+            }
+
+            if (response.status === 401) {
+                throw new Error('NVIDIA NIM: Invalid API key. Verify your key at build.nvidia.com.');
+            } else if (response.status === 429) {
+                throw new Error('NVIDIA NIM: Rate limit exceeded. Please wait before retrying.');
+            } else if (response.status === 500 || response.status === 503) {
+                throw new Error(`NVIDIA NIM: Service unavailable (${response.status}). Try again shortly.`);
+            } else {
+                throw new Error(`NVIDIA NIM HTTP ${response.status}${detail ? ': ' + detail : ''}`);
+            }
+        }
+
+        const data = await response.json();
+        return data?.choices?.[0]?.message?.content || '';
+    };
+
+    // ============================================
     // SETTINGS UI
     // ============================================
     const createSettingsUI = () => {
@@ -2663,6 +2982,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 <option value="g4f" ${SETTINGS.aiProvider === 'g4f' ? 'selected' : ''}>G4F (g4f.space)</option>
                 <option value="duckduckgo" ${SETTINGS.aiProvider === 'duckduckgo' ? 'selected' : ''}>DuckDuckGo AI (FREE!)</option>
                 <option value="openai-compatible" ${SETTINGS.aiProvider === 'openai-compatible' ? 'selected' : ''}>OpenAI-Compatible API (Any)</option>
+                <option value="nvidia" ${SETTINGS.aiProvider === 'nvidia' ? 'selected' : ''}>NVIDIA NIM (Free Tier)</option>
             </select>
         `;
         const providerSelect = providerWrapper.querySelector('select');
@@ -2697,6 +3017,10 @@ Compare the output character-by-character against the expected sample outputs (i
             const openaiCompatModelWrapper = document.getElementById('openai-compat-model-wrapper');
             if (openaiCompatModelWrapper) {
                 openaiCompatModelWrapper.style.display = providerSelect.value === 'openai-compatible' ? 'block' : 'none';
+            }
+            const nvidiaModelWrapper = document.getElementById('nvidia-model-wrapper');
+            if (nvidiaModelWrapper) {
+                nvidiaModelWrapper.style.display = providerSelect.value === 'nvidia' ? 'block' : 'none';
             }
         });
         panelContent.appendChild(providerWrapper);
@@ -3862,9 +4186,146 @@ Compare the output character-by-character against the expected sample outputs (i
         panelContent.appendChild(createOpenAICompatModelSelector());
         // ==============================================================
 
+        // ========== NVIDIA NIM API KEY + MODEL SELECTOR ==========
+        panelContent.appendChild(createTextInput('nvidiaApiKey', 'NVIDIA NIM API Key', SETTINGS.nvidiaApiKey, 'nvapi-... (free key from build.nvidia.com)'));
+
+        const createNvidiaModelSelector = () => {
+            const wrapper = document.createElement('div');
+            wrapper.id = 'nvidia-model-wrapper';
+            wrapper.style.cssText = `padding: 10px 0; border-bottom: 1px solid #333; display: ${SETTINGS.aiProvider === 'nvidia' ? 'block' : 'none'};`;
+
+            wrapper.innerHTML = `
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">NVIDIA NIM Model</div>
+                <div style="display: flex; gap: 6px; margin-bottom: 6px;">
+                    <input type="text" id="nvidiaModelSearch" placeholder="Search models (e.g., nemotron, deepseek, kimi)" style="
+                        flex: 1;
+                        padding: 8px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #2d2d2d;
+                        color: #fff;
+                        font-size: 15px;
+                        box-sizing: border-box;
+                    ">
+                    <button id="nvidiaRefreshModels" title="Refresh models from API" style="
+                        padding: 8px 12px;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        background: #3d3d3d;
+                        color: #fff;
+                        cursor: pointer;
+                        font-size: 15px;
+                    "><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></button>
+                </div>
+                <select id="nvidiaModel" style="
+                    width: 100%;
+                    padding: 8px;
+                    border: 1px solid #444;
+                    border-radius: 6px;
+                    background: #000000;
+                    color: #76b900;
+                    font-size: 15px;
+                    box-sizing: border-box;
+                    font-family: 'VT323', monospace;
+                ">
+                    <option value="${NvidiaProvider.CONFIG.DEFAULT_MODEL}">Loading models...</option>
+                </select>
+                <div id="nvidiaModelStatus" style="color: #666; font-size: 14px; margin-top: 4px;"></div>
+            `;
+
+            setTimeout(() => {
+                const select = document.getElementById('nvidiaModel');
+                const searchInput = document.getElementById('nvidiaModelSearch');
+                const refreshBtn = document.getElementById('nvidiaRefreshModels');
+                const statusDiv = document.getElementById('nvidiaModelStatus');
+
+                let allModels = [];
+
+                const populateSelect = (models) => {
+                    if (!select) return;
+                    const currentValue = SETTINGS.nvidiaModel || NvidiaProvider.CONFIG.DEFAULT_MODEL;
+                    select.innerHTML = '';
+
+                    const groups = NvidiaProvider.groupModels(models);
+                    const groupOrder = ['NVIDIA', 'Z.ai', 'DeepSeek', 'Google', 'Mistral', 'Moonshot', 'MiniMax', 'Qwen', 'StepFun', 'Other'];
+                    const renderedGroups = new Set();
+
+                    // Render in priority order first, then remaining
+                    [...groupOrder, ...Object.keys(groups).filter(g => !groupOrder.includes(g))].forEach(g => {
+                        if (renderedGroups.has(g) || !groups[g] || groups[g].length === 0) return;
+                        renderedGroups.add(g);
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = `${g} (${groups[g].length})`;
+                        groups[g].forEach(model => {
+                            const option = document.createElement('option');
+                            option.value = model.id;
+                            const tagsStr = model.tags ? ` — ${model.tags}` : '';
+                            const ctxStr = model.context ? ` [${model.context}]` : '';
+                            option.textContent = `${model.name} (Free)${ctxStr}${tagsStr}`;
+                            option.selected = model.id === currentValue;
+                            optgroup.appendChild(option);
+                        });
+                        select.appendChild(optgroup);
+                    });
+
+                    if (statusDiv) statusDiv.textContent = `${models.length} models available`;
+                };
+
+                const loadModels = async (forceRefresh = false) => {
+                    if (statusDiv) statusDiv.textContent = 'Loading models...';
+                    if (refreshBtn) {
+                        refreshBtn.disabled = true;
+                        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;animation:bypassSpin 1s linear infinite"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>';
+                    }
+                    try {
+                        allModels = await NvidiaProvider.fetchModels(forceRefresh);
+                        populateSelect(allModels);
+                        if (statusDiv) statusDiv.textContent = `${allModels.length} models loaded`;
+                    } catch (error) {
+                        console.error('[NVIDIA] Failed to load models:', error);
+                        if (statusDiv) statusDiv.textContent = `Error: ${error.message}`;
+                        if (select) select.innerHTML = `<option value="${NvidiaProvider.CONFIG.DEFAULT_MODEL}" selected>${NvidiaProvider.CONFIG.DEFAULT_MODEL} (Default)</option>`;
+                    } finally {
+                        if (refreshBtn) {
+                            refreshBtn.disabled = false;
+                            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4C7.58 4 4 7.58 4 12s3.58 8 8 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>';
+                        }
+                    }
+                };
+
+                if (searchInput) {
+                    let searchTimeout;
+                    searchInput.addEventListener('input', () => {
+                        clearTimeout(searchTimeout);
+                        searchTimeout = setTimeout(() => {
+                            const filtered = NvidiaProvider.filterModels(allModels, searchInput.value.trim());
+                            populateSelect(filtered);
+                        }, 150);
+                    });
+                }
+
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', () => loadModels(true));
+                }
+
+                if (select) {
+                    select.addEventListener('change', () => {
+                        SETTINGS.nvidiaModel = select.value;
+                        saveSettings(SETTINGS);
+                    });
+                }
+
+                loadModels();
+            }, 100);
+
+            return wrapper;
+        };
+        panelContent.appendChild(createNvidiaModelSelector());
+        // =========================================================
+
         const note = document.createElement('div');
         note.style.cssText = 'color:#3f3f46;font-size:14px;padding:14px 4px;text-align:center;font-family:"VT323",monospace;line-height:1.7;border-top:1px solid rgba(255,255,255,0.05);margin-top:4px;';
-        note.innerHTML = 'Reload page after changing settings<br>Keys: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a><br>Puter.js: no API key required | <a href="https://developer.puter.com/ai/" target="_blank" style="color:#2196F3;">Puter AI docs</a><br>DuckDuckGo AI is FREE! | OpenAI-Compatible API: works with OpenAI, OpenRouter, LM Studio, Ollama, local servers, etc.';
+        note.innerHTML = 'Reload page after changing settings<br>Keys: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#4CAF50;">Gemini</a> | <a href="https://openrouter.ai/keys" target="_blank" style="color:#4CAF50;">OpenRouter</a> | <a href="https://g4f.space" target="_blank" style="color:#4CAF50;">G4F</a><br>Puter.js: no API key required | <a href="https://developer.puter.com/ai/" target="_blank" style="color:#2196F3;">Puter AI docs</a><br>DuckDuckGo AI is FREE! | OpenAI-Compatible API: works with OpenAI, OpenRouter, LM Studio, Ollama, local servers, etc.<br>NVIDIA NIM: Free key at <a href="https://build.nvidia.com" target="_blank" style="color:#76b900;">build.nvidia.com</a>';
         panelContent.appendChild(note);
 
         panel.appendChild(panelHeader);
@@ -5821,7 +6282,7 @@ Compare the output character-by-character against the expected sample outputs (i
 
     // ============================================
     // 10. AI SOLUTION GENERATOR
-    // Uses Gemini, OpenAI, OpenRouter, Puter.js, G4F, DuckDuckGo, or an OpenAI-compatible API to generate code solutions
+    // Uses Gemini, OpenAI, OpenRouter, Puter.js, G4F, DuckDuckGo, OpenAI-Compatible API, or NVIDIA NIM to generate code solutions
     // ============================================
 
     const getSelectedLanguage = () => {
@@ -7082,6 +7543,8 @@ SOLVING APPROACH:
                         return await generateWithDuckDuckGo(promptText);
                     case 'openai-compatible':
                         return await generateWithOpenAICompat(promptText);
+                    case 'nvidia':
+                        return await generateWithNvidia(promptText);
                     default:
                         throw new Error(`Unknown AI provider: ${SETTINGS.aiProvider}`);
                 }

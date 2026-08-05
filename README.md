@@ -98,13 +98,15 @@ Click the ⚙️ button (bottom-right corner) to toggle features on/off:
 
 ### 🤖 AI Solution Generator
 - Automatically generates code solutions using AI
-- Supports **6 AI Providers**:
+- Supports **8 AI Providers**:
   - **Google Gemini** - Free tier available
   - **OpenAI (ChatGPT)** - Paid
   - **OpenRouter (Multi-Model)** - Free & Paid models
   - **G4F (g4f.space)** - Alternative provider
   - **DuckDuckGo AI** - FREE, no API key needed!
-  - **YuppBridge** - Self-hosted, 200+ models from Yupp AI
+  - **Puter.js** - FREE, no API key needed
+  - **OpenAI-Compatible API** - works with OpenAI, OpenRouter, LM Studio, Ollama, local servers, YuppBridge, etc.
+  - **NVIDIA NIM** - Free tier from build.nvidia.com
 - Works on both tutorial pages (generates middle code portion) and code track pages (generates complete solution)
 - Purple "🤖 AI Solution" button appears next to Save/Run buttons
 - Configure your API key in the settings panel
@@ -232,7 +234,7 @@ Click the **⚙️ gear button** in the bottom-right corner to open settings:
 |---------|-------------|---------|
 | Enable AI Solver | Show AI solution button | ❌ Off |
 | ⚡ Auto Solver | Auto-solve & submit (experimental) | ❌ Off |
-| AI Provider | Choose Gemini, OpenAI, OpenRouter, G4F, DuckDuckGo, or **YuppBridge** | Gemini |
+| AI Provider | Choose Gemini, OpenAI, OpenRouter, G4F, DuckDuckGo, Puter, OpenAI-Compatible API, or NVIDIA NIM | Gemini |
 | Gemini API Key | Your Google Gemini API key | (empty) |
 | OpenAI API Key | Your OpenAI API key | (empty) |
 | OpenRouter API Key | Your OpenRouter API key | (empty) |
@@ -241,9 +243,11 @@ Click the **⚙️ gear button** in the bottom-right corner to open settings:
 | G4F Model | Dynamic model selection | Auto |
 | DuckDuckGo Model | Select from 6 free models | GPT-4o Mini |
 | DuckDuckGo API URL | Custom proxy URL (optional) | (default proxy) |
-| YuppBridge API URL | Your self-hosted YuppBridge URL | (empty) |
-| YuppBridge API Key | Your YuppBridge API key | (empty) |
-| YuppBridge Model | Dynamic selection from 200+ models | gpt-4o |
+| OpenAI-Compatible API URL | Any OpenAI-compatible base URL (e.g. https://host/v1) | (empty) |
+| OpenAI-Compatible API Key | Optional — leave blank for keyless/local APIs | (empty) |
+| OpenAI-Compatible Model | Dynamic selection (OpenAI, OpenRouter, LM Studio, Ollama, etc.) | gpt-4o |
+| NVIDIA NIM API Key | Free key from build.nvidia.com (nvapi-...) | (empty) |
+| NVIDIA NIM Model | Dynamic selection of free NIM models | deepseek-v4-pro |
 
 ---
 
@@ -341,6 +345,17 @@ Any OpenAI-compatible host works, for example:
 | llama-3-70b | Meta | Open source |
 | mistral-large | Mistral | European AI |
 | deepseek-coder | DeepSeek | Coding specialist |
+
+### Using NVIDIA NIM (Free Tier) ⭐
+NVIDIA NIM provides free API access to popular open models (Llama, Nemotron, DeepSeek, Kimi, Qwen, GLM, and more).
+
+1. Get a free API key at [build.nvidia.com](https://build.nvidia.com) — keys start with `nvapi-`
+2. Change "AI Provider" to "NVIDIA NIM (Free Tier)"
+3. Paste your key in the "NVIDIA NIM API Key" field
+4. Click 🔄 to load available free models
+5. Use the search to find a model (e.g., "deepseek", "nemotron", "glm")
+
+> Model caching (6 hours) avoids repeated API calls. Entering a valid `nvapi-` key loads the live model list; without a key it uses a built-in free catalog.
 
 ---
 
