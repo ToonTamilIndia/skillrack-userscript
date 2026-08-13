@@ -67,14 +67,20 @@ Verified: `<sample input> → <sample output>`
 
 ## 3. Solving a batch (the loop)
 
-1. Enumerate: `python3 tools/enum.py <idx> --json /tmp/sack_enum.json`
+1. Enumerate: `python3 tools/enum.py <idx> --json /tmp/sack_enum.json` (CODETUTOR)
+   or `python3 tools/enum.py 0 --lev <2..6|100> --json /tmp/sack_enum.json` (CODETRACK)
    (fills `{<section>:{<part>:[{row,id,name}]}}`).
 2. Fetch statements: `python3 tools/fetch.py /tmp/sack_enum.json <idx> --out /tmp/sack_stmts.json`
+   (CODETUTOR) or `python3 tools/fetchlev.py /tmp/sack_enum.json --lev <N> --out /tmp/sack_stmts.json`
+   (CODETRACK; reuses enum's replay chain, one part per problem via the `part` field).
 3. Split: `python3 tools/mkbatch.py /tmp/sack_stmts.json --n 8 --outdir /tmp/sack_batches`
 4. Solve each batch (agents or humans), then verify:
    `python3 tools/verify.py solutions/<id>.md /tmp/sack_stmts.json`
    - C/C++ compile w/ `gcc`/`g++ -w -O2`; Java `javac`; Python `python3`.
    - Exit 0 = all samples PASS. Iterate until green.
+   - Function-style (no `main()`) problems can't link via verify.py — build a small
+     harness `main()` that reads the sample input and calls the function; compare to
+     `out_clean`; save only the function in the `.md`.
 5. Update the tracker: `python3 tools/status.py /tmp/sack_stmts.json --md document.md`
    (regenerates the solved/pending report).
 6. Commit the `.md` (see §5). That's the whole contribution.

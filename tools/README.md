@@ -6,9 +6,10 @@ No third-party Python deps; uses `curl`, `gcc`/`g++`/`javac`/`python3` for code.
 ## Layout
 | Script | Purpose |
 |--------|---------|
-| `sack.py` | shared HTTP client — reads the session cookie from `cookie.txt` (gitignored) or `$SKILLRACK_COOKIE`; `BASE` points at the CODETUTOR centre |
-| `enum.py` | enumerate unsolved problems for a pack |
-| `fetch.py` | fetch statements + sample I/O for enumerated ids |
+| `sack.py` | shared HTTP client — reads the session cookie from `cookie.txt` (gitignored) or `$SKILLRACK_COOKIE`; `BASE` points at the CODETUTOR centre; `base_for(lev)` gives CODETRACK pages |
+| `enum.py` | enumerate unsolved problems for a pack (CODETUTOR) or level (CODETRACK via `--lev 2..6/100`) |
+| `fetch.py` | fetch statements + sample I/O for enumerated ids (CODETUTOR packs) |
+| `fetchlev.py` | fetch statements + samples for enumerated ids on any CODETRACK level (`--lev`) |
 | `verify.py` | compile & test a `solutions/<id>.md` against recorded samples |
 | `compile.py` | language-aware compile/run (C, C++, Java, Python) |
 | `mkbatch.py` | split ids into parallel solve batches |
@@ -25,8 +26,11 @@ No third-party Python deps; uses `curl`, `gcc`/`g++`/`javac`/`python3` for code.
 
 ## Typical flow
 ```
-python3 tools/enum.py 0 --json /tmp/sack_c_enum.json    # enumerate C pack
+python3 tools/enum.py 0 --json /tmp/sack_c_enum.json              # enumerate C pack
 python3 tools/fetch.py /tmp/sack_c_enum.json 0 --out /tmp/sack_c_stmts.json
+# CODETRACK levels:
+python3 tools/enum.py 0 --lev 3 --json /tmp/sack_lev3.json
+python3 tools/fetchlev.py /tmp/sack_lev3.json --lev 3 --out /tmp/sack_lev3_stmts.json
 python3 tools/mkbatch.py /tmp/sack_c_stmts.json --n 8 --outdir /tmp/sack_batches
 # solve each batch (see ../skill.md) writing solutions/<id>.md
 python3 tools/verify.py solutions/6650.md /tmp/sack_stmts.json

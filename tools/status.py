@@ -93,7 +93,9 @@ def main():
     # detect: flat stmts (values contain 'samples'/'description') vs nested enum
     flat = any(isinstance(v, dict) and ('samples' in v or 'description' in v) for v in raw.values())
     if flat:
-        known = {k: {'id': k, 'name': v.get('name', '?'), 'sub': '?', 'part': '?'}
+        known = {k: {'id': k, 'name': v.get('name', '?'),
+                     'sub': v.get('section') or v.get('sub') or '?',
+                     'part': v.get('part') or '?'}
                  for k, v in raw.items() if isinstance(v, dict)}
         kind = 'statement set'
     else:

@@ -62,14 +62,14 @@ def main():
     tmp = tempfile.mkdtemp(prefix='sack_')
     try:
         prep = cc.prepare(lang, code, tmp)
-        if not prep.get('ok', True):
+        if prep.get('ok', 0) != 0:
             print('COMPILE FAIL:', (prep.get('err') or '')[:1500]); sys.exit(4)
         allpass = True
         for i, s in enumerate(samples):
             try:
                 prep['inp'] = s.get('input') or ''
                 got, rc = cc.run(lang, prep)
-                exp = norm(s.get('output'))
+                exp = norm(s.get('out_clean') if s.get('out_clean') is not None else s.get('output'))
                 g = norm(got)
                 status = 'PASS' if g == exp else 'FAIL'
                 if status == 'FAIL': allpass = False
