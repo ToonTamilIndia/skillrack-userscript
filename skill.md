@@ -22,12 +22,24 @@
 - Each pack = ~23 sub-challenges (`pkglistform:j_id_49:<sidx>:j_id_4h`), each with
   parts (`cttbl:<row>:j_id_4u`) and each part shows **only the unsolved problems**
   (`pctbl:<row>:j_id_5w`). The list is LIVE/rotating — solve one and it disappears.
-- **"Level 1/2/3/4" mapping:** the C pack's difficulty tiers appear as sub-challenge
-  names — `50 VERY-EASY`, `50 EASY`, `50 EASY ADD-ON`, `50 AVERAGE` (plus INTRO,
-  STARTER, course, practice, video sections). The exact Level→section table must be
-  confirmed per-account by `tools/enum.py <idx>` (re-enumerate before every bulk
-  solve; the unsolved list is live and the sections that expose "View" change as
-  you clear them).
+- **The platform has 6 levels + extras**, each a different challenge TYPE, at
+  `codeprogramgroup.xhtml` (the `gt`/`lev` query picks them):
+
+  | Level | URL `gt=` | Content |
+  |-------|-----------|---------|
+  | Level 1 | `CODETUTOR` | 7 **language** packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges (INTRO, STARTER, 50 VERY-EASY / EASY / EASY ADD-ON / AVERAGE, LAB ADD-ON, practice, videos). Some problems are **MFIB (fill-in-the-blank)** — the userscript detects and answers those too. |
+  | Level 2 | `CODETRACK&lev=2` | KICKSTART for ABSOLUTE Beginner |
+  | Level 3 | `CODETRACK&lev=3` | **MNC Companies** (TCS/CTS/WIPRO/INFOSYS) → 3 sub-options, each with its own question set: COGNIZANT CTS - 35 PROGRAMS, InfyTQ Programs, MNC COMPANIES PROGRAMS |
+  | Level 4 | `CODETRACK&lev=4` | Data Structures & Algorithms |
+  | Level 5 | `CODETRACK&lev=5` | Product Companies (Higher Salary) → 10 SETs of 10 programs each |
+  | Level 6 | `CODETRACK&lev=6` | Dream Product Companies (Very High Salary) + Mini Projects |
+  | Prime | `CODETRACK&lev=100` | Dream Companies Placement Pack |
+  | LACS | `webinarcodetrack.xhtml` | Webinar code track |
+  | LAB | `labcodeprograms.xhtml?type=LAB` | LAB programs |
+
+  The exact sub-challenge→part table must be re-confirmed per-account by
+  `tools/enum.py <idx>` (re-enumerate before every bulk solve; the unsolved list
+  is live and the sections that expose "View" change as you clear them).
 - Every click is a PrimeFaces POST carrying its own `jakarta.faces.ViewState`
   (fresh per page/form — `tools/sack.py` extracts it from the last response).
 - The problem page shows the full statement + samples WITHOUT solving a captcha;
@@ -84,10 +96,12 @@ Verified: `<sample input> → <sample output>`
 - **Flow:** fork → branch `add/<id>` → add `solutions/<id>.md` → run
   `verify.py` → update the tracker (`tools/status.py --md document.md`) → PR.
   A passing verify line in the PR body is the acceptance bar.
-- The repo's userscript auto-pulls solved answers straight from this repo
-  (`raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`),
-  with a fallback to a self-hosted local server and then AI. So a merged
-  solution is instantly live for every user.
+- The repo's userscript auto-pulls solved answers straight from this repo by
+  default — `raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
+  (GitHub raw URL, no server needed). For dev/testing you can set the "Solutions
+  Base URL" in the settings to a local server (e.g. `http://localhost:3000`, run
+  `node solutions-server.js`). AI is the last fallback. So a merged solution is
+  instantly live for every user.
 - Keep the solution bank moving: when a challenge rotates to a new unsolved set,
   re-enumerate (§3) and claim a batch.
 

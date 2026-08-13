@@ -3,8 +3,10 @@
 > **Crowd-solve it once, everyone gets it.** This repo pairs a
 > **[`SKILL.md`](skill.md)** playbook with a **[`solutions/`](solutions/)** answer
 > bank (keyed by SkillRack `ProgramID`) and the **[Tampermonkey userscript](userscript.user.js)**
-> that auto-loads those answers into the editor — from this repo itself, from a
-> local server, or from AI. Contributors add verified solutions; [SKILL.md](skill.md)
+> that auto-loads those answers into the editor — straight from this repo via
+> `raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
+> (the default), or from a local server (`http://localhost:3000`, for dev/testing),
+> or from AI. Contributors add verified solutions; [SKILL.md](skill.md)
 > documents the whole scraping/verification workflow.
 
 > ⚠️ **Please disable the script during live invigilated tests** — continuing to
@@ -19,9 +21,11 @@
 - **Tools:** [`tools/`](tools/) — enumerate → fetch → verify (C, C++, Java, Python).
 - **Users submit answers** by adding `solutions/<id>.md` (format + contract in
   [`skill.md` §2](skill.md)). A passing `verify` line is the acceptance bar.
-- The userscript pulls answers live from
+- The userscript pulls answers live (Settings → "Solved Solutions"). Default:
   `raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
-  (Settings → "Solved Solutions"), with local-server and AI fallbacks.
+  (GitHub raw = the solved answer, no server needed). For dev/testing you can
+  point the "Solutions Base URL" at a local server, e.g. `http://localhost:3000`,
+  with AI as the final fallback.
 - **Contribute:** fork → `add/<id>` branch → add file → generate samples with
   `tools/fetch.py <enum.json> 0 --out /tmp/sack_stmts.json`, then
   `tools/verify.py solutions/<id>.md /tmp/sack_stmts.json` → PR.

@@ -20,6 +20,14 @@ def ensure_scratch():
     os.makedirs(SCRATCH, exist_ok=True)
 
 
+def scratch(name):
+    """Absolute path of a scratch file (name must be a bare filename)."""
+    if os.sep in name or name in ('..', '.'):
+        raise ValueError('scratch name must be a bare filename')
+    ensure_scratch()
+    return os.path.join(SCRATCH, name)
+
+
 def cookie_value():
     c = os.environ.get('SKILLRACK_COOKIE', '').strip()
     if c:

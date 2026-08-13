@@ -74,6 +74,13 @@ def main():
     lines.append('Scanned {n} solution files in `solutions/` (per-language: {L}).'.format(
         n=len(sol), L=', '.join('{}={}'.format(k, v) for k, v in sorted(langs.items()))))
     lines.append('')
+    lines.append('The userscript fetches these by **ProgramID** from this repo by '
+                 'default — `https://raw.githubusercontent.com/ToonTamilIndia/'
+                 'skillrack-userscript/main/solutions/<id>.md` (GitHub raw URL, '
+                 'no server needed). For dev/testing point Settings → "Solutions '
+                 'Base URL" at a local server (e.g. `http://localhost:3000`, run '
+                 '`node solutions-server.js`); AI is the final fallback.')
+    lines.append('')
 
     if not args.data:
         lines.append('## Solved solutions')

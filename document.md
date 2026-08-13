@@ -1,20 +1,26 @@
 # SkillRack Program Tracker — solved / pending
 
 > Live tracker maintained by `tools/status.py`. A problem is **SOLVED** when a
-> verified `solutions/<ProgramID>.md` exists in this repo (the userscript auto-loads
-> them). Everything else on the platform is **PENDING** (enumerate it, solve batch-wise,
-> per [skill.md](skill.md)).
+> verified `solutions/<ProgramID>.md` exists in this repo.
 >
-> All solved problems are **C** (CODETUTOR pack 0, Level-1 set). Other packs & levels
-> are PENDING until enumerated with a live session cookie (see skill.md §1).
+> The userscript fetches these **by ProgramID** from this repo **by default**:
+> `https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
+> (GitHub raw URL — works for everyone, no server needed). For dev/testing, point
+> Settings → "Solutions Base URL" at a local server, e.g. `http://localhost:3000`
+> (run `node solutions-server.js`); AI is the final fallback.
+>
+> All solved problems are **C** (CODETUTOR pack 0, the 50 VERY-EASY / EASY sets).
+> The platform has **6 levels + extras** (see the inventory table); every other
+> pack/level is PENDING until enumerated with a live session cookie (see skill.md §1).
 
 ## Current status
 
 - **Solved (committed solution file exists):** 183
-- **Pending (enumerated by crawling but not yet solved):** see skill.md workflow.
-  C Level-1 set is fully solved; Levels/tiers 2-4 and the Python / Java / C++ / SQL packs
-  are the next targets once the **Level 1/2/3/4 → section mapping** is re-confirmed with
-  a fresh cookie (`tools/enum.py <idx>`, pack indexes in skill.md §1).
+- **Pending:** see skill.md workflow. The C **Level 1** (CODETUTOR) language-pack
+  sets are mostly solved; the other 6-level platform tracks (Level 2 KICKSTART,
+  Level 3 MNC companies, Level 4 DSA, Level 5 Product companies, Level 6 Dream
+  companies, Prime/LACS/LAB) and the Java / Python / C++ / SQL / DS packs are the
+  next targets (`tools/enum.py <idx>`, pack indexes in skill.md §1).
 
 ## Language coverage
 
@@ -24,16 +30,17 @@
 
 ## Pack / level inventory
 
-| Pack (idx) | Level set | Status |
-|-----------|-----------|--------|
-| 0 C | Level 1 (EASY-ADD-ON set) | ✅ SOLVED (183 files) |
-| 0 C | Level 2 / 3 / 4 | ⏳ PENDING — needs fresh-cookie enumeration |
-| 1 Java | all | ⏳ PENDING |
-| 2 Python | all | ⏳ PENDING |
-| 3 C++ | all | ⏳ PENDING |
-| 4 SQL | all | ⏳ PENDING |
-| 5 Data Structures in C | all | ⏳ PENDING |
-| 6 Data Structures in Java | all | ⏳ PENDING |
+| Level | Content | Status |
+|-------|---------|--------|
+| 1 — CODETUTOR | 7 language packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges incl. INTRO, STARTER, 50 VERY-EASY, 50 EASY, 50 EASY ADD-ON, 50 AVERAGE, LAB ADD-ON; some problems are MFIB fill-in-the-blank | 🔄 C VERY-EASY/EASY sets SOLVED (183 files); rest ⏳ |
+| 2 — CODETRACK lev=2 | KICKSTART for ABSOLUTE Beginner | ⏳ PENDING |
+| 3 — CODETRACK lev=3 | MNC Companies (TCS/CTS/WIPRO/INFOSYS): COGNIZANT CTS - 35 PROGRAMS · InfyTQ Programs · MNC COMPANIES PROGRAMS | ⏳ PENDING |
+| 4 — CODETRACK lev=4 | Data Structures & Algorithms | ⏳ PENDING |
+| 5 — CODETRACK lev=5 | Product Companies (Higher Salary) — 10 SETs of 10 programs | ⏳ PENDING |
+| 6 — CODETRACK lev=6 | Dream Product Companies (Very High Salary) + Mini Projects | ⏳ PENDING |
+| Prime — CODETRACK lev=100 | Dream Companies Placement Pack | ⏳ PENDING |
+| LACS — webinarcodetrack | Webinar code track | ⏳ PENDING |
+| LAB — labcodeprograms | LAB programs | ⏳ PENDING |
 
 ## All solved problems (183)
 

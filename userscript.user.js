@@ -2971,7 +2971,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 font-family: 'VT323', monospace;
                 outline: none;
             ">
-            <div style="color:#52525b;font-size:14.5px;margin-top:5px;font-family:'VT323',monospace;">Userscript fetches <span style="color:#71717a;">{url}/solutions/{ProgramID}.md</span>. The server can be Node.js/Python (e.g. <span style="color:#71717a;">npx http-server solutions</span>).</div>
+            <div style="color:#52525b;font-size:14.5px;margin-top:5px;font-family:'VT323',monospace;">Default: this repo's GitHub raw URL — <span style="color:#71717a;">{url}/solutions/{ProgramID}.md</span>, no server needed. For dev/testing, set <span style="color:#71717a;">http://localhost:3000</span> and run <span style="color:#71717a;">node solutions-server.js</span> (serves <span style="color:#71717a;">/solutions/{ProgramID}.md</span>).</div>
         `;
         const localServerUrlInput = localServerUrlWrapper.querySelector('input');
         localServerUrlInput.addEventListener('input', (e) => {
@@ -9749,7 +9749,7 @@ SOLVING APPROACH:
         async function runFullCrawl() {
             if (currentState === STATE.SCANNING) return;
             setState(STATE.SCANNING);
-            showStatus('Starting full scan...', '🔍');
+            showStatus('Starting full scan...');
             renderScanningState();
 
             activeController = new AbortController();
@@ -9761,7 +9761,7 @@ SOLVING APPROACH:
                 for (let i = 0; i < levels.length; i++) {
                     const levelName = levels[i];
                     const levelUrl = LEVEL_URLS[levelName];
-                    showStatus(`Scanning ${levelName}...`, '🔍');
+                    showStatus(`Scanning ${levelName}...`);
                     updateLoadingMessage(`Scanning ${levelName}...`);
 
                     const levelParts = await crawlPage(
@@ -9771,7 +9771,7 @@ SOLVING APPROACH:
                         [levelName],
                         [],
                         (msg) => {
-                            showStatus(msg, '🔍');
+                            showStatus(msg);
                             updateLoadingMessage(msg);
                         }
                     );
@@ -9785,7 +9785,7 @@ SOLVING APPROACH:
                     allParts = allParts.concat(levelParts);
                 }
 
-                showStatus('Fetching solved counts...', '📊');
+                showStatus('Fetching solved counts...');
                 updateLoadingMessage('Fetching solved counts...');
                 const solvedCounts = await getSolvedCounts();
 
@@ -9808,7 +9808,7 @@ SOLVING APPROACH:
                 storage.setValue('find_incomplete_cache_v2', JSON.stringify(cacheData));
 
                 setState(STATE.IDLE);
-                showStatus('Scan completed! 🎉', '✅');
+                showStatus('Scan completed!', 'done');
                 setTimeout(hideStatus, 3000);
 
                 if (dropdown && dropdown.style.display === 'block' && dropdown.style.opacity !== '0') {
@@ -9822,7 +9822,7 @@ SOLVING APPROACH:
                     return;
                 }
                 setState(STATE.ERROR);
-                showStatus(`Scan failed: ${err.message}`, '❌');
+                showStatus('Scan failed: ' + err.message, 'error');
                 renderErrorState(err.message);
                 setTimeout(hideStatus, 6000);
             } finally {
@@ -9908,7 +9908,7 @@ SOLVING APPROACH:
         async function startNavigation(item) {
             if (currentState === STATE.NAVIGATING) return;
             setState(STATE.NAVIGATING);
-            showStatus(`Navigating to ${item.partName}...`, '🚀');
+            showStatus(`Navigating to ${item.partName}...`);
             hideDropdown();
 
             try {
@@ -9974,7 +9974,7 @@ SOLVING APPROACH:
                 setState(STATE.IDLE);
             } catch (err) {
                 setState(STATE.IDLE);
-                showStatus(`Navigation failed: ${err.message}`, '❌');
+                showStatus(`Navigation failed: ${err.message}`, 'error');
                 setTimeout(hideStatus, 5000);
             }
         }
@@ -10140,7 +10140,7 @@ SOLVING APPROACH:
             const refreshBtn = document.createElement('div');
             refreshBtn.id = 'find-inc-refresh-btn';
             refreshBtn.style.cssText = 'text-align: center; padding: 10px 0; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); color: #63b3ed; cursor: pointer; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;';
-            refreshBtn.innerHTML = '🔄 Force Re-Crawl & Refresh';
+            refreshBtn.innerHTML = 'Force Re-Crawl & Refresh';
             refreshBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 loadAndRenderTracks(true);
@@ -10152,8 +10152,8 @@ SOLVING APPROACH:
             if (!dropdown) return;
             dropdown.innerHTML = `
                 <div style="text-align: center; padding: 30px 15px;">
-                    <div style="font-size: 24px; margin-bottom: 12px; animation: spin 2s linear infinite; display: inline-block;">🔄</div>
-                    <div id="find-inc-loading-msg" style="font-size: 15px; color: #a1a1aa;">Starting scan...</div>
+                    <div class="find-inc-spinner"></div>
+                    <div id="find-inc-loading-msg" class="find-inc-spinner-label">Starting scan...</div>
                     <div style="margin-top: 12px; font-size: 11px; color: #71717a;">Please wait, rate-limiting is active to ensure safety.</div>
                     <div id="find-inc-cancel-btn" style="margin-top: 16px; font-size: 13px; color: #f87171; cursor: pointer; text-decoration: underline;">Cancel Scan</div>
                 </div>
@@ -10171,7 +10171,9 @@ SOLVING APPROACH:
             if (!dropdown) return;
             dropdown.innerHTML = `
                 <div style="text-align: center; padding: 30px 15px;">
-                    <div style="font-size: 24px; margin-bottom: 12px;">❌</div>
+                    <div style="width:40px;height:4px;margin:0 auto 12px;border-radius:2px;background:rgba(239,68,68,0.25);overflow:hidden;">
+                        <div style="width:40%;height:100%;background:#f87171;border-radius:2px;animation:slide 1.1s ease-in-out infinite;"></div>
+                    </div>
                     <div style="font-size: 15px; color: #f87171; font-weight: 600;">Scan Failed</div>
                     <div style="margin-top: 8px; font-size: 13px; color: #a1a1aa; max-height: 80px; overflow-y: auto;">${msg}</div>
                     <div id="find-inc-retry-btn" style="margin-top: 16px; font-size: 13px; color: #63b3ed; cursor: pointer; text-decoration: underline;">Try Again</div>
@@ -10190,7 +10192,7 @@ SOLVING APPROACH:
             if (!dropdown) return;
             dropdown.innerHTML = `
                 <div style="text-align: center; padding: 24px 12px;">
-                    <div style="font-size: 24px; margin-bottom: 8px;">🔍</div>
+                    <div class="find-inc-spinner" style="width:30px;height:30px;border-width:3px;"></div>
                     <div style="font-size: 15px; color: #a1a1aa; margin-bottom: 12px;">No Scraped Data Found</div>
                     <div style="font-size: 12px; color: #71717a; margin-bottom: 16px; line-height: 1.4;">
                         Please run a scan to discover and list all incomplete tracks.
@@ -10245,7 +10247,16 @@ SOLVING APPROACH:
         // Expose function for updating status Panel
         function showStatus(msg, icon) {
             ensureStatusPanel();
-            statusText.textContent = (icon ? icon + '  ' : '') + msg;
+            const showSpinner = !icon || icon !== 'done' && icon !== 'error';
+            if (showSpinner && !statusPanel.querySelector('.find-inc-spinner')) {
+                const sp = document.createElement('div');
+                sp.className = 'find-inc-spinner';
+                sp.style.cssText = 'width:16px;height:16px;margin:0 8px 0 0;border-width:2px;display:inline-block;vertical-align:middle;';
+                statusPanel.insertBefore(sp, statusText);
+            }
+            const spinnerEl = statusPanel.querySelector('.find-inc-spinner');
+            if (spinnerEl) spinnerEl.style.display = showSpinner ? 'inline-block' : 'none';
+            statusText.textContent = msg;
             statusPanel.style.display = 'block';
             statusPanel.style.opacity = '1';
         }
@@ -10266,6 +10277,29 @@ SOLVING APPROACH:
                 @keyframes spin {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
+                }
+                .find-inc-spinner {
+                    width: 34px;
+                    height: 34px;
+                    margin: 0 auto 14px;
+                    border: 3px solid rgba(99, 179, 237, 0.2);
+                    border-top-color: #63b3ed;
+                    border-radius: 50%;
+                    animation: spin 0.9s linear infinite;
+                }
+                .find-inc-spinner-label {
+                    font-size: 13px;
+                    color: #a1a1aa;
+                    text-align: center;
+                    animation: pulse 1.6s ease-in-out infinite;
+                }
+                @keyframes pulse {
+                    0%, 100% { opacity: 0.55; }
+                    50% { opacity: 1; }
+                }
+                @keyframes slide {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(250%); }
                 }
                 .find-inc-item {
                     display: flex;
