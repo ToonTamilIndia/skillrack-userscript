@@ -1,12 +1,36 @@
-# Anti-Cheat Bypass Userscript
+# SkillRack Solution Bank — Beat Every Challenge, Together
 
-A Tampermonkey/Greasemonkey userscript that bypasses common anti-cheat mechanisms on SkillRack.
+> **Crowd-solve it once, everyone gets it.** This repo pairs a
+> **[`SKILL.md`](skill.md)** playbook with a **[`solutions/`](solutions/)** answer
+> bank (keyed by SkillRack `ProgramID`) and the **[Tampermonkey userscript](userscript.user.js)**
+> that auto-loads those answers into the editor — from this repo itself, from a
+> local server, or from AI. Contributors add verified solutions; [SKILL.md](skill.md)
+> documents the whole scraping/verification workflow.
 
-## ⚠️ Important Warnings
+> ⚠️ **Please disable the script during live invigilated tests** — continuing to
+> run it mid-test may have unintended effects. Use at your own academic discretion.
 
-> **⚠️ Please disable the script if you are attending a test as it might lead to unintended effects.**
+---
 
-> **⚠️ Attempting to navigate the page while the captcha solver is running may lead to unintended effects. If it gets stuck in a loop, closing and opening the tabs will fix it.**
+## 🧠 The Event / Collaboration
+
+- **Rail:** [`skill.md`](skill.md) — the playbook (site structure, tooling, pitfalls).
+- **Bank:** [`solutions/<ProgramID>.md`](solutions/) — one markdown file per solved problem.
+- **Tools:** [`tools/`](tools/) — enumerate → fetch → verify (C, C++, Java, Python).
+- **Users submit answers** by adding `solutions/<id>.md` (format + contract in
+  [`skill.md` §2](skill.md)). A passing `verify` line is the acceptance bar.
+- The userscript pulls answers live from
+  `raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
+  (Settings → "Solved Solutions"), with local-server and AI fallbacks.
+- **Contribute:** fork → `add/<id>` branch → add file → generate samples with
+  `tools/fetch.py <enum.json> 0 --out /tmp/sack_stmts.json`, then
+  `tools/verify.py solutions/<id>.md /tmp/sack_stmts.json` → PR.
+
+---
+
+# Anti-Cheat Bypass Userscript (the client)
+
+A Tampermonkey/Greasemonkey userscript for SkillRack with AI solution generation and the walkthrough above.
 
 ---
 

@@ -1,0 +1,9 @@
+# Internal notes for AI / maintainer — NOT committed
+context.md
+
+# Findings / proofs-of-concept — NOT committed (dev output)
+docs/
+
+# Working scripts/data (live-crawl scrapes, verify harness, batches) — kept on
+# disk so they survive /tmp auto-deletion, but NOT committed
+tools/cookie.txt

@@ -647,6 +647,15 @@ Compare the output character-by-character against the expected sample outputs (i
         autoSolverDelay: 500,
         // ==========================================
 
+        // ========== SOLUTIONS SOURCE SETTINGS (solutions/*.md) ==========
+        // Fetches solved solutions by <ProgramID>.md, either from the GitHub
+        // repo (raw.githubusercontent.com — no local server needed) or from a
+        // self-hosted local server (Node/Python serving the solutions/ dir).
+        enableLocalServer: false,
+        localServerUrl: "https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main",
+        localServerTimeout: 5000,
+        // ============================================
+
         // ========== FIND INCOMPLETE SETTINGS ==========
         enableFindIncomplete: true,
         // ===============================================
@@ -665,6 +674,10 @@ Compare the output character-by-character against the expected sample outputs (i
                 if (merged.openaiCompatApiUrl === undefined && merged.yuppbridgeApiUrl !== undefined) merged.openaiCompatApiUrl = merged.yuppbridgeApiUrl;
                 if (merged.openaiCompatApiKey === undefined && merged.yuppbridgeApiKey !== undefined) merged.openaiCompatApiKey = merged.yuppbridgeApiKey;
                 if (merged.openaiCompatModel === undefined && merged.yuppbridgeModel !== undefined) merged.openaiCompatModel = merged.yuppbridgeModel;
+                // Migrate: ensure new local-server settings exist
+                if (merged.enableLocalServer === undefined) merged.enableLocalServer = false;
+                if (merged.localServerUrl === undefined) merged.localServerUrl = "https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main";
+                if (merged.localServerTimeout === undefined) merged.localServerTimeout = 5000;
                 return merged;
             }
         } catch (e) {
@@ -2938,6 +2951,40 @@ Compare the output character-by-character against the expected sample outputs (i
             });
         }
         panelContent.appendChild(autoSolverToggle);
+
+        // Solutions source toggle (solutions/<ProgramID>.md from GitHub / local server)
+        const localServerToggle = createToggle('enableLocalServer', 'Solved Solutions (GitHub / Local Server)', SETTINGS.enableLocalServer, 'Fetch solutions/<ProgramID>.md from the GitHub repo (raw.githubusercontent.com) or a self-hosted server first, fall back to AI if missing');
+        panelContent.appendChild(localServerToggle);
+        const localServerUrlWrapper = document.createElement('div');
+        localServerUrlWrapper.style.cssText = `padding: 9px 2px; border-bottom: 1px solid rgba(255,255,255,0.05); display: ${SETTINGS.enableLocalServer ? 'block' : 'none'};`;
+        localServerUrlWrapper.innerHTML = `
+            <div style="color: #a1a1aa; font-size: 15px; font-weight: 600; font-family: 'VT323',monospace; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px;">Solutions Base URL</div>
+            <input type="text" id="localServerUrl" value="${SETTINGS.localServerUrl}" placeholder="https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main" style="
+                width: 100%;
+                padding: 8px 10px;
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 8px;
+                background: rgba(255,255,255,0.05);
+                color: #e4e4e7;
+                font-size: 16px;
+                box-sizing: border-box;
+                font-family: 'VT323', monospace;
+                outline: none;
+            ">
+            <div style="color:#52525b;font-size:14.5px;margin-top:5px;font-family:'VT323',monospace;">Userscript fetches <span style="color:#71717a;">{url}/solutions/{ProgramID}.md</span>. The server can be Node.js/Python (e.g. <span style="color:#71717a;">npx http-server solutions</span>).</div>
+        `;
+        const localServerUrlInput = localServerUrlWrapper.querySelector('input');
+        localServerUrlInput.addEventListener('input', (e) => {
+            SETTINGS.localServerUrl = e.target.value.trim();
+            saveSettings(SETTINGS);
+        });
+        panelContent.appendChild(localServerUrlWrapper);
+        const localServerCheckbox = localServerToggle.querySelector('input[type="checkbox"]');
+        if (localServerCheckbox) {
+            localServerCheckbox.addEventListener('change', (e) => {
+                localServerUrlWrapper.style.display = e.target.checked ? 'block' : 'none';
+            });
+        }
 
         // Find Incomplete toggle
         const findIncompleteToggle = createToggle('enableFindIncomplete', 'Incomplete Question', SETTINGS.enableFindIncomplete, 'Show incomplete tracks in the dropdown (requires scan)');
@@ -7289,6 +7336,83 @@ Compare the output character-by-character against the expected sample outputs (i
         return matches / Math.max(norm1.length, norm2.length);
     };
 
+    // ========== LOCAL SERVER HELPER: ProgramID extraction ==========
+    const getProgramId = () => {
+        const candidates = [];
+        document.querySelectorAll('.ui.label').forEach(label => {
+            if (label.classList.contains('ribbon') || label.classList.contains('circular') || label.classList.contains('image')) return;
+            candidates.push(label.textContent);
+        });
+        const sources = candidates.concat([document.body ? document.body.innerText : '']);
+        for (const src of sources) {
+            const m = src.match(/Program\s*ID\s*[:#-]?\s*(\d{2,})/i);
+            if (m) return m[1];
+        }
+        return null;
+    };
+
+    // ========== LOCAL SERVER HELPER: strip pre/post code from answer ==========
+    // .md files may hold the FULL solution; when the page has pre/post code,
+    // answer ONLY the middle portion that the editor expects.
+    const stripPrePostCode = (fullCode, preCode, postCode) => {
+        let code = fullCode;
+        if (preCode) {
+            const trimmedPre = preCode.trim();
+            const idx = code.indexOf(trimmedPre);
+            if (idx !== -1) {
+                code = code.slice(0, idx) + code.slice(idx + trimmedPre.length);
+            } else if (code.trim().startsWith(trimmedPre)) {
+                code = code.slice(trimmedPre.length);
+            }
+        }
+        if (postCode) {
+            const trimmedPost = postCode.trim();
+            const idx = code.lastIndexOf(trimmedPost);
+            if (idx !== -1) {
+                code = code.slice(0, idx);
+            }
+        }
+        return code.trim();
+    };
+
+    // ========== LOCAL SERVER / GITHUB HELPER: fetch solution ==========
+    const generateWithLocalServer = async () => {
+        const pid = getProgramId();
+        if (!pid) throw new Error('No ProgramID found on page');
+
+        const base = (SETTINGS.localServerUrl || DEFAULT_SETTINGS.localServerUrl).replace(/\/+$/, '');
+
+        // If it's a GitHub raw URL, also try the other branch (main <-> master)
+        const candidates = [base];
+        if (/raw\.githubusercontent\.com\//.test(base)) {
+            if (base.includes('/main')) candidates.push(base.replace('/main', '/master'));
+            else if (base.includes('/master')) candidates.push(base.replace('/master', '/main'));
+        }
+
+        let lastErr = null;
+        for (const b of candidates) {
+            const url = `${b}/solutions/${pid}.md`;
+            try {
+                const raw = await fetchWithTimeout(url, { cache: 'no-store' }, SETTINGS.localServerTimeout || 5000);
+                const codeMatch = raw.match(/```[a-zA-Z0-9_+-]*\n?([\s\S]*?)```/);
+                if (!codeMatch) throw new Error(`No code block found in ${pid}.md`);
+
+                let code = codeMatch[1].trim();
+                const problem = getProblemDescription();
+                if (problem.preCode || problem.postCode) {
+                    code = stripPrePostCode(code, problem.preCode, problem.postCode);
+                }
+                if (!code || code.trim().length < 10) throw new Error('Solution in ' + pid + '.md was empty');
+
+                console.log(`[Solutions] Used ${url}`, problem.preCode || problem.postCode ? '(middle-only after pre/post strip)' : '(full solution)');
+                return code;
+            } catch (e) {
+                lastErr = e;
+            }
+        }
+        throw lastErr || new Error('Solution fetch failed');
+    };
+
     // ==========  generateAISolution FUNCTION ==========
     const generateAISolution = async () => {
         if (!SETTINGS.enableAISolver) return;
@@ -7363,6 +7487,29 @@ Compare the output character-by-character against the expected sample outputs (i
                 aiBtn.style.opacity = '1';
             }
             console.log('[AI] Built-in solution not found for', langKey, '— falling through to AI');
+        }
+
+        // ========== Try Local Server (solutions/*.md) first ==========
+        if (SETTINGS.enableLocalServer && !problem.isMFIB) {
+            try {
+                const localCode = await generateWithLocalServer();
+                if (localCode && localCode.trim().length >= 10) {
+                    const injected = injectCodeToActiveEditor(localCode);
+                    if (injected) {
+                        console.log('[Solutions] Solution inserted successfully from GitHub/local server');
+                        const lsBtn = document.getElementById('ai-solution-btn');
+                        if (lsBtn) {
+                            lsBtn.disabled = false;
+                            lsBtn.innerHTML = getAiButtonMarkup('AI Solution');
+                            lsBtn.style.opacity = '1';
+                        }
+                        isAiGenerationInProgress = false;
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('[LocalServer] Failed — falling back to AI:', e.message);
+            }
         }
 
         const errorInfo = getErrorInfo();  // NEW: Check for errors
