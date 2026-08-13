@@ -12,8 +12,15 @@ import os, re, subprocess, pickle
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRATCH = os.environ.get('SACK_SCRATCH', os.path.join(REPO, 'tools', '.scratch'))
 UA = 'Mozilla/5.0'
-BASE = 'https://skillrack.com/faces/candidate/codeprogramgroup.xhtml?gt=CODETUTOR'
+CODETUTOR = 'https://skillrack.com/faces/candidate/codeprogramgroup.xhtml?gt=CODETUTOR'
+CODETRACK = 'https://skillrack.com/faces/candidate/codeprogramgroup.xhtml?gt=CODETRACK&lev={lev}'
 CODENV = 'https://skillrack.com/faces/candidate/codeprogram.xhtml'
+BASE = CODETUTOR
+
+
+def base_for(lev):
+    """Level-aware base page: lev=2..6 or 100 (Prime) -> CODETRACK, else CODETUTOR."""
+    return CODETRACK.format(lev=lev) if lev else CODETUTOR
 
 
 def ensure_scratch():

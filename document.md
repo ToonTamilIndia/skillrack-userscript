@@ -10,17 +10,21 @@
 > (run `node solutions-server.js`); AI is the final fallback.
 >
 > All solved problems are **C** (CODETUTOR pack 0, the 50 VERY-EASY / EASY sets).
-> The platform has **6 levels + extras** (see the inventory table); every other
-> pack/level is PENDING until enumerated with a live session cookie (see skill.md §1).
+> The platform has **6 levels + extras** (see the inventory table); Levels 1-4 are
+> enumerated with a live session cookie (see skill.md §1), Levels 5/6/Prime are
+> wallet-gated kits and expose no problem IDs in their lists.
 
 ## Current status
 
 - **Solved (committed solution file exists):** 183
-- **Pending:** see skill.md workflow. The C **Level 1** (CODETUTOR) language-pack
-  sets are mostly solved; the other 6-level platform tracks (Level 2 KICKSTART,
-  Level 3 MNC companies, Level 4 DSA, Level 5 Product companies, Level 6 Dream
-  companies, Prime/LACS/LAB) and the Java / Python / C++ / SQL / DS packs are the
-  next targets (`tools/enum.py <idx>`, pack indexes in skill.md §1).
+- **Enumerated with a live session cookie (`tools/.scratch/enum/`):** Level 1 C pack = 543
+  unique problems; Level 2 = 5; Level 3 = 207; Level 4 = 25. **Levels 5/6/Prime are
+  wallet-gated kits** — they expose only a names-only preview, so unsolved IDs must be
+  captured from the `viewsolved` / solve pages rather than the kit list.
+- **Pending:** see skill.md workflow. The C **Level 1** (CODETUTOR) language-pack sets
+  are mostly solved; the enumerated Level 2/3/4 problems (232 total) and the Java /
+  Python / C++ / SQL / DS packs are the next solve targets (`tools/enum.py <idx>`,
+  pack indexes in skill.md §1).
 
 ## Language coverage
 
@@ -33,12 +37,12 @@
 | Level | Content | Status |
 |-------|---------|--------|
 | 1 — CODETUTOR | 7 language packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges incl. INTRO, STARTER, 50 VERY-EASY, 50 EASY, 50 EASY ADD-ON, 50 AVERAGE, LAB ADD-ON; some problems are MFIB fill-in-the-blank | 🔄 C VERY-EASY/EASY sets SOLVED (183 files); rest ⏳ |
-| 2 — CODETRACK lev=2 | KICKSTART for ABSOLUTE Beginner | ⏳ PENDING |
-| 3 — CODETRACK lev=3 | MNC Companies (TCS/CTS/WIPRO/INFOSYS): COGNIZANT CTS - 35 PROGRAMS · InfyTQ Programs · MNC COMPANIES PROGRAMS | ⏳ PENDING |
-| 4 — CODETRACK lev=4 | Data Structures & Algorithms | ⏳ PENDING |
-| 5 — CODETRACK lev=5 | Product Companies (Higher Salary) — 10 SETs of 10 programs | ⏳ PENDING |
-| 6 — CODETRACK lev=6 | Dream Product Companies (Very High Salary) + Mini Projects | ⏳ PENDING |
-| Prime — CODETRACK lev=100 | Dream Companies Placement Pack | ⏳ PENDING |
+| 2 — CODETRACK lev=2 | KICKSTART for ABSOLUTE Beginner → **Recursion** sub-challenge (5 unsolved) | ⏳ 5 unsolved enumerated |
+| 3 — CODETRACK lev=3 | MNC Companies (TCS/CTS/WIPRO/INFOSYS): COGNIZANT CTS - 35 PROGRAMS (10 unsolved, e.g. 6679, 6681-6689) · InfyTQ Programs (all solved) · MNC COMPANIES PROGRAMS (SET 001-020, 197 unsolved) | ⏳ 207 unsolved enumerated |
+| 4 — CODETRACK lev=4 | Data Structures & Algorithms — Stack / Queue / Binary Tree / Sorting (25 unsolved) | ⏳ 25 unsolved enumerated |
+| 5 — CODETRACK lev=5 | Product Companies (Higher Salary) — **wallet-gated KIT**; page shows a names-only "Programs List" preview (Step Number [ZH], Array LEADERS (ZH), …) with **no problem IDs**; scheduling needs wallet points (balance 0) | 🔒 wallet-gated — capture IDs from `viewsolved`/solve pages instead |
+| 6 — CODETRACK lev=6 | Dream Product Companies (Very High Salary) + Mini Projects — **wallet-gated KIT**, names-only preview | 🔒 wallet-gated |
+| Prime — CODETRACK lev=100 | Dream Companies Placement Pack — **wallet-gated KIT**, names-only preview | 🔒 wallet-gated |
 | LACS — webinarcodetrack | Webinar code track | ⏳ PENDING |
 | LAB — labcodeprograms | LAB programs | ⏳ PENDING |
 

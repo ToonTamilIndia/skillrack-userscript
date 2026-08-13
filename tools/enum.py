@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Enumerate unsolved problems for a language pack.
+"""Enumerate unsolved problems for a language/level page.
 
-Usage: python3 enum.py <pack_index> [--json <out.json>]
+Usage: python3 enum.py <pack_or_level> [--json <out.json>]
+       python3 enum.py 0            # CODETUTOR pack 0 (C)
+       python3 enum.py 3 --lev 3    # CODETRACK level 3
 
-pack_index (CODETUTOR):
+CODETUTOR pack_index:
   0 = C         1 = Java         2 = Python
   3 = C++       4 = SQL          5 = Data Structures in C
   6 = Data Structures in Java
+
+CODETRACK level (--lev): 2..6, or 100 for Prime.
 
 Flow (PrimeFaces POSTs, each with its own form-scoped ViewState):
   BASE page -> POST pack button (pkglistform form)
@@ -94,10 +98,14 @@ def extract_problems(part_html):
 
 def main():
     pack = int(sys.argv[1])
+    lev = None
+    if '--lev' in sys.argv:
+        lev = int(sys.argv[sys.argv.index('--lev') + 1])
+        sack.BASE = sack.base_for(lev)
     outjson = None
     if '--json' in sys.argv:
         outjson = sys.argv[sys.argv.index('--json') + 1]
-    print('Pack', pack, '=', PACKS.get(pack), flush=True)
+    print('Pack', pack, '=', PACKS.get(pack), '| lev =', lev, flush=True)
     sack.get(sack.BASE, name='root.html')  # warm session
     body = pack_open(open(sack.scratch('root.html')).read(), pack)
     if 'Expired' in body or 'j_security_check' in body or len(body) < 5000:

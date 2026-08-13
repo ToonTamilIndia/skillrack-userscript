@@ -27,13 +27,13 @@
 
   | Level | URL `gt=` | Content |
   |-------|-----------|---------|
-  | Level 1 | `CODETUTOR` | 7 **language** packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges (INTRO, STARTER, 50 VERY-EASY / EASY / EASY ADD-ON / AVERAGE, LAB ADD-ON, practice, videos). Some problems are **MFIB (fill-in-the-blank)** — the userscript detects and answers those too. |
-  | Level 2 | `CODETRACK&lev=2` | KICKSTART for ABSOLUTE Beginner |
-  | Level 3 | `CODETRACK&lev=3` | **MNC Companies** (TCS/CTS/WIPRO/INFOSYS) → 3 sub-options, each with its own question set: COGNIZANT CTS - 35 PROGRAMS, InfyTQ Programs, MNC COMPANIES PROGRAMS |
-  | Level 4 | `CODETRACK&lev=4` | Data Structures & Algorithms |
-  | Level 5 | `CODETRACK&lev=5` | Product Companies (Higher Salary) → 10 SETs of 10 programs each |
-  | Level 6 | `CODETRACK&lev=6` | Dream Product Companies (Very High Salary) + Mini Projects |
-  | Prime | `CODETRACK&lev=100` | Dream Companies Placement Pack |
+  | Level 1 | `CODETUTOR` | 7 **language** packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges (INTRO, STARTER, 50 VERY-EASY / EASY / EASY ADD-ON / AVERAGE, LAB ADD-ON, practice, videos). Some problems are **MFIB (fill-in-the-blank)** — the userscript detects and answers those too. Enumerated: C pack = **543 unique unsolved** across 18 sections/55 parts. |
+  | Level 2 | `CODETRACK&lev=2` | KICKSTART for ABSOLUTE Beginner → sub-challenge **Recursion** (5 unsolved). |
+  | Level 3 | `CODETRACK&lev=3` | **MNC Companies** (TCS/CTS/WIPRO/INFOSYS) → COGNIZANT CTS - 35 PROGRAMS (10 unsolved), InfyTQ Programs (solved), MNC COMPANIES PROGRAMS SET 001-020 (**197 unsolved**, 207 total). |
+  | Level 4 | `CODETRACK&lev=4` | Data Structures & Algorithms → Stack / Queue / Binary Tree / Sorting (**25 unsolved**). |
+  | Level 5 | `CODETRACK&lev=5` | Product Companies (Higher Salary) → 10 SETs, but **wallet-gated KIT**: the list page shows only a names-only "Programs List" preview (Step Number [ZH], Array LEADERS (ZH), …) with **no problem IDs**; scheduling requires wallet points (balance 0). Capture IDs from the `viewsolved` / solve pages instead. |
+  | Level 6 | `CODETRACK&lev=6` | Dream Product Companies (Very High Salary) + Mini Projects — **wallet-gated KIT**, names-only preview. |
+  | Prime | `CODETRACK&lev=100` | Dream Companies Placement Pack — **wallet-gated KIT**, names-only preview. |
   | LACS | `webinarcodetrack.xhtml` | Webinar code track |
   | LAB | `labcodeprograms.xhtml?type=LAB` | LAB programs |
 
