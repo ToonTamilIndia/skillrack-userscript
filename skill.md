@@ -22,6 +22,12 @@
 - Each pack = ~23 sub-challenges (`pkglistform:j_id_49:<sidx>:j_id_4h`), each with
   parts (`cttbl:<row>:j_id_4u`) and each part shows **only the unsolved problems**
   (`pctbl:<row>:j_id_5w`). The list is LIVE/rotating — solve one and it disappears.
+- **"Level 1/2/3/4" mapping:** the C pack's difficulty tiers appear as sub-challenge
+  names — `50 VERY-EASY`, `50 EASY`, `50 EASY ADD-ON`, `50 AVERAGE` (plus INTRO,
+  STARTER, course, practice, video sections). The exact Level→section table must be
+  confirmed per-account by `tools/enum.py <idx>` (re-enumerate before every bulk
+  solve; the unsolved list is live and the sections that expose "View" change as
+  you clear them).
 - Every click is a PrimeFaces POST carrying its own `jakarta.faces.ViewState`
   (fresh per page/form — `tools/sack.py` extracts it from the last response).
 - The problem page shows the full statement + samples WITHOUT solving a captcha;
@@ -57,7 +63,9 @@ Verified: `<sample input> → <sample output>`
    `python3 tools/verify.py solutions/<id>.md /tmp/sack_stmts.json`
    - C/C++ compile w/ `gcc`/`g++ -w -O2`; Java `javac`; Python `python3`.
    - Exit 0 = all samples PASS. Iterate until green.
-5. Commit the `.md` (see §5). That's the whole contribution.
+5. Update the tracker: `python3 tools/status.py /tmp/sack_stmts.json --md document.md`
+   (regenerates the solved/pending report).
+6. Commit the `.md` (see §5). That's the whole contribution.
 
 ## 4. Verification pitfalls (read before trusting a FAIL)
 
@@ -74,7 +82,8 @@ Verified: `<sample input> → <sample output>`
   `Verified` line reflects a real run; never edit someone else's file without
   adding a note; no personal data, no cookies in any committed file.
 - **Flow:** fork → branch `add/<id>` → add `solutions/<id>.md` → run
-  `verify.py` → PR. A passing verify line in the PR body is the acceptance bar.
+  `verify.py` → update the tracker (`tools/status.py --md document.md`) → PR.
+  A passing verify line in the PR body is the acceptance bar.
 - The repo's userscript auto-pulls solved answers straight from this repo
   (`raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`),
   with a fallback to a self-hosted local server and then AI. So a merged

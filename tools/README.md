@@ -12,6 +12,7 @@ No third-party Python deps; uses `curl`, `gcc`/`g++`/`javac`/`python3` for code.
 | `verify.py` | compile & test a `solutions/<id>.md` against recorded samples |
 | `compile.py` | language-aware compile/run (C, C++, Java, Python) |
 | `mkbatch.py` | split ids into parallel solve batches |
+| `status.py` | inventory + tracker: solved vs pending, per-language/section, writes `document.md` |
 | `cookie.txt` | **your** session cookie — never committed |
 | `data/` | scraped statement/sample caches — gitignored |
 
@@ -28,7 +29,9 @@ python3 tools/enum.py 0 --json /tmp/sack_c_enum.json    # enumerate C pack
 python3 tools/fetch.py /tmp/sack_c_enum.json 0 --out /tmp/sack_c_stmts.json
 python3 tools/mkbatch.py /tmp/sack_c_stmts.json --n 8 --outdir /tmp/sack_batches
 # solve each batch (see ../skill.md) writing solutions/<id>.md
-python3 tools/verify.py solutions/6650.md /tmp/sack_c_stmts.json
+python3 tools/verify.py solutions/6650.md /tmp/sack_stmts.json
+python3 tools/status.py /tmp/sack_stmts.json          # solved vs pending
+python3 tools/status.py --md document.md              # regenerate the tracker
 ```
 
 ## Crawl caveats
