@@ -118,6 +118,11 @@ Verified: `<sample input> → <sample output>`
   `Dharaneeshwar/Cognizant-CTS-PATTERN-PROGRAMS`); where our version diverged from
   the reference (signature/return-type or include issues), it was corrected to the
   judge's contract (e.g. `findMinElement` returns an `int*` of both minima).
+  A wider sweep cloned 14 SkillRack solution repos (incl.
+  `Priyadharshini-06-04/Skillrack-Level-3-MNC-Companies-program-set1|set2` — the
+  same Level-3 MNC set) and cross-verified all 207 names; 14 exact matches were
+  compared, 13 confirmed equivalent to our bank, and `findSequence` (12058) was
+  realigned to the reference convention (decreasing prefix must be ≥ 2 elements).
 - Keep the solution bank moving: when a challenge rotates to a new unsolved set,
   re-enumerate (§3) and claim a batch.
 
