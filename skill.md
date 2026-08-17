@@ -74,16 +74,22 @@ Verified: `<sample input> → <sample output>`
    (CODETUTOR) or `python3 tools/fetchlev.py /tmp/sack_enum.json --lev <N> --out /tmp/sack_stmts.json`
    (CODETRACK; reuses enum's replay chain, one part per problem via the `part` field).
 3. Split: `python3 tools/mkbatch.py /tmp/sack_stmts.json --n 8 --outdir /tmp/sack_batches`
-4. Solve each batch (agents or humans), then verify:
+4. **Search online (GitHub) FIRST** — for each problem, search the web for the
+   exact problem name (e.g. `<problem name> skillrack solution`, CTF-style:
+   `site:github.com "<problem name>"`). If a matching reference solution is found,
+   use/cross-check it against the statement. **Only if nothing is found (or the
+   found reference fails) fall back to writing a solution from scratch / AI.** This
+   is the priority: GitHub search → verify → AI is the last-resort fallback.
+5. Solve each batch (agents or humans), then verify:
    `python3 tools/verify.py solutions/<id>.md /tmp/sack_stmts.json`
    - C/C++ compile w/ `gcc`/`g++ -w -O2`; Java `javac`; Python `python3`.
    - Exit 0 = all samples PASS. Iterate until green.
    - Function-style (no `main()`) problems can't link via verify.py — build a small
      harness `main()` that reads the sample input and calls the function; compare to
      `out_clean`; save only the function in the `.md`.
-5. Update the tracker: `python3 tools/status.py /tmp/sack_stmts.json --md document.md`
+6. Update the tracker: `python3 tools/status.py /tmp/sack_stmts.json --md document.md`
    (regenerates the solved/pending report).
-6. Commit the `.md` (see §5). That's the whole contribution.
+7. Commit the `.md` (see §5). That's the whole contribution.
 
 ## 4. Verification pitfalls (read before trusting a FAIL)
 
@@ -113,16 +119,13 @@ Verified: `<sample input> → <sample output>`
   panel (`getErrorInfo()`), skips re-injecting the same code, and hands the failing
   code + judge error (input/expected/actual) to the AI fixer. This applies to manual
   AI clicks and the ⚡ Auto Solver retry loop alike.
-- **Level 3 cross-check:** CTS/COGNIZANT answers (ids 6679-6689) were verified
-  CTF-style against GitHub problem-name matches (e.g.
-  `Dharaneeshwar/Cognizant-CTS-PATTERN-PROGRAMS`); where our version diverged from
-  the reference (signature/return-type or include issues), it was corrected to the
-  judge's contract (e.g. `findMinElement` returns an `int*` of both minima).
-  A wider sweep cloned 14 SkillRack solution repos (incl.
-  `Priyadharshini-06-04/Skillrack-Level-3-MNC-Companies-program-set1|set2` — the
-  same Level-3 MNC set) and cross-verified all 207 names; 14 exact matches were
-  compared, 13 confirmed equivalent to our bank, and `findSequence` (12058) was
-  realigned to the reference convention (decreasing prefix must be ≥ 2 elements).
+- **Search GitHub first (no hardcoded repo list):** for every problem, search the
+  web/GitHub by the exact problem name and cross-check the found reference against
+  the statement. Where our version diverged from the reference (signature/return
+  type, include issues, edge-case conventions), correct it to the judge's contract
+  (e.g. `findMinElement` returns an `int*` of both minima; `findSequence` requires
+  a ≥2-element strictly-decreasing prefix). AI is the last-resort fallback when no
+  reference exists or the reference fails.
 - Keep the solution bank moving: when a challenge rotates to a new unsolved set,
   re-enumerate (§3) and claim a batch.
 
