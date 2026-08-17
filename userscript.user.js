@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      6.0
+// @version      6.1
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -20,7 +20,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '6.0';
+    const SCRIPT_VERSION = '6.1';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -2953,7 +2953,7 @@ Compare the output character-by-character against the expected sample outputs (i
         panelContent.appendChild(autoSolverToggle);
 
         // Solutions source toggle (solutions/<ProgramID>.md from GitHub / local server)
-        const localServerToggle = createToggle('enableLocalServer', 'Solved Solutions (GitHub / Local Server)', SETTINGS.enableLocalServer, 'Fetch solutions/<ProgramID>.md from the GitHub repo (raw.githubusercontent.com) or a self-hosted server first, fall back to AI if missing');
+        const localServerToggle = createToggle('enableLocalServer', 'Solved Solutions (GitHub / Local Server)', SETTINGS.enableLocalServer, 'Fetch solutions/<ProgramID>.md from the GitHub repo (raw.githubusercontent.com) or a self-hosted server first, fall back to AI if missing — and if the saved answer fails the judge, AI fixes it');
         panelContent.appendChild(localServerToggle);
         const localServerUrlWrapper = document.createElement('div');
         localServerUrlWrapper.style.cssText = `padding: 9px 2px; border-bottom: 1px solid rgba(255,255,255,0.05); display: ${SETTINGS.enableLocalServer ? 'block' : 'none'};`;
@@ -7425,11 +7425,16 @@ Compare the output character-by-character against the expected sample outputs (i
         const language = getSelectedLanguage();
         const problem = getProblemDescription();
 
+        // Check for a prior run failure FIRST. If the previously injected solution
+        // (SkillRack built-in or GitHub/local-server .md) failed the judge, we must
+        // NOT re-inject the same failing code — fall straight through to the AI fix.
+        const errorInfo = getErrorInfo();
+
         // ========== Try View Solution first ==========
         const showBtn = document.getElementById('showbtn');
         const hideBtn = document.getElementById('hidebtn');
         const solutionAvailable = (showBtn && showBtn.style.display !== 'none') || (hideBtn && hideBtn.style.display !== 'none');
-        if (solutionAvailable) {
+        if (solutionAvailable && !errorInfo.hasError) {
             const aiBtn = document.getElementById('ai-solution-btn');
             if (aiBtn) {
                 aiBtn.disabled = true;
@@ -7490,7 +7495,9 @@ Compare the output character-by-character against the expected sample outputs (i
         }
 
         // ========== Try Local Server (solutions/*.md) first ==========
-        if (SETTINGS.enableLocalServer && !problem.isMFIB) {
+        // Skip when a previous run already failed: the same .md would fail again,
+        // so fall back to AI to actually fix the solution (user: "if it failed, AI fallback").
+        if (SETTINGS.enableLocalServer && !problem.isMFIB && !errorInfo.hasError) {
             try {
                 const localCode = await generateWithLocalServer();
                 if (localCode && localCode.trim().length >= 10) {
@@ -7512,7 +7519,9 @@ Compare the output character-by-character against the expected sample outputs (i
             }
         }
 
-        const errorInfo = getErrorInfo();  // NEW: Check for errors
+        if (errorInfo.hasError) {
+            console.log('[AI] Previous solution failed the judge — skipping saved/built-in code, using AI to fix it');
+        }
 
         if (!problem.title && !problem.description && !errorInfo.hasError) {
             notifyPopup('Could not find problem description on this page.');

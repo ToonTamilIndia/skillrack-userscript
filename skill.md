@@ -108,6 +108,16 @@ Verified: `<sample input> → <sample output>`
   Base URL" in the settings to a local server (e.g. `http://localhost:3000`, run
   `node solutions-server.js`). AI is the last fallback. So a merged solution is
   instantly live for every user.
+- **Failure → AI fallback (userscript v6.1):** if the injected answer (saved `.md`
+  or SkillRack built-in) fails the judge, `generateAISolution()` detects the error
+  panel (`getErrorInfo()`), skips re-injecting the same code, and hands the failing
+  code + judge error (input/expected/actual) to the AI fixer. This applies to manual
+  AI clicks and the ⚡ Auto Solver retry loop alike.
+- **Level 3 cross-check:** CTS/COGNIZANT answers (ids 6679-6689) were verified
+  CTF-style against GitHub problem-name matches (e.g.
+  `Dharaneeshwar/Cognizant-CTS-PATTERN-PROGRAMS`); where our version diverged from
+  the reference (signature/return-type or include issues), it was corrected to the
+  judge's contract (e.g. `findMinElement` returns an `int*` of both minima).
 - Keep the solution bank moving: when a challenge rotates to a new unsolved set,
   re-enumerate (§3) and claim a batch.
 

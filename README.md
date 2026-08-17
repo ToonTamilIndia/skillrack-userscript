@@ -9,6 +9,16 @@
 > or from AI. Contributors add verified solutions; [SKILL.md](skill.md)
 > documents the whole scraping/verification workflow.
 
+> 🔁 **Priority chain (v6.1):** 1) saved answer in `solutions/<id>.md` (GitHub raw /
+> local server) → 2) if that answer **fails the judge** (compile / runtime / wrong
+> output), the script detects the error and **falls back to the AI fixer**, feeding
+> the failing code + the judge error back to your AI provider → 3) code is rewritten
+> in the editor and you re-run. For **Level 3 (MNC Companies / CTS)**, solutions were
+> additionally cross-checked CTF-style by searching GitHub for the exact problem name
+> (e.g. `Dharaneeshwar/Cognizant-CTS-PATTERN-PROGRAMS`) and corrected against the
+> reference implementation; AI is the last-resort fallback for any problem GitHub
+> can't confirm.
+
 > ⚠️ **Please disable the script during live invigilated tests** — continuing to
 > run it mid-test may have unintended effects. Use at your own academic discretion.
 
@@ -38,7 +48,21 @@ A Tampermonkey/Greasemonkey userscript for SkillRack with AI solution generation
 
 ---
 
-## Version 6.0 Features (Latest)
+## Version 6.1 Features (Latest)
+
+### New in v6.1 — Failure → AI Fallback for Saved Solutions
+
+- **Detects judge failures** on the code the script inserted (from `solutions/<id>.md`
+  via GitHub raw / local server, or SkillRack's built-in "View Solution").
+- **No more infinite re-injection of a wrong `.md`:** when a run fails (compilation
+  error, runtime error, or wrong output), the AI button skips the saved/built-in
+  answer and goes straight to the **AI fixer**, which receives the failing code plus
+  the judge's input / expected / actual output and rewrites it.
+- Works both when you click "AI Solution" manually *and* inside the ⚡ **Auto Solver**
+  retry loop (retries now actually produce a *different*, corrected attempt).
+- Level 3 (MNC Companies / CTS) solutions cross-checked against GitHub problem-name
+  searches (CTF-style) and corrected to reference implementations where our version
+  diverged (e.g. `findMinElement`, `root`).
 
 ### New in v6.0
 
@@ -530,6 +554,13 @@ This is used for:
 ---
 
 ## Changelog
+
+### v6.1
+- 🔁 Saved-solution failure → AI fallback: judge failures detected, AI fixes the
+  failing code instead of re-injecting the same wrong answer
+- 🔧 AI button now skips saved/built-in code on retry after a failed run
+- 🔍 Level 3 (MNC / CTS) answers cross-checked via GitHub problem-name search and
+  corrected to reference implementations
 
 ### v6.0
 - Added multi-fill-in-the-blank AI solving support
