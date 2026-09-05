@@ -7776,10 +7776,18 @@ Emit ONLY the final executable solution.`,
             const url = `${b}/solutions/${pid}.md`;
             try {
                 const raw = await fetchWithTimeout(url, { cache: 'no-store' }, SETTINGS.localServerTimeout || 5000);
-                const codeMatch = raw.match(/```[a-zA-Z0-9_+-]*\n?([\s\S]*?)```/);
+                const codeMatch = raw.match(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/);
                 if (!codeMatch) throw new Error(`No code block found in ${pid}.md`);
+                // ProgramIDs are shared across language tracks: a Python answer must not be
+                // pasted into a C editor. Compare the fence tag with the editor language.
+                const tag = (codeMatch[1] || '').toLowerCase().replace('c++', 'cpp');
+                const editorLang = (getSelectedLanguage() || 'C').toLowerCase();
+                const langOk = !tag || (tag === 'c' && editorLang === 'c') || (tag === 'cpp' && editorLang.startsWith('c++')) ||
+                    (tag === 'java' && editorLang === 'java') || ((tag === 'python' || tag === 'py' || tag === 'python3') && editorLang === 'python') ||
+                    (tag === 'sql' && editorLang === 'sql');
+                if (!langOk) throw new Error(`Saved solution ${pid}.md is ${tag} but the editor language is ${editorLang}`);
 
-                let code = codeMatch[1].trim();
+                let code = codeMatch[2].trim();
                 const problem = getProblemDescription();
                 if (problem.preCode || problem.postCode) {
                     code = stripPrePostCode(code, problem.preCode, problem.postCode);
