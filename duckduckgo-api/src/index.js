@@ -222,28 +222,45 @@ async function genRequestHash(hash) {
 
 // Load token from status endpoint and solve challenge
 async function loadToken() {
-	const response = await fetch(STATUS_URL, {
-		method: 'GET',
-		headers: {
-			'User-Agent': USER_AGENT,
-			'Referer': ORIGIN_API,
-			'x-vqd-accept': '1'
+	// DuckDuckGo rate limits and sometimes withholds the challenge header for a
+	// given egress IP. Try both hosts with a short backoff before giving up.
+	const statusUrls = [STATUS_URL, STATUS_URL.replace('https://duck.ai', 'https://duckduckgo.com')];
+	let lastError = null;
+	for (let attempt = 0; attempt < 3; attempt++) {
+		for (const url of statusUrls) {
+			let response;
+			try {
+				response = await fetch(url, {
+					method: 'GET',
+					headers: {
+						'User-Agent': USER_AGENT,
+						'Referer': ORIGIN_API + '/',
+						'Origin': ORIGIN_API,
+						'Accept': '*/*',
+						'Accept-Language': 'en-US,en;q=0.9',
+						'x-vqd-accept': '1'
+					}
+				});
+			} catch (e) {
+				lastError = e;
+				continue;
+			}
+			if (!response.ok) {
+				lastError = new Error(`Status request failed: ${response.status}`);
+				continue;
+			}
+			const hash = response.headers.get('x-vqd-hash-1');
+			if (!hash) {
+				const allHeaders = {};
+				response.headers.forEach((v, k) => allHeaders[k] = v);
+				lastError = new Error(`x-vqd-hash-1 not found. Headers: ${Object.keys(allHeaders).join(', ')}`);
+				continue;
+			}
+			return await genRequestHash(hash);
 		}
-	});
-
-	if (!response.ok) {
-		throw new Error(`Status request failed: ${response.status}`);
+		await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
 	}
-
-	const hash = response.headers.get('x-vqd-hash-1');
-	if (!hash) {
-		const allHeaders = {};
-		response.headers.forEach((v, k) => allHeaders[k] = v);
-		throw new Error(`x-vqd-hash-1 not found. Headers: ${Object.keys(allHeaders).join(', ')}`);
-	}
-
-	const requestHash = await genRequestHash(hash);
-	return requestHash;
+	throw lastError || new Error('Cannot get token');
 }
 
 function textFromValue(value) {
@@ -603,6 +620,10 @@ async function handleChat(request, env) {
 
 	if (!fullMessage) {
 		return new Response(JSON.stringify({ error: 'Empty response from AI' }), {
+			status: 502,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
 
 	const outputMessage = { role: 'assistant', content: fullMessage };
 	if (includeReasoning && reasoningMessage) {

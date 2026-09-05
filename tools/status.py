@@ -69,13 +69,13 @@ def main():
         return 0
 
     lines = []
-    lines.append('# Status — solved / pending')
+    lines.append('# Status: solved / pending')
     lines.append('')
     lines.append('Scanned {n} solution files in `solutions/` (per-language: {L}).'.format(
         n=len(sol), L=', '.join('{}={}'.format(k, v) for k, v in sorted(langs.items()))))
     lines.append('')
     lines.append('The userscript fetches these by **ProgramID** from this repo by '
-                 'default — `https://raw.githubusercontent.com/ToonTamilIndia/'
+                 'default: `https://raw.githubusercontent.com/ToonTamilIndia/'
                  'skillrack-userscript/main/solutions/<id>.md` (GitHub raw URL, '
                  'no server needed). For dev/testing point Settings → "Solutions '
                  'Base URL" at a local server (e.g. `http://localhost:3000`, run '
@@ -122,7 +122,7 @@ def main():
     lines.append('')
     lines.append('**Total solved:** {} / {}'.format(len(known) - len(pending), len(known)))
     lines.append('')
-    lines.append('### Pending (enumerated but no solution yet) — {}'.format(len(pending)))
+    lines.append('### Pending (enumerated but no solution yet): {}'.format(len(pending)))
     lines.append('')
     if pending:
         lines.append('| Id | Problem | Section |')
@@ -133,7 +133,7 @@ def main():
         lines.append('_none_')
     lines.append('')
     if missing_stmt:
-        lines.append('### Solutions not present in the {} — {}'.format(kind, len(missing_stmt)))
+        lines.append('### Solutions not present in the {}: {}'.format(kind, len(missing_stmt)))
         lines.append('')
         lines.append(', '.join(missing_stmt))
         lines.append('')

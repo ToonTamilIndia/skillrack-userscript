@@ -1,0 +1,14 @@
+{
+  "name": "skillrack-userscript-playwright-harness",
+  "private": true,
+  "version": "7.0.0",
+  "description": "Headless Chromium harness that tests userscript.user.js against the live SkillRack site",
+  "scripts": {
+    "repro": "node repro.js",
+    "ocrbench": "node ocrbench.js",
+    "autotest": "node autotest.js"
+  },
+  "dependencies": {
+    "playwright": "1.47.2"
+  }
+}

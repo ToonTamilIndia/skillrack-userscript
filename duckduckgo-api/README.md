@@ -4,21 +4,45 @@ A Cloudflare Worker that proxies requests to DuckDuckGo AI Chat, bypassing CSP r
 
 ## Features
 
-- 🦆 **Free AI Access** - Uses DuckDuckGo AI Chat (no API key needed for end users)
-- 🔐 **Hash Challenge Solver** - Automatically solves the `x-vqd-hash-1` authentication challenge
-- 🌐 **CORS Support** - Works from any browser/userscript
-- ⚡ **OpenAI-Compatible API** - Drop-in replacement for OpenAI chat completions
+- **Free AI Access** - Uses DuckDuckGo AI Chat (no API key needed for end users)
+- **Hash Challenge Solver** - Automatically solves the `x-vqd-hash-1` authentication challenge
+- **CORS Support** - Works from any browser/userscript
+- **OpenAI-Compatible API** - Drop-in replacement for OpenAI chat completions
 
 ## Available Models
 
-| Model ID | Name | Provider |
-|----------|------|----------|
-| `gpt-4o-mini` | GPT-4o Mini | OpenAI |
-| `gpt-5-mini` | GPT-5 Mini | OpenAI |
-| `gpt-oss-120b` | GPT-OSS 120B | OpenAI |
-| `llama-4-scout` | Llama 4 Scout | Meta |
-| `claude-haiku-4-5` | Claude Haiku 4.5 | Anthropic |
-| `mistral-small-3` | Mistral Small 3 | Mistral AI |
+The worker exposes the models below at `/models`. DuckDuckGo retires models
+without notice; on 2026-09-05 `claude-haiku-4-5` and `gpt-oss-120b` answered,
+the Mistral and older GPT ids returned `ERR_MODEL_UNAVAILABLE`, and rapid
+requests were rate limited (HTTP 429). The userscript falls back through the
+list automatically.
+
+| Model ID | Name | Provider | Reasoning |
+|----------|------|----------|-----------|
+| `claude-haiku-4-5` | Claude Haiku 4.5 | Anthropic | no |
+| `gpt-oss-120b` | GPT-OSS 120B | Tinfoil | yes |
+| `gpt-5.4-mini` | GPT-5.4 Mini | OpenAI | yes |
+| `gpt-5.4-nano` | GPT-5.4 Nano | OpenAI | yes |
+| `gemma-4-31b` | Gemma 4 31B | Google | no |
+| `mistral-small-4` | Mistral Small 4 | Mistral AI | no |
+| `mistral-small-2603` | Mistral Small 2603 | Mistral AI | no |
+| `claude-4-5-haiku` | Claude 4.5 Haiku | Anthropic | no |
+
+Endpoints: `POST /chat` (alias `/v1/chat/completions`), `GET /models`
+(alias `/v1/models`), `GET /health`.
+
+## Operational notes
+
+* The token handshake (`x-vqd-hash-1`) depends on DuckDuckGo accepting the
+  worker's egress IP. On 2026-09-05 the shared `workers.dev` deployment was
+  refused (`x-vqd-hash-1 not found`) while the same code answered from a
+  residential IP. Deploy your own worker to get a separate quota, and keep
+  request volume modest; bursts are answered with HTTP 429.
+* `src/index.js` retries the status request on both `duck.ai` and
+  `duckduckgo.com` with a short backoff before failing.
+* You can exercise the worker locally without Cloudflare: Node 18 needs a
+  WebCrypto shim (`globalThis.crypto = require('crypto').webcrypto`) and the
+  file imported as an ES module.
 
 ## Setup
 

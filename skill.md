@@ -1,137 +1,200 @@
-# skill.md — SkillRack autonomous solving, end to end
+# skill.md: SkillRack autonomous solving, end to end
 
-> Version: CODETUTOR structure as of the latest session.
-> Read `tools/README.md` for the CLI toolkit; this file is the playbook +
-> contribution guide. Contributors: **you solve a problem once, we all get it.**
+This is the playbook for the repository. It describes how SkillRack is laid out,
+how a problem is solved and verified, how a solution is contributed, and how the
+userscript consumes the result. `tools/README.md` documents the command line
+toolkit; `README.md` documents the userscript for end users.
 
-## 1. Site structure (things that rarely change)
+The rule that makes the bank useful: one contributor solves a problem once, with
+a verified answer, and every user of the userscript gets it from then on.
 
-- Centre: `codeprogramgroup.xhtml?gt=CODETUTOR` → **7 language packs**.
-- The account must be logged in. Grab `JSESSIONID` (+ `oam.Flash.RENDERMAP.TOKEN`,
-  + the `AWSALB*` cookies) from a logged-in browser tab and put it in
-  `tools/cookie.txt` (gitignored) or `$SKILLRACK_COOKIE`.
-- **Pack indexes** (button id `pkglistform:cttbl:<idx>:j_id_41`):
+## 1. Site structure
 
-  | idx | Pack | | idx | Pack |
-  |-----|------|---|-----|------|
-  | 0 | C Programming | | 4 | SQL |
-  | 1 | Java Programming | | 5 | Data Structures in C |
-  | 2 | Python Programming | | 6 | Data Structures in Java |
-  | 3 | C++ Programming |
+SkillRack is a JSF / PrimeFaces application. Almost every click is a POST that
+carries a `jakarta.faces.ViewState` token taken from the previous response.
 
-- Each pack = ~23 sub-challenges (`pkglistform:j_id_49:<sidx>:j_id_4h`), each with
-  parts (`cttbl:<row>:j_id_4u`) and each part shows **only the unsolved problems**
-  (`pctbl:<row>:j_id_5w`). The list is LIVE/rotating — solve one and it disappears.
-- **The platform has 6 levels + extras**, each a different challenge TYPE, at
-  `codeprogramgroup.xhtml` (the `gt`/`lev` query picks them):
+### Entry points
 
-  | Level | URL `gt=` | Content |
-  |-------|-----------|---------|
-  | Level 1 | `CODETUTOR` | 7 **language** packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges (INTRO, STARTER, 50 VERY-EASY / EASY / EASY ADD-ON / AVERAGE, LAB ADD-ON, practice, videos). Some problems are **MFIB (fill-in-the-blank)** — the userscript detects and answers those too. Enumerated: C pack = **543 unique unsolved** across 18 sections/55 parts. |
-  | Level 2 | `CODETRACK&lev=2` | KICKSTART for ABSOLUTE Beginner → sub-challenge **Recursion** (5 unsolved). |
-  | Level 3 | `CODETRACK&lev=3` | **MNC Companies** (TCS/CTS/WIPRO/INFOSYS) → COGNIZANT CTS - 35 PROGRAMS (10 unsolved), InfyTQ Programs (solved), MNC COMPANIES PROGRAMS SET 001-020 (**197 unsolved**, 207 total). |
-  | Level 4 | `CODETRACK&lev=4` | Data Structures & Algorithms → Stack / Queue / Binary Tree / Sorting (**25 unsolved**). |
-  | Level 5 | `CODETRACK&lev=5` | Product Companies (Higher Salary) → 10 SETs, but **wallet-gated KIT**: the list page shows only a names-only "Programs List" preview (Step Number [ZH], Array LEADERS (ZH), …) with **no problem IDs**; scheduling requires wallet points (balance 0). Capture IDs from the `viewsolved` / solve pages instead. |
-  | Level 6 | `CODETRACK&lev=6` | Dream Product Companies (Very High Salary) + Mini Projects — **wallet-gated KIT**, names-only preview. |
-  | Prime | `CODETRACK&lev=100` | Dream Companies Placement Pack — **wallet-gated KIT**, names-only preview. |
-  | LACS | `webinarcodetrack.xhtml` | Webinar code track |
-  | LAB | `labcodeprograms.xhtml?type=LAB` | LAB programs |
+| Level | URL | Content |
+|-------|-----|---------|
+| Level 1 | `codeprogramgroup.xhtml?gt=CODETUTOR` | Seven language packs: C, Java, Python, C++, SQL, Data Structures in C, Data Structures in Java. Each pack has about 23 sub-challenges (INTRO, STARTER, VERY-EASY, EASY, EASY ADD-ON, AVERAGE, LAB ADD-ON, practice, videos). Some problems are fill-in-the-blank (MFIB). |
+| Level 2 | `codeprogramgroup.xhtml?gt=CODETRACK&lev=2` | KICKSTART for absolute beginners, including a Recursion sub-challenge. |
+| Level 3 | `codeprogramgroup.xhtml?gt=CODETRACK&lev=3` | MNC Companies: Cognizant CTS 35 programs, InfyTQ, MNC Companies Programs SET 001 to 020. |
+| Level 4 | `codeprogramgroup.xhtml?gt=CODETRACK&lev=4` | Data Structures and Algorithms: Stack, Queue, Binary Tree, Sorting. |
+| Level 5 | `codeprogramgroup.xhtml?gt=CODETRACK&lev=5` | Product Companies. Wallet-gated kit: the list shows names only, no ProgramIDs, until points are spent. |
+| Level 6 | `codeprogramgroup.xhtml?gt=CODETRACK&lev=6` | Dream Product Companies and Mini Projects. Wallet-gated. |
+| Prime | `codeprogramgroup.xhtml?gt=CODETRACK&lev=100` | Dream Companies Placement Pack. Wallet-gated. |
+| LACS | `webinarcodetrack.xhtml` | Live assisted coding sessions. |
+| LAB | `labcodeprograms.xhtml?type=LAB` | Lab programs. |
+| Daily | `dailychallenge.xhtml?k=DC` and `k=DT` | Daily Challenge and Daily Test. One problem each, always behind a captcha. Excluded from the incomplete scanner. |
 
-  The exact sub-challenge→part table must be re-confirmed per-account by
-  `tools/enum.py <idx>` (re-enumerate before every bulk solve; the unsolved list
-  is live and the sections that expose "View" change as you clear them).
-- Every click is a PrimeFaces POST carrying its own `jakarta.faces.ViewState`
-  (fresh per page/form — `tools/sack.py` extracts it from the last response).
-- The problem page shows the full statement + samples WITHOUT solving a captcha;
-  only server-side **submission** is captcha-gated.
+### Navigating a pack (Level 1)
 
-## 2. Solution file format (the one true contract)
+Pack buttons on the centre page: `pkglistform:cttbl:<idx>:j_id_41` with
+`0=C 1=Java 2=Python 3=C++ 4=SQL 5=DS-C 6=DS-Java`.
 
-One markdown file per problem in `solutions/<ProgramID>.md`:
+Inside a pack: sub-challenge buttons `pkglistform:j_id_49:<sidx>:j_id_4h`
+(labelled Show). Inside a sub-challenge: part cards with a View button
+`cttbl:<row>:j_id_4u`. A part page (`codeprogram.xhtml`) lists only the unsolved
+problems, each with a Solve button, and every card shows `ProgramID- <id>`. The
+list is live: a solved problem disappears from it.
 
-```md
-# Id <id> — <Problem Name>
+Completed parts show a Completed tag and a feedback form instead of a View
+button. The hands-on courses (`H001` style names) open `tutorprogram.xhtml`
+lessons rather than problem lists.
+
+### The problem page
+
+`codeprogram.xhtml` (tracks) and `tutorprogram.xhtml` (tutorials) show the full
+statement, sample input and output, and a captcha panel:
+
+* image `j_id_51` (350 by 50, white on black, roll number on line one and an
+  expression such as `23+7=` on line two)
+* input `capval`
+* button `proceedbtn`, a PrimeFaces AJAX call that re-renders `programgrid`
+
+A wrong answer keeps the same image and shows an "Incorrect Captcha Value"
+growl. A correct answer replaces the panel with the ACE editor, the language
+selector and the Run and Save buttons. Only submission is captcha-gated; the
+statement is readable without solving it.
+
+### Authentication for the tools
+
+The tools need a logged-in session. Copy `JSESSIONID`, `oam.Flash.RENDERMAP.TOKEN`
+and the `AWSALB*` cookies from a browser tab into `tools/cookie.txt` (gitignored)
+or export `SKILLRACK_COOKIE`. The login form itself posts `j_username` and
+`j_password` to `j_security_check`; the login page is served at any URL without
+a redirect, so detect it by the presence of the `j_username` input.
+
+## 2. Solution file format
+
+One markdown file per problem at `solutions/<ProgramID>.md`:
+
+````md
+# Id 12345 - Problem Name
 
 ```c
 <full source code>
 ```
 
-Verified: `<sample input> → <sample output>`
+Verified: <sample input> -> <sample output>
+````
+
+* The ProgramID is the stable key. The userscript requests
+  `solutions/<ProgramID>.md` by it.
+* The fence language tag (`c`, `cpp`, `java`, `python`, `sql`) selects the
+  toolchain for `verify.py` and tells the userscript which editor language to
+  expect.
+* The `Verified:` line records what was actually confirmed: the sample you ran,
+  or the judge result when the file was produced by the auto solver.
+* Store the full program. When a problem has pre-code and post-code the
+  userscript strips them and inserts only the middle.
+* Never use `head` or `tail` as identifiers; the judge rejects them. Use
+  `lhead` and `ltail`.
+
+## 3. Solving a batch
+
+1. Enumerate. `python3 tools/enum.py <idx> --json /tmp/enum.json` for a Level 1
+   pack, or `python3 tools/enum.py 0 --lev <2..6|100> --json /tmp/enum.json` for
+   a track level. Output: `{section: {part: [{row, id, name}]}}`.
+2. Fetch statements. `python3 tools/fetch.py /tmp/enum.json <idx> --out /tmp/stmts.json`
+   for Level 1, or `python3 tools/fetchlev.py /tmp/enum.json --lev <N> --out /tmp/stmts.json`
+   for track levels.
+3. Split. `python3 tools/mkbatch.py /tmp/stmts.json --n 8 --outdir /tmp/batches`.
+4. Search first. For each problem search GitHub and the web for the exact
+   problem name (`"<problem name>" skillrack`, `site:github.com "<problem name>"`).
+   A found reference is cross-checked against the statement. Only when nothing
+   is found, or the reference fails, write the solution yourself or with AI.
+5. Verify. `python3 tools/verify.py solutions/<id>.md /tmp/stmts.json`. C and C++
+   compile with `gcc`/`g++ -w -O2`, Java with `javac`, Python with `python3`.
+   Exit code 0 means every sample passed. Function-only problems have no `main`
+   and cannot link; build a small harness that reads the sample input, calls the
+   function and compares with the clean expected output, and save only the
+   function in the `.md`.
+6. Track. `python3 tools/status.py /tmp/stmts.json --md document.md` regenerates
+   the solved and pending report.
+7. Commit the `.md` (section 5).
+
+### Batch solving with the userscript
+
+`tools/playwright/autosolve.js` drives the real site in headless Chromium: it
+logs in, opens a part list, turns on the userscript's auto solver with the
+keyless DuckDuckGo provider, and writes every solution that passes the judge to
+`solutions/<ProgramID>.md` with a `Verified:` line. Problems the solver cannot
+pass after three attempts are parked on its skip list and become the to-do list
+for a human contributor.
+
+```
+cd tools/playwright && npm install && npx playwright install chromium
+export SKILLRACK_USER='rollno@college' SKILLRACK_PASS='...'
+TRACK=1 SUB=1 PART=0 N=15 SOLUTIONS_DIR=../../solutions node autosolve.js
 ```
 
-- **ProgramID** is the stable key — the userscript looks up `solutions/<pid>.md`
-  by it.
-- The code fence language tag (`c`, `cpp`, `java`, `python`) is what the userscript
-  and `verify.py` use to pick the toolchain.
-- `Verified:` line: paste the sample input→output you actually confirmed.
+`TRACK` is the pack index, `SUB` the sub-challenge index (in Show button order)
+and `PART` the part index (in View button order).
 
-## 3. Solving a batch (the loop)
+## 4. Verification pitfalls
 
-1. Enumerate: `python3 tools/enum.py <idx> --json /tmp/sack_enum.json` (CODETUTOR)
-   or `python3 tools/enum.py 0 --lev <2..6|100> --json /tmp/sack_enum.json` (CODETRACK)
-   (fills `{<section>:{<part>:[{row,id,name}]}}`).
-2. Fetch statements: `python3 tools/fetch.py /tmp/sack_enum.json <idx> --out /tmp/sack_stmts.json`
-   (CODETUTOR) or `python3 tools/fetchlev.py /tmp/sack_enum.json --lev <N> --out /tmp/sack_stmts.json`
-   (CODETRACK; reuses enum's replay chain, one part per problem via the `part` field).
-3. Split: `python3 tools/mkbatch.py /tmp/sack_stmts.json --n 8 --outdir /tmp/sack_batches`
-4. **Search online (GitHub) FIRST** — for each problem, search the web for the
-   exact problem name (e.g. `<problem name> skillrack solution`, CTF-style:
-   `site:github.com "<problem name>"`). If a matching reference solution is found,
-   use/cross-check it against the statement. **Only if nothing is found (or the
-   found reference fails) fall back to writing a solution from scratch / AI.** This
-   is the priority: GitHub search → verify → AI is the last-resort fallback.
-5. Solve each batch (agents or humans), then verify:
-   `python3 tools/verify.py solutions/<id>.md /tmp/sack_stmts.json`
-   - C/C++ compile w/ `gcc`/`g++ -w -O2`; Java `javac`; Python `python3`.
-   - Exit 0 = all samples PASS. Iterate until green.
-   - Function-style (no `main()`) problems can't link via verify.py — build a small
-     harness `main()` that reads the sample input and calls the function; compare to
-     `out_clean`; save only the function in the `.md`.
-6. Update the tracker: `python3 tools/status.py /tmp/sack_stmts.json --md document.md`
-   (regenerates the solved/pending report).
-7. Commit the `.md` (see §5). That's the whole contribution.
+* Scraped sample output is polluted: appended `Explanation:` prose, `&nbsp;`,
+  `&#39;`, leading newlines or tabs. `verify.py` normalises whitespace but not
+  prose, so a FAIL can be the record rather than the code. Compare the clean
+  prefix by eye before trusting it.
+* Function-only problems have no samples and cannot be auto-verified; check the
+  signature and output format against the statement.
+* Fixed-width and precision output must match exactly; print the requested
+  number of decimals.
+* Inputs may arrive on one line or several with stray carriage returns. Read
+  tokens, not lines, unless a line legitimately contains spaces.
+* Use 64-bit accumulators. Overflow is the most common hidden-test failure.
 
-## 4. Verification pitfalls (read before trusting a FAIL)
+## 5. Contribution model
 
-- Scraped sample `output` is **polluted**: appended `Explanation:` prose, `&nbsp;`,
-  `&#39;`, leading newlines/tabs. `verify.py` normalises whitespace but not prose,
-  so many "FAIL"s are the record, not the code. Check the clean output prefix.
-- Function/no-I/O problems have NO samples → cannot be auto-verified; eyeball
-  the signature/format against the statement.
-- Fixed-width / precision outputs: print exactly the requested decimals.
+Rules: one problem is one `solutions/<id>.md`; real code that compiles; a
+`Verified` line that reflects a real run; do not edit someone else's file
+without adding a note; no personal data and no cookies in any committed file.
 
-## 5. Contribution / collaboration model
+Flow: fork, branch `add/<id>`, add the file, run `verify.py`, regenerate the
+tracker with `tools/status.py --md document.md`, open a pull request with the
+passing verify line in the body. That line is the acceptance bar.
 
-- **Rules:** one problem = one `solutions/<id>.md`; real code only (compiles);
-  `Verified` line reflects a real run; never edit someone else's file without
-  adding a note; no personal data, no cookies in any committed file.
-- **Flow:** fork → branch `add/<id>` → add `solutions/<id>.md` → run
-  `verify.py` → update the tracker (`tools/status.py --md document.md`) → PR.
-  A passing verify line in the PR body is the acceptance bar.
-- The repo's userscript auto-pulls solved answers straight from this repo by
-  default — `raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
-  (GitHub raw URL, no server needed). For dev/testing you can set the "Solutions
-  Base URL" in the settings to a local server (e.g. `http://localhost:3000`, run
-  `node solutions-server.js`). AI is the last fallback. So a merged solution is
-  instantly live for every user.
-- **Failure → AI fallback (userscript v6.1):** if the injected answer (saved `.md`
-  or SkillRack built-in) fails the judge, `generateAISolution()` detects the error
-  panel (`getErrorInfo()`), skips re-injecting the same code, and hands the failing
-  code + judge error (input/expected/actual) to the AI fixer. This applies to manual
-  AI clicks and the ⚡ Auto Solver retry loop alike.
-- **Search GitHub first (no hardcoded repo list):** for every problem, search the
-  web/GitHub by the exact problem name and cross-check the found reference against
-  the statement. Where our version diverged from the reference (signature/return
-  type, include issues, edge-case conventions), correct it to the judge's contract
-  (e.g. `findMinElement` returns an `int*` of both minima; `findSequence` requires
-  a ≥2-element strictly-decreasing prefix). AI is the last-resort fallback when no
-  reference exists or the reference fails.
-- Keep the solution bank moving: when a challenge rotates to a new unsolved set,
-  re-enumerate (§3) and claim a batch.
+Once merged, a solution is live for every user immediately. The userscript
+fetches `raw.githubusercontent.com/<owner>/skillrack-userscript/main/solutions/<id>.md`
+with `credentials: 'omit'` (GitHub answers `Access-Control-Allow-Origin: *`, so
+a credentialed request would be rejected). For development the "Solutions Base
+URL" setting can point at `http://localhost:3000` with `node solutions-server.js`.
 
-## 6. Key invariants
-- **ProgramID** is the join key between `solutions/`, `stmts_all.json`, and the live page.
-- The unsolved list rotates — always enumerate fresh before bulk solving.
-- `cookie.txt`, `context.md`, `docs/`, `tools/data/` are never committed.
-- Bash tool timeout: run long crawls with `nohup ... &`; cap each request with
-  curl `--max-time 20` (both already in `tools/sack.py`).
+## 6. How the userscript uses the bank
+
+Order of sources when a solution is requested:
+
+1. SkillRack's own View Solution, when present.
+2. `solutions/<ProgramID>.md` from GitHub or the local server.
+3. The AI provider (DuckDuckGo by default, no key), with statement, samples and
+   pre or post code.
+
+If inserted code fails the judge, the next attempt skips the saved answer and
+sends the failing code plus the judge output to the AI provider. After
+`autoSolverMaxRetries` failures the problem goes on the skip list
+(`localStorage.autosolver_skipped_problems`) and the solver presses Back and
+opens the next unsolved problem. Nothing on the list is retried until the user
+clears it (Settings, Auto Solver, Clear list) or clicks retry on one entry.
+After `autoSolverMaxSkips` consecutive skips the solver stops.
+
+The captcha solver crops the expression line, inverts and upscales it, reads it
+with a Tesseract worker restricted to digits, plus and equals, and votes across
+three image variants. It watches the DOM after each submit, retries up to three
+times excluding rejected sums, then asks the user.
+
+The incomplete scanner (Find Incomplete in the top menu) crawls every level in
+section 1 with its own fetch queue and ViewState replay, scanning the level of
+the current page first and rendering results after each level. Wallet-gated
+levels report a scan failure for that level without stopping the others.
+
+## 7. Key invariants
+
+* ProgramID joins `solutions/`, the statement caches and the live page.
+* The unsolved list rotates; always enumerate fresh before a bulk solve.
+* `cookie.txt`, `context.md`, `docs/`, `tools/data/`, `tools/playwright/state.json`
+  and `tools/playwright/out/` are never committed.
+* Long crawls run with `nohup ... &`; every request is capped with
+  `--max-time 20` in `tools/sack.py`.

@@ -1,12 +1,12 @@
-# SkillRack Program Tracker — solved / pending
+# SkillRack Program Tracker: solved / pending
 
 > Live tracker maintained by `tools/status.py`. A problem is **SOLVED** when a
 > verified `solutions/<ProgramID>.md` exists in this repo.
 >
 > The userscript fetches these **by ProgramID** from this repo **by default**:
 > `https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
-> (GitHub raw URL — works for everyone, no server needed). For dev/testing, point
-> Settings → "Solutions Base URL" at a local server, e.g. `http://localhost:3000`
+> (GitHub raw URL - works for everyone, no server needed). For dev/testing, point
+> Settings -> "Solutions Base URL" at a local server, e.g. `http://localhost:3000`
 > (run `node solutions-server.js`); AI is the final fallback.
 >
 > All solved problems are **C**. Level 1 (CODETUTOR pack 0) covers the 50
@@ -17,13 +17,13 @@
 ## Current status
 
 - **Solved (committed solution file exists):** 390
-- **Level 3 — MNC Companies (CODETRACK lev=3): 207/207 SOLVED** — COGNIZANT CTS
+- **Level 3 - MNC Companies (CODETRACK lev=3): 207/207 SOLVED** - COGNIZANT CTS
   35 PROGRAMS (10) and MNC COMPANIES PROGRAMS SET 001-020 (197). All verified:
   151 auto-verified against sample I/O (`tools/verify.py`), 49 function-style
   harness-verified, 7 CTS function problems without samples sanity-checked.
 - **Enumerated with a live session cookie (`tools/.scratch/enum/`):** Level 1 C pack = 543
   unique problems; Level 2 = 5; Level 3 = 207; Level 4 = 25. **Levels 5/6/Prime are
-  wallet-gated kits** — they expose only a names-only preview, so unsolved IDs must be
+  wallet-gated kits** - they expose only a names-only preview, so unsolved IDs must be
   captured from the `viewsolved` / solve pages rather than the kit list.
 - **Pending:** Level 2 (5 Recursion problems), Level 4 (25 DSA problems) and the
   remaining Level 1 packs (Java / Python / C++ / SQL / DS-C / DS-Java) are the next
@@ -39,15 +39,15 @@
 
 | Level | Content | Status |
 |-------|---------|--------|
-| 1 — CODETUTOR | 7 language packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges incl. INTRO, STARTER, 50 VERY-EASY, 50 EASY, 50 EASY ADD-ON, 50 AVERAGE, LAB ADD-ON; some problems are MFIB fill-in-the-blank | 🔄 C sets SOLVED (183 files); rest ⏳ |
-| 2 — CODETRACK lev=2 | KICKSTART for ABSOLUTE Beginner → **Recursion** sub-challenge (5 unsolved) | ⏳ 5 unsolved enumerated |
-| 3 — CODETRACK lev=3 | MNC Companies (TCS/CTS/WIPRO/INFOSYS): COGNIZANT CTS - 35 PROGRAMS (10) · InfyTQ Programs (all solved) · MNC COMPANIES PROGRAMS (SET 001-020, 197) | 🔄 **207/207 SOLVED** |
-| 4 — CODETRACK lev=4 | Data Structures & Algorithms — Stack / Queue / Binary Tree / Sorting (25 unsolved) | ⏳ 25 unsolved enumerated |
-| 5 — CODETRACK lev=5 | Product Companies (Higher Salary) — **wallet-gated KIT**; page shows a names-only "Programs List" preview (Step Number [ZH], Array LEADERS (ZH), …) with **no problem IDs**; scheduling needs wallet points (balance 0) | 🔒 wallet-gated — capture IDs from `viewsolved`/solve pages instead |
-| 6 — CODETRACK lev=6 | Dream Product Companies (Very High Salary) + Mini Projects — **wallet-gated KIT**, names-only preview | 🔒 wallet-gated |
-| Prime — CODETRACK lev=100 | Dream Companies Placement Pack — **wallet-gated KIT**, names-only preview | 🔒 wallet-gated |
-| LACS — webinarcodetrack | Webinar code track | ⏳ PENDING |
-| LAB — labcodeprograms | LAB programs | ⏳ PENDING |
+| 1 - CODETUTOR | 7 language packs (C / Java / Python / C++ / SQL / DS-C / DS-Java); each pack = ~23 sub-challenges incl. INTRO, STARTER, 50 VERY-EASY, 50 EASY, 50 EASY ADD-ON, 50 AVERAGE, LAB ADD-ON; some problems are MFIB fill-in-the-blank | in progress: C sets SOLVED (183 files); rest pending: |
+| 2 - CODETRACK lev=2 | KICKSTART for ABSOLUTE Beginner -> **Recursion** sub-challenge (5 unsolved) | pending: 5 unsolved enumerated |
+| 3 - CODETRACK lev=3 | MNC Companies (TCS/CTS/WIPRO/INFOSYS): COGNIZANT CTS - 35 PROGRAMS (10) ; InfyTQ Programs (all solved) ; MNC COMPANIES PROGRAMS (SET 001-020, 197) | in progress: **207/207 SOLVED** |
+| 4 - CODETRACK lev=4 | Data Structures & Algorithms - Stack / Queue / Binary Tree / Sorting (25 unsolved) | pending: 25 unsolved enumerated |
+| 5 - CODETRACK lev=5 | Product Companies (Higher Salary) - **wallet-gated KIT**; page shows a names-only "Programs List" preview (Step Number [ZH], Array LEADERS (ZH), …) with **no problem IDs**; scheduling needs wallet points (balance 0) | locked: wallet-gated - capture IDs from `viewsolved`/solve pages instead |
+| 6 - CODETRACK lev=6 | Dream Product Companies (Very High Salary) + Mini Projects - **wallet-gated KIT**, names-only preview | locked: wallet-gated |
+| Prime - CODETRACK lev=100 | Dream Companies Placement Pack - **wallet-gated KIT**, names-only preview | locked: wallet-gated |
+| LACS - webinarcodetrack | Webinar code track | pending: PENDING |
+| LAB - labcodeprograms | LAB programs | pending: PENDING |
 
 ## All solved problems (390)
 
@@ -452,7 +452,7 @@
 - Full cross-check (needs an enumeration/statement json):
   `python3 tools/fetchlev.py <enum.json> --lev <N> --out /tmp/sack_stmts.json`
   then `python3 tools/status.py /tmp/sack_stmts.json --md document.md`
-- The solved-problems table is regenerated from `solutions/` — all 390 files are
+- The solved-problems table is regenerated from `solutions/` - all 390 files are
   committed under `solutions/<ProgramID>.md` (ProgramID is the join key).
-- The `Pending` list is intentionally structural here — re-enumeration is required
+- The `Pending` list is intentionally structural here - re-enumeration is required
   every bulk solve because SkillRack only shows unsolved problems and the list rotates.

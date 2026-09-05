@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      6.2
+// @version      7.0
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -20,7 +20,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '6.2';
+    const SCRIPT_VERSION = '7.0';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -463,155 +463,132 @@
         captchaUsername: "",
 
         // AI Solution Generator
-        enableAISolver: false,
+        enableAISolver: true,
         includePrePostCode: false,
         aiTemperature: 0,
-        aiSystemPrompt: `You are an expert competitive programmer solving a SkillRack coding challenge.  
+        aiSystemPromptVersion: 7,
+        aiSystemPrompt: `You are a World-Finalist Competitive Programmer (IOI / ICPC World Finalist, Legendary Grandmaster) solving coding challenges on the SkillRack platform.
 
-Your response will be automatically parsed and run, then reviewed by other AI systems for correctness. Follow these rules with 100% strictness. Accuracy is mandatory — never invent syntax, APIs, table names, column names, function names, or behaviors that are not grounded in the problem statement, pre-code, or sample I/O. 
+Your response will be automatically parsed, compiled, and evaluated against public test cases as well as strict private hidden test cases with large boundary constraints. Follow these rules with 100% strictness. Accuracy is mandatory — never invent syntax, APIs, table names, column names, function names, or behaviors that are not grounded in the problem statement, pre-code, or sample I/O.
 
-Supported languages: C, C++, Java, Python, SQL (and any other language explicitly stated in the problem). Apply the correct language rules below based on what the problem asks for. 
+Supported languages: C, C++, Java, Python, SQL (and any other language explicitly requested). Solve in the language the problem / editor asks for.
 
-[CRITICAL - OUTPUT MODE]
+---
 
-For Fill-In-The-Blanks (MFIB) problems:  
+## [CRITICAL - OUTPUT MODE & FORMATTING]
 
-- Output ONLY the values that belong in the blank fields ([BLANK_0], [BLANK_1], etc.).  
-- Print each blank's value on a new line, in order of appearance.  
-- Do NOT include any code markdown fences, notes, explanations, or labels. 
+### 1. For Full-Code & Function Problems (C / C++ / Java / Python):
+- Output ONLY the clean, executable source code.
+- Enclose the code inside standard markdown fences (\`\`\`c, \`\`\`cpp, \`\`\`java, \`\`\`python).
+- **ABSOLUTELY ZERO COMMENTS:** Do NOT include any comments (\`//\`, \`/* */\`, \`#\`), step annotations, or explanations anywhere in the code.
+- **ZERO CONVERSATIONAL PREAMBLE:** Do NOT output reasoning, thinking process, bug analyses, or greetings before or after the code block. Start directly with the code block.
+- If the page provides PRE-CODE and/or POST-CODE, output ONLY the middle portion that belongs between them — never repeat the pre/post code, never re-declare their includes, classes, or \`main\`.
+- Function-only problems: implement exactly the requested function signature and nothing else (no \`main\`, no I/O) unless the problem asks for it.
 
-For Full-Code problems (C / C++ / Java / Python / other):  
+### 2. For Fill-In-The-Blanks (MFIB) Problems:
+- Output ONLY the exact token values for the blanks (\`[BLANK_0]\`, \`[BLANK_1]\`, etc.).
+- Print each blank's value on a new line, in sequential order — one line per blank, exactly as many lines as there are blanks.
+- Do NOT include markdown fences, comments, notes, labels, or explanations.
 
-- Output ONLY the raw source code.  
-- Do NOT wrap code in markdown fences (do NOT use cpp, java, python, sql, or similar).  
-- Do NOT include any comments, introductory text, explanations, or placeholders like // your code here. 
+### 3. For SQL Problems:
+- Output the **entire SQL query on a SINGLE CONTINUOUS LINE** with single spaces between clauses.
+- Do NOT wrap in markdown fences.
+- Do NOT insert newline characters anywhere in the SQL body.
+- Use only tables, columns, aliases, and ordering specified by the schema.
 
-For SQL problems:  
+---
 
-- Output ONLY the SQL query/statement(s) required.  
-- Do NOT wrap in markdown fences.  
-- Do NOT invent table names, column names, schemas, or sample data — use exactly what the problem and pre-code provide.  
-- Prefer standard SQL unless the problem specifies a dialect (MySQL, SQLite, PostgreSQL, H2, etc.); then match that dialect exactly.  
-- Do NOT add USE database, CREATE TABLE, DROP TABLE, or INSERT unless the problem explicitly requires them (e.g. “CREATE with SELECT” / “create a new table” problems). 
+## [MANDATORY COMPETITIVE PROGRAMMING ENGINEERING PROTOCOLS]
 
-*SQL Formatting (STRICT):*  
+### 1. 64-BIT INTEGER OVERFLOW IMMUNITY (MOST COMMON HIDDEN BUG)
+- **C / C++ / DS-C:** Default to \`long long\` for all counters, cumulative sums, products, array indices, prefix sums, and coordinate arithmetic.
+- When multiplying two numbers, ALWAYS explicitly cast operands: \`(1LL * a * b)\` or \`((long long)a * b)\` to prevent 32-bit truncation before assignment.
+- **Java:** Use \`long\` for all state variables, accumulators, and counters. Use \`BigInteger\` if numbers exceed 10^18.
+- **Modulo Arithmetic:** Use \`((a % M) + M) % M\` to guarantee positive results on negative inputs.
 
-- Emit the *entire SQL solution as a SINGLE LINE*.  
-- Do NOT insert line breaks anywhere in the SQL statement.  
-- Do NOT pretty-print or format clauses on separate lines.  
-- Use only spaces to separate SQL keywords and clauses.
+### 2. TLE IMMUNITY & ASYMPTOTIC COMPLEXITY
+- If N <= 10^5, time complexity MUST be O(N) or O(N log N). Never use O(N^2) nested loops for N > 2000.
+- **C++:** Enable Fast I/O at the start of \`main()\`:
+  \`\`\`cpp
+  std::ios_base::sync_with_stdio(false);
+  std::cin.tie(NULL);
+  \`\`\`
+- **Python:** Use \`sys.stdin.read().split()\` to tokenize the entire input stream in one pass. Avoid string concatenation \`+=\` in loops (use lists and \`''.join()\`). For deep recursion, add \`sys.setrecursionlimit(300000)\`.
+- **C:** Allocate large buffers (>= 10^5) globally (\`static int arr[200005];\`) or dynamically with \`malloc\`/\`calloc\` rather than on the stack to prevent Segmentation Faults.
 
-*Correct (Single Line) examples:*  
+### 3. SKILLRACK I/O STREAM & BUFFER HYGIENE
+- Inputs on SkillRack may arrive on a single line, space-separated, or on multiple lines with varying whitespace, carriage returns (\`\\r\\n\`), or trailing spaces.
+- **C:** When reading a string/character after reading numbers, NEVER use bare \`gets()\` or \`fgets()\` without clearing leading newlines. Use \`scanf(" %c", &ch)\` or \`scanf(" %[^\\r\\n]", str)\` with a leading space to skip unread whitespace.
+- **C++:** Use \`cin >> ws\` before \`std::getline(cin, str)\` to clear leftover whitespace.
+- **Python:** \`sys.stdin.read().split()\` seamlessly handles single-line, multi-line, and irregular whitespace tokens without input buffer issues. Use \`sys.stdin.read().splitlines()\` only when a line may legitimately contain spaces (sentences).
+- **Java:** Call \`sc.nextLine()\` after \`sc.nextInt()\` / \`sc.nextLong()\` before reading the next string line. Class name MUST be \`Hello\`.
 
-- SELECT c.id, c.name, c.age, p.name, p.price FROM customer c INNER JOIN plan p ON c.planid = p.id ORDER BY c.id; 
-- SELECT name, age FROM customer WHERE age >= 18 ORDER BY age DESC; 
-- SELECT p.name, COUNT(*) FROM customer c INNER JOIN plan p ON c.planid = p.id GROUP BY p.name HAVING COUNT(*) > 1 ORDER BY p.name; 
-- UPDATE customer SET age = age + 1 WHERE id = 5; 
-- DELETE FROM customer WHERE age < 18; 
-- CREATE TABLE filledbus AS SELECT * FROM bus WHERE seats > 0; 
+### 4. ADVERSARIAL HIDDEN CORNER & BOUNDARY CASE COVERAGE
+Always mentally verify logic against all extreme hidden test permutations:
+- **Lengths & Quantities:** N = 0, N = 1, N = 2, maximum boundary N = 10^5.
+- **Values:** Negative numbers, zeros, \`INT_MAX\`, \`INT_MIN\`, duplicate values, all elements identical.
+- **Strings:** Empty string, single character, all identical characters, palindrome, no match found (\`-1\` or default output).
+- **Ordering:** Already sorted ascending, reverse-sorted (descending), alternating peaks/valleys.
+- **Matrices:** 1x1, 1xM (single row), Nx1 (single column), non-square NxM.
+- **Circular Arrays / Rotations:** Use \`((i - k) % n + n) % n\` for negative index wraparounds.
+- **Divisors & Modulo:** Guard against division by zero when an element or divisor is 0.
 
-*Incorrect (Multi-Line) examples:*  
+### 5. EXACT OUTPUT SPECIFICATION
+- Output ONLY what is explicitly requested. Never print input prompts like \`"Enter N:"\` or decorative labels like \`"Answer:"\`.
+- Match spacing, case-sensitivity, and trailing newline requirements of sample outputs.
+- For rounded floating-point decimals, format to the exact requested precision (e.g. \`printf("%.2f\\n", ans)\` in C, \`fixed << setprecision(2)\` in C++, \`"{:.2f}".format()\` in Python).
 
--  
-  SELECT c.id,  
-         c.name,  
-         p.name  
-   FROM customer c  
-   INNER JOIN plan p  
-   ON c.planid = p.id  
-   ORDER BY c.id;
+### 6. FORBIDDEN UNIX/LINUX KEYWORDS (HEAD & TAIL REPLACEMENT)
+- SkillRack judge strictly blocks UNIX keywords in code submissions: NEVER use \`head\` or \`tail\` as variable, pointer, parameter, struct member, or function names.
+- ALWAYS use \`lhead\` and \`ltail\` instead (e.g., \`Node* lhead\`, \`Node* ltail\`, \`lhead->next\`, \`ltail->prev\`).
 
--  
-  SELECT *  
-   FROM customer  
-   WHERE age > 18;
+### 7. RETRY CONTEXT (WHEN A PREVIOUS ATTEMPT FAILED)
+- If a compilation error, runtime error, or failed test case from a previous attempt is provided, treat it as ground truth. Diagnose the ROOT CAUSE (wrong algorithm, overflow, off-by-one, I/O parsing, output format) and rewrite the full solution — never resubmit the same code with cosmetic changes.
+- Re-derive the expected output from the sample I/O by hand before emitting the fix.
 
-*Rule:* Every SQL answer must be one continuous line with spaces between clauses only. No newline characters are allowed anywhere in the SQL statement. 
+---
 
-[ANTI-HALLUCINATION RULES]
+## [PRE-CODE & LANGUAGE RULES]
 
-- Never invent problem constraints, input formats, output formats, function signatures, library functions, or SQL schema details that are not present in the problem. 
-- If something is ambiguous, choose the interpretation that matches the sample I/O exactly. Sample I/O is ground truth over the written description.
-- Do not use non-existent or language-specific APIs unless they appear in the problem or pre-code.
-- Do not add extra print statements, debug output, labels, or decorative text. 
-- Mentally verify every identifier (variables, columns, tables, functions) against the problem before emitting output. 
+### C / C++
+- Do NOT re-declare \`#include\` or \`using namespace std;\` if already present in pre-code.
+- For decimal precision: include \`<iomanip>\` and use \`std::fixed << std::setprecision(N)\`.
+- Use \`long long\` for all large accumulators and calculations.
 
-Your final output will be reviewed by Claude Mythos Preview and Codex — it must be exact, minimal, and correct on first parse. No partial answers, no "assuming that...", no commentary. 
+### Java
+- Class name MUST be \`Hello\`.
+- Do NOT include a \`package\` statement.
+- Use \`long\` for large accumulators.
 
-[PRE-CODE & INTEGRATION RULES]
+### Python
+- Write code to execute directly at the top level (unless the problem explicitly asks for a function definition).
+- Use \`sys.stdin.read().split()\` for bulletproof input tokenization.
 
-Respect Pre-Code Conventions:  
+### SQL (SkillRack / MySQL / H2)
+- SkillRack pre-creates tables and sample data. Default to \`SELECT\` queries with appropriate \`JOIN\`, \`WHERE\`, \`GROUP BY\`, and \`ORDER BY\`.
+- Do NOT output \`CREATE TABLE\`, \`DROP\`, or \`INSERT\` unless explicitly required by the problem statement (e.g. "CREATE TABLE ... AS SELECT").
+- Output the entire query as a **SINGLE CONTINUOUS LINE**.
 
-- Do NOT re-declare or include #include directives or import statements if they are already in the pre-code.  
-- If the pre-code uses using namespace std;, respect it and align with it.  
-- Do not override existing conventions. 
+---
 
-C / C++:  
+## [SELF-VERIFICATION STEP]
 
-- Use correct headers only if not already provided.  
-- For decimals: when N decimal places are required, include <iomanip> and use std::fixed << std::setprecision(N) (or fixed << setprecision(N) if using namespace std; is active).  
-- Prevent integer overflow: use long long for any variables that accumulate large numbers. 
+Before emitting the final code:
+1. Did you eliminate ALL comments (\`//\`, \`/* */\`, \`#\`, \`--\`)?
+2. Did you eliminate ALL introductory and concluding conversational text?
+3. Did you check for 64-bit integer overflow with explicit casting (\`1LL * a * b\`)?
+4. Does the algorithm run in O(N) or O(N log N) to guarantee passing TLE on large hidden test cases?
+5. Does the output format match the sample output character-for-character? Trace every provided sample input through your code by hand and confirm the exact output.
+6. Did you avoid \`head\` / \`tail\` identifiers and any name that clashes with pre-code?
 
-Java structure:  
-
-- Class name must be Hello.  
-- Do NOT include a package declaration.  
-- Prevent integer overflow: use long for accumulators that can grow large. 
-
-Python execution:  
-
-- Do NOT define functions unless explicitly asked by the problem.  
-- Write code to execute directly at the top level.
-
-SQL Execution (SkillRack / H2 and similar):  
-
-- SkillRack almost always pre-creates tables and loads sample data before your code runs. Your job is usually a SELECT (or SELECT with JOIN / ORDER BY / WHERE / GROUP BY), not DDL/DML. 
-- Default: write ONLY the query that produces the required result set. Do NOT emit CREATE TABLE, DROP, or INSERT unless the problem text explicitly says to create/insert (e.g. “CREATE TABLE … AS SELECT …”, “create a new table filledbus”, etc.).
-- If you re-create a table that already exists, the judge fails with errors such as java.sql.SQLException: Table "CUSTOMER" already exists — that means you must remove CREATE and only SELECT from the given tables.
-- Use table and column names exactly as in the problem DDL (e.g., customer, plan, courseid, etc.). Do not rename or invent columns. 
-- Match column order, aliases, sorting, NULL handling, and aggregation exactly as specified by the problem and samples. 
-- Use correct JOIN types and filters as required (e.g., INNER JOIN on foreign keys like planid = plan.id when output mixes customer + plan fields, LEFT JOIN when rows with null foreign keys must still appear). 
-- ORDER BY must match sample row order (for example, id DESC when samples list highest id first).
-- Names with spaces (e.g., "Spoken English", "Basic Plus") come from table data — do not hardcode sample rows. 
-- Always output SQL as one continuous single line (spaces between clauses only; zero newline characters in the SQL body). 
-
-[OUTPUT SPECIFICATION]
-
-- Match the EXPECTED output format exactly. NEVER add labels, prefixes, or decorative text (e.g., if the expected output is 23.52, output exactly 23.52 — do NOT output Result: 23.52). 
-- Treat ALL sample input/output as ground truth. If the problem description conflicts with the sample I/O, obey the sample I/O behavior. 
-- If the expected output ends without a newline, do NOT add one. If it ends with one, add one.
-- Time complexity: Must not exceed O(n^2) for n > 10^4. Prefer O(n) or O(n log n). 
-- SQL correctness: result columns, row order, NULL handling, and aggregate behavior must match samples character-for-character when compared as the judge does. 
-
-[SKILLRACK SQL FAILURE PATTERNS TO AVOID]
-
-- Table already exists → You submitted CREATE TABLE; tables are pre-created. Output SELECT only. 
-- Wrong column order → Reorder SELECT list to match expected output fields left-to-right. 
-- Wrong sort → Add ORDER BY exactly as samples imply (often primary key DESC or ASC). 
-- Missing JOIN → When output needs columns from two tables (e.g., customer name + plan name + amount), JOIN on the foreign key; do not invent columns on one table. 
-
-- Hardcoded sample rows → Never INSERT or SELECT literal sample values; query the live tables.
-- CREATE WITH SELECT problems only → Emit CREATE TABLE … AS SELECT … (or equivalent) only when the problem title/statement explicitly requires creating a new table from a query. 
-- Multi-line SQL → Forbidden. Collapse the full statement into one line before emitting. 
-
-[SELF-CHECK STEP]
-
-Before generating your final response, mentally trace your solution with the sample inputs (or sample tables for SQL). 
-
-For SQL:  
-
-- Confirm you did not CREATE/INSERT unless required.  
-- Confirm JOIN keys, SELECT column order, and ORDER BY reproduce the expected rows character-for-character (including trailing spaces if present).  
-- Confirm the entire SQL is a single line with no line breaks. 
-
-Compare the output character-by-character against the expected sample outputs (including trailing spaces and newlines). Verify it matches exactly. Only then emit the final answer — nothing else.`,
-        aiProvider: "gemini",
+Emit ONLY the final executable solution.`,
+        aiProvider: "duckduckgo",
         geminiApiKey: "",
         geminiModel: "gemini-2.5-flash",
         openaiApiKey: "",
         openaiModel: "gpt-4o-mini",
         openrouterApiKey: "",
-        openrouterModel: "qwen/qwen3-coder:free",
+        openrouterModel: "z-ai/glm-5.2:free",
         puterModel: "gpt-5.4-nano",
         puterCustomModel: "",
         puterEnableReasoning: false,
@@ -623,7 +600,7 @@ Compare the output character-by-character against the expected sample outputs (i
         // ========================================
 
         // ========== DUCKDUCKGO SETTINGS (NEW) ==========
-        duckduckgoModel: "gpt-4o-mini",
+        duckduckgoModel: "claude-haiku-4-5",
         duckduckgoApiUrl: "https://duckduckgo-api.toontamilindia.workers.dev",
         duckduckgoApiKey: "",
         duckduckgoIncludeReasoning: false,
@@ -638,20 +615,22 @@ Compare the output character-by-character against the expected sample outputs (i
 
         // ========== NVIDIA NIM SETTINGS ==========
         nvidiaApiKey: "",
-        nvidiaModel: "deepseek-ai/deepseek-v4-pro",
+        nvidiaModel: "deepseek-ai/deepseek-v4-pro-0813",
         // =========================================
 
         // ========== AUTO SOLVER SETTINGS ==========
         enableAutoSolver: false,
         autoSolverMaxRetries: 3,
         autoSolverDelay: 500,
+        // After this many problems skipped in a row (no pass in between) the auto solver stops
+        autoSolverMaxSkips: 5,
         // ==========================================
 
         // ========== SOLUTIONS SOURCE SETTINGS (solutions/*.md) ==========
         // Fetches solved solutions by <ProgramID>.md, either from the GitHub
         // repo (raw.githubusercontent.com — no local server needed) or from a
         // self-hosted local server (Node/Python serving the solutions/ dir).
-        enableLocalServer: false,
+        enableLocalServer: true,
         localServerUrl: "https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main",
         localServerTimeout: 5000,
         // ============================================
@@ -674,8 +653,33 @@ Compare the output character-by-character against the expected sample outputs (i
                 if (merged.openaiCompatApiUrl === undefined && merged.yuppbridgeApiUrl !== undefined) merged.openaiCompatApiUrl = merged.yuppbridgeApiUrl;
                 if (merged.openaiCompatApiKey === undefined && merged.yuppbridgeApiKey !== undefined) merged.openaiCompatApiKey = merged.yuppbridgeApiKey;
                 if (merged.openaiCompatModel === undefined && merged.yuppbridgeModel !== undefined) merged.openaiCompatModel = merged.yuppbridgeModel;
-                // Migrate: ensure new local-server settings exist
-                if (merged.enableLocalServer === undefined) merged.enableLocalServer = false;
+                // Migrate: v7 ships a much stronger system prompt. Replace the saved one
+                // only if it is empty or still the untouched v6 default (user edits are kept).
+                if ((merged.aiSystemPromptVersion || 0) < 7) {
+                    const saved = (merged.aiSystemPrompt || '').trim();
+                    if (!saved || saved.startsWith('You are an expert competitive programmer solving a SkillRack coding challenge')) {
+                        merged.aiSystemPrompt = DEFAULT_SETTINGS.aiSystemPrompt;
+                    }
+                    merged.aiSystemPromptVersion = 7;
+                }
+                // Migrate: v7 defaults to the keyless DuckDuckGo proxy. Users who never
+                // configured a key for the old Gemini default are moved over; models that
+                // DuckDuckGo retired are replaced by the current default.
+                const retiredDdgModels = ['gpt-4o-mini', 'gpt-5-mini', 'llama-4-scout', 'mistral-small-3', 'mixtral-small-3'];
+                if (!merged.duckduckgoModel || retiredDdgModels.includes(merged.duckduckgoModel)) merged.duckduckgoModel = 'claude-haiku-4-5';
+                // Retired default model ids (checked against the live /models endpoints on 2026-09-05)
+                if (merged.openrouterModel === 'qwen/qwen3-coder:free') merged.openrouterModel = 'z-ai/glm-5.2:free';
+                if (merged.nvidiaModel === 'deepseek-ai/deepseek-v4-pro') merged.nvidiaModel = 'deepseek-ai/deepseek-v4-pro-0813';
+                if (!merged.v7ProviderMigrated) {
+                    if ((merged.aiProvider === 'gemini' && !merged.geminiApiKey) || !merged.aiProvider) {
+                        merged.aiProvider = 'duckduckgo';
+                        merged.enableAISolver = true;
+                    }
+                    merged.v7ProviderMigrated = true;
+                }
+                // Migrate: ensure new local-server settings exist (GitHub solutions need no server → on by default)
+                if (merged.enableLocalServer === undefined) merged.enableLocalServer = true;
+                if (merged.autoSolverMaxSkips === undefined) merged.autoSolverMaxSkips = 5;
                 if (merged.localServerUrl === undefined) merged.localServerUrl = "https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main";
                 if (merged.localServerTimeout === undefined) merged.localServerTimeout = 5000;
                 return merged;
@@ -695,6 +699,16 @@ Compare the output character-by-character against the expected sample outputs (i
     };
 
     let SETTINGS = loadSettings();
+
+    // Small inline SVG icons for UI strings (no emoji anywhere in the interface)
+    const svgIcon = (path, color) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="${color}" style="vertical-align:-2px;margin-right:4px;" aria-hidden="true"><path d="${path}"/></svg>`;
+    const UI_ICON = {
+        check: svgIcon('M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z', '#4CAF50'),
+        cross: svgIcon('M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z', '#f44336'),
+        warn: svgIcon('M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z', '#FF9800'),
+        trophy: svgIcon('M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z', '#FFC107'),
+        star: svgIcon('M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z', '#FFC107'),
+    };
 
     const notifyPopup = (message) => {
         if (!SETTINGS.enablePopupMode) {
@@ -1700,7 +1714,10 @@ Compare the output character-by-character against the expected sample outputs (i
 
         const CONFIG = {
             DEFAULT_API_URL: 'https://duckduckgo-api.toontamilindia.workers.dev',
-            DEFAULT_MODEL: 'gpt-4o-mini'
+            DEFAULT_MODEL: 'claude-haiku-4-5',
+            // Tried in order when the selected model is unavailable on DuckDuckGo.
+            // Verified working on 2026-09-05: claude-haiku-4-5, gpt-oss-120b.
+            FALLBACK_MODELS: ['claude-haiku-4-5', 'gpt-oss-120b', 'gpt-5.4-mini', 'gemma-4-31b', 'mistral-small-4', 'gpt-5.4-nano', 'claude-4-5-haiku']
         };
 
         let _cachedModels = null;
@@ -1730,19 +1747,14 @@ Compare the output character-by-character against the expected sample outputs (i
             } catch (e) {
                 console.warn('DuckDuckGo: failed to fetch models, using fallback', e);
                 _cachedModels = _cachedModels || [
-                    { id: 'gpt-4o-mini', name: 'GPT-4o Mini', owned_by: 'openai' },
-                    { id: 'gpt-5-mini', name: 'GPT-5 Mini', owned_by: 'openai', reasoning: true },
-                    { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owned_by: 'tinfoil', reasoning: true },
-                    { id: 'llama-4-scout', name: 'Llama 4 Scout', owned_by: 'meta' },
                     { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', owned_by: 'anthropic' },
-                    { id: 'mistral-small-3', name: 'Mistral Small 3', owned_by: 'mistral' },
-                    { id: 'mixtral-small-3', name: 'Mistral Small 3', owned_by: 'mistral' },
-                    { id: 'mistral-small-4', name: 'Mistral Small 4', owned_by: 'mistral' },
-                    { id: 'mistral-small-2603', name: 'Mistral Small 2603', owned_by: 'mistral' },
-                    { id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owned_by: 'anthropic' },
+                    { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', owned_by: 'tinfoil', reasoning: true },
                     { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', owned_by: 'openai', reasoning: true },
                     { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', owned_by: 'openai', reasoning: true },
-                    { id: 'gemma-4-31b', name: 'Gemma 4 31B', owned_by: 'google' }
+                    { id: 'gemma-4-31b', name: 'Gemma 4 31B', owned_by: 'google' },
+                    { id: 'mistral-small-4', name: 'Mistral Small 4', owned_by: 'mistral' },
+                    { id: 'mistral-small-2603', name: 'Mistral Small 2603', owned_by: 'mistral' },
+                    { id: 'claude-4-5-haiku', name: 'Claude 4.5 Haiku', owned_by: 'anthropic' }
                 ];
                 _cachedReasoningModels = new Set(
                     _cachedModels.filter(m => m.reasoning).map(m => m.id)
@@ -1853,15 +1865,39 @@ Compare the output character-by-character against the expected sample outputs (i
 
     // DuckDuckGo wrapper function
     const generateWithDuckDuckGo = async (prompt) => {
-        const model = SETTINGS.duckduckgoModel || 'gpt-4o-mini';
-        return await DuckDuckGoProvider.generateCompletion(
-            [{ role: 'user', content: prompt }],
-            {
-                model: model,
-                includeReasoning: SETTINGS.duckduckgoIncludeReasoning,
-                reasoningEffort: SETTINGS.duckduckgoReasoningEffort
+        const preferred = SETTINGS.duckduckgoModel || DuckDuckGoProvider.CONFIG.DEFAULT_MODEL;
+        const chain = [preferred, ...DuckDuckGoProvider.CONFIG.FALLBACK_MODELS.filter(m => m !== preferred)];
+        let lastErr = null;
+        for (const model of chain) {
+            try {
+                return await DuckDuckGoProvider.generateCompletion(
+                    [{ role: 'user', content: prompt }],
+                    {
+                        model: model,
+                        includeReasoning: SETTINGS.duckduckgoIncludeReasoning,
+                        reasoningEffort: SETTINGS.duckduckgoReasoningEffort
+                    }
+                );
+            } catch (e) {
+                lastErr = e;
+                const msg = String(e && e.message || '');
+                // DuckDuckGo retires models without notice; fall through to the next one.
+                if (/ERR_MODEL_UNAVAILABLE|model.*unavailable|404/i.test(msg)) {
+                    console.warn(`[DuckDuckGo] Model "${model}" unavailable, trying next fallback`);
+                    continue;
+                }
+                // Rate limit: one short pause then retry the same model once
+                if (/429|rate limit/i.test(msg)) {
+                    console.warn('[DuckDuckGo] Rate limited, waiting 8s before retrying');
+                    await new Promise(r => setTimeout(r, 8000));
+                    try {
+                        return await DuckDuckGoProvider.generateCompletion([{ role: 'user', content: prompt }], { model });
+                    } catch (e2) { lastErr = e2; continue; }
+                }
+                throw e;
             }
-        );
+        }
+        throw lastErr || new Error('DuckDuckGo: no model available');
     };
 
     // ============================================
@@ -2952,6 +2988,44 @@ Compare the output character-by-character against the expected sample outputs (i
         }
         panelContent.appendChild(autoSolverToggle);
 
+        // Skipped ("temporarily can't solve") problems — list + clear
+        const skipWrapper = document.createElement('div');
+        skipWrapper.id = 'autosolver-skip-wrapper';
+        skipWrapper.style.cssText = 'padding: 9px 2px; border-bottom: 1px solid rgba(255,255,255,0.05);';
+        const renderSkipList = () => {
+            const api = window.AutoSolver;
+            const items = api && api.getSkipped ? api.getSkipped() : [];
+            const rows = items.slice(0, 50).map(it => {
+                const when = it.ts ? new Date(it.ts).toLocaleString() : '';
+                const label = `${it.pid.startsWith('title:') ? '' : '#' + it.pid + ' '}${(it.title || '').slice(0, 40)}`.trim() || it.pid;
+                return `<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,0.06);">
+                    <span style="color:#e4e4e7;">${label.replace(/</g, '&lt;')}</span>
+                    <span style="color:#71717a;white-space:nowrap;">${(it.reason || '').replace(/</g, '&lt;')} · ${when}</span>
+                    <a href="#" data-unskip="${it.pid.replace(/"/g, '')}" style="color:#63b3ed;text-decoration:none;white-space:nowrap;">retry</a>
+                </div>`;
+            }).join('');
+            skipWrapper.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="color:#a1a1aa;font-size:15px;font-weight:600;font-family:'VT323',monospace;text-transform:uppercase;letter-spacing:0.6px;">Skipped problems (${items.length})</div>
+                    <button id="autosolver-clear-skips" style="background:#607D8B;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;font-family:'VT323',monospace;" ${items.length ? '' : 'disabled'}>Clear list</button>
+                </div>
+                <div style="color:#52525b;font-size:14px;margin:4px 0 6px;font-family:'VT323',monospace;">Problems the auto solver failed ${SETTINGS.autoSolverMaxRetries || 3}x are parked here and skipped so it moves on to the next one. Clear the list (or click retry) to attempt them again. Stops after ${SETTINGS.autoSolverMaxSkips || 5} skips in a row.</div>
+                <div style="max-height:160px;overflow:auto;font-size:14px;font-family:'VT323',monospace;">${rows || '<span style="color:#52525b;">None</span>'}</div>`;
+            skipWrapper.querySelector('#autosolver-clear-skips').addEventListener('click', () => {
+                if (!window.AutoSolver) return;
+                window.AutoSolver.clearSkipped();
+                window.AutoSolver.resetFailures();
+                renderSkipList();
+            });
+            skipWrapper.querySelectorAll('a[data-unskip]').forEach(a => a.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (window.AutoSolver) { window.AutoSolver.unskip(a.dataset.unskip); renderSkipList(); }
+            }));
+        };
+        renderSkipList();
+        document.addEventListener('autosolver:skiplist-changed', renderSkipList);
+        panelContent.appendChild(skipWrapper);
+
         // Solutions source toggle (solutions/<ProgramID>.md from GitHub / local server)
         const localServerToggle = createToggle('enableLocalServer', 'Solved Solutions (GitHub / Local Server)', SETTINGS.enableLocalServer, 'Fetch solutions/<ProgramID>.md from the GitHub repo (raw.githubusercontent.com) or a self-hosted server first, fall back to AI if missing — and if the saved answer fails the judge, AI fixes it');
         panelContent.appendChild(localServerToggle);
@@ -3470,7 +3544,7 @@ Compare the output character-by-character against the expected sample outputs (i
                     // Add free models first
                     if (freeModels.length > 0) {
                         const freeGroup = document.createElement('optgroup');
-                        freeGroup.label = `⭐ Free Models (${freeModels.length})`;
+                        freeGroup.label = `Free Models (${freeModels.length})`;
                         freeModels.forEach(model => {
                             const option = document.createElement('option');
                             option.value = model.id;
@@ -3824,9 +3898,9 @@ Compare the output character-by-character against the expected sample outputs (i
             const currentReasoningEffort = (SETTINGS.duckduckgoReasoningEffort || 'low').toLowerCase();
 
             wrapper.innerHTML = `
-                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">🦆 DuckDuckGo AI (Proxy)</div>
+                <div style="color: #fff; font-size: 17px; margin-bottom: 6px;">DuckDuckGo AI (Proxy)</div>
                 <div style="background: #1a3a1a; border: 1px solid #4CAF50; border-radius: 6px; padding: 8px; margin-bottom: 8px;">
-                    <div style="color: #4CAF50; font-size: 15px; font-weight: bold;">✨ FREE - Uses Cloudflare Worker Proxy</div>
+                    <div style="color: #4CAF50; font-size: 15px; font-weight: bold;">${UI_ICON.check}Free, uses the Cloudflare Worker proxy, no API key</div>
                     <div style="color: #888; font-size: 14px; margin-top: 4px;">Bypasses CSP restrictions</div>
                 </div>
                 <div style="margin-bottom: 8px;">
@@ -4211,10 +4285,10 @@ Compare the output character-by-character against the expected sample outputs (i
                         if (result.ok) {
                             if (statusDiv) {
                                 const modelCount = result.data?.modelCount ? ` (${result.data.modelCount} models)` : '';
-                                statusDiv.innerHTML = `<span style="color:#4CAF50;">✓ API is healthy${modelCount}</span>`;
+                                statusDiv.innerHTML = `<span style="color:#4CAF50;">${UI_ICON.check}API is healthy${modelCount}</span>`;
                             }
                         } else {
-                            if (statusDiv) statusDiv.innerHTML = `<span style="color:#f44336;">✗ ${result.error}</span>`;
+                            if (statusDiv) statusDiv.innerHTML = `<span style="color:#f44336;">${UI_ICON.cross}${result.error}</span>`;
                         }
 
                         healthBtn.disabled = false;
@@ -5062,7 +5136,7 @@ Compare the output character-by-character against the expected sample outputs (i
         // ============================================
         const pasteBlockObserver = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
-                for (const node of mutation.addNodes) {
+                for (const node of mutation.addedNodes) {
                     if (node.nodeType === 1) {
                         // Check if it's a script with clipboard blocking
                         const scripts = node.tagName === 'SCRIPT' ? [node] : (node.querySelectorAll?.('script') || []);
@@ -5205,7 +5279,14 @@ Compare the output character-by-character against the expected sample outputs (i
     }
 
     function injectCodeToActiveEditor(code) {
-        const editor = getActiveAceEditor();
+        // Prefer the editor instance attached to the VISIBLE .ace_editor element; the
+        // cached instance can belong to a previous (replaced) panel after an AJAX update.
+        let editor = null;
+        try {
+            const visible = [...document.querySelectorAll('.ace_editor')].find(el => el.offsetParent !== null) || document.querySelector('.ace_editor');
+            if (visible && visible.env && visible.env.editor) editor = visible.env.editor;
+        } catch (e) { }
+        if (!editor) editor = getActiveAceEditor();
         const $ = window.jQuery || window.$;
         const $area = $ ? ($('#txtCode').length ? $('#txtCode') : $('#codediv textarea')) : null;
         const domArea = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
@@ -5234,6 +5315,24 @@ Compare the output character-by-character against the expected sample outputs (i
             }
             if (domArea) domArea.value = code;
             if ($area && $area.length) $area.val(code);
+            // SkillRack's editor hooks (anti-bulk-paste / reset-on-change) can wipe a value
+            // that was set right after the editor appeared. Verify shortly after and re-apply.
+            const verify = (attempt) => {
+                try {
+                    const current = (editor.getValue ? editor.getValue() : editor.getSession().getValue()) || '';
+                    if (current.trim() !== code.trim()) {
+                        console.warn(`[SkillRack] Editor content was reset after insertion, re-applying (attempt ${attempt})`);
+                        if (editor.getSession && typeof editor.getSession().setValue === 'function') editor.getSession().setValue(code);
+                        else if (typeof editor.setValue === 'function') editor.setValue(code);
+                        if (typeof editor.clearSelection === 'function') editor.clearSelection();
+                        if (domArea) domArea.value = code;
+                        if ($area && $area.length) $area.val(code);
+                        if (attempt < 3) setTimeout(() => verify(attempt + 1), 600);
+                    }
+                } catch (e) { }
+            };
+            setTimeout(() => verify(1), 400);
+            setTimeout(() => verify(2), 1500);
             return true;
         } else if (domArea) {
             domArea.value = code;
@@ -6059,7 +6158,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 const img = findCaptchaImage();
 
                 if (img) {
-                    console.log(`[Captcha] ✓ Image found on attempt ${attempts}`);
+                    console.log(`[Captcha] [ok] Image found on attempt ${attempts}`);
                     resolve(img);
                     return;
                 }
@@ -6098,7 +6197,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 if (img) {
                     resolved = true;
                     observer.disconnect();
-                    console.log('[Captcha] ✓ Image detected by observer');
+                    console.log('[Captcha] [ok] Image detected by observer');
                     resolve(img);
                 }
             });
@@ -6114,7 +6213,7 @@ Compare the output character-by-character against the expected sample outputs (i
                 if (!resolved) {
                     resolved = true;
                     observer.disconnect();
-                    console.warn('[Captcha] ✗ Observer timeout - no image found');
+                    console.warn('[Captcha] [fail] Observer timeout - no image found');
                     reject(new Error('Captcha image not found'));
                 }
             }, CAPTCHA_CONFIG.observerTimeout);
@@ -6136,187 +6235,182 @@ Compare the output character-by-character against the expected sample outputs (i
         return null;
     }
 
-    // ===== IMPROVED: Enhanced image processing for better OCR =====
-    function processImageForOCR(image) {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+    // ============================================
+    // CAPTCHA IMAGE PRE-PROCESSING
+    // SkillRack captcha (350x50): line 1 = "<rollno>@<college>", line 2 = "X+Y=".
+    // White text on a black background. Tesseract works best with dark text on a
+    // light background, so every variant inverts. The "bottom" variant crops the
+    // username line away entirely so the OCR only ever sees the math expression.
+    // ============================================
+    function makeCaptchaCanvas(image, { scale = 3, crop = null, invert = true, threshold = 128, mode = 'smooth' } = {}) {
+        const W = image.naturalWidth || image.width || 350;
+        const H = image.naturalHeight || image.height || 50;
+        const sy = crop ? Math.floor(H * crop[0]) : 0;
+        const sh = crop ? Math.ceil(H * (crop[1] - crop[0])) : H;
+        const pad = 10 * scale; // margin so glyphs don't touch the edge
 
-        // Scale up for better OCR accuracy
-        const scale = 3;
-        canvas.width = (image.width || image.naturalWidth || 200) * scale;
-        canvas.height = (image.height || image.naturalHeight || 50) * scale;
+        const binarize = (ctx, w, h) => {
+            const data = ctx.getImageData(0, 0, w, h);
+            const d = data.data;
+            for (let i = 0; i < d.length; i += 4) {
+                const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                // invert: bright (text) -> black, dark (background) -> white
+                const v = invert ? (lum > threshold ? 0 : 255) : (lum < threshold ? 0 : 255);
+                d[i] = d[i + 1] = d[i + 2] = v;
+                d[i + 3] = 255;
+            }
+            ctx.putImageData(data, 0, 0);
+        };
 
-        // Enable image smoothing for upscaling
-        ctx.imageSmoothingEnabled = true;
+        // Native-resolution crop first
+        const src = document.createElement('canvas');
+        src.width = W; src.height = sh;
+        const sctx = src.getContext('2d');
+        sctx.fillStyle = invert ? '#000' : '#fff';
+        sctx.fillRect(0, 0, W, sh);
+        sctx.drawImage(image, 0, sy, W, sh, 0, 0, W, sh);
+        const threshFirst = mode === 'nearest' || mode === 'threshFirst';
+        if (threshFirst) binarize(sctx, W, sh);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = W * scale + pad * 2;
+        canvas.height = sh * scale + pad * 2;
+        const ctx = canvas.getContext('2d');
+        // Padding must be WHITE in the final image. If we binarize after scaling and
+        // invert, bright pixels turn black — so pre-fill the margin with black then.
+        ctx.fillStyle = (threshFirst || !invert) ? '#fff' : '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.imageSmoothingEnabled = mode !== 'nearest';
         ctx.imageSmoothingQuality = 'high';
-
-        // Draw scaled image
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-        // Get image data
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-
-        // ===== ENHANCED PROCESSING =====
-        // Convert to high contrast black/white with threshold
-        for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
-
-            // Calculate luminance
-            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-
-            // Apply threshold (adjust if needed - lower = more black)
-            const threshold = 140;
-            const value = luminance < threshold ? 0 : 255;
-
-            data[i] = value;     // R
-            data[i + 1] = value; // G
-            data[i + 2] = value; // B
-            // Alpha stays the same
-        }
-
-        ctx.putImageData(imageData, 0, 0);
-
+        ctx.drawImage(src, pad, pad, W * scale, sh * scale);
+        if (!threshFirst) binarize(ctx, canvas.width, canvas.height);
         return canvas.toDataURL();
     }
 
-    // ===== IMPROVED: Alternative invert processing =====
-    function invertColors(image) {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+    // Kept for backwards compatibility with the old method names
+    function processImageForOCR(image) { return makeCaptchaCanvas(image, { scale: 3, invert: false, threshold: 140 }); }
+    function invertColors(image) { return makeCaptchaCanvas(image, { scale: 3, invert: true }); }
 
-        const scale = 2;
-        canvas.width = (image.width || image.naturalWidth || 200) * scale;
-        canvas.height = (image.height || image.naturalHeight || 50) * scale;
+    // ===== Tesseract worker (reused across attempts; parameters actually applied) =====
+    // NOTE: Tesseract.recognize(img, lang, opts) treats `opts` as *worker* options, so
+    // passing tessedit_char_whitelist there is silently ignored. We need a real worker
+    // and worker.setParameters() for the whitelist / page-segmentation mode to apply.
+    let captchaWorkerPromise = null;
+    function getCaptchaWorker() {
+        if (!captchaWorkerPromise) {
+            captchaWorkerPromise = (async () => {
+                if (typeof Tesseract.createWorker !== 'function') return null;
+                const worker = await Tesseract.createWorker('eng', 1, { logger: () => {} });
+                return worker;
+            })().catch(err => {
+                console.warn('[Captcha] Could not create Tesseract worker, falling back to Tesseract.recognize:', err);
+                captchaWorkerPromise = null;
+                return null;
+            });
+        }
+        return captchaWorkerPromise;
+    }
 
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        ctx.globalCompositeOperation = "difference";
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    async function ocrCaptcha(dataUrl, { psm = '7', whitelist = '0123456789+=' } = {}) {
+        const worker = await getCaptchaWorker();
+        if (worker) {
+            await worker.setParameters({
+                tessedit_char_whitelist: whitelist,
+                tessedit_pageseg_mode: psm,
+            });
+            const { data } = await worker.recognize(dataUrl);
+            return data.text || '';
+        }
+        const { data } = await Tesseract.recognize(dataUrl, 'eng');
+        return data.text || '';
+    }
 
-        return canvas.toDataURL();
+    // Username shown in the page header, e.g. "RAGUL - 210625205099@jeppiaarit".
+    // Used to strip the first captcha line if a full-image OCR method is used.
+    function detectCaptchaUsername() {
+        if (SETTINGS.captchaUsername) return SETTINGS.captchaUsername;
+        try {
+            const m = (document.body.innerText || '').match(/\d{6,}\s*@\s*[a-zA-Z0-9]+/);
+            return m ? m[0].replace(/\s+/g, '') : '';
+        } catch (e) { return ''; }
     }
 
     // ===== IMPROVED: Smarter math expression parser =====
     function solveCaptcha(text) {
-        const username = SETTINGS.captchaUsername || "";
+        const username = detectCaptchaUsername();
         let cleanedText = text;
 
         // Remove username patterns (handle OCR adding spaces)
         // Pattern: 12 digits followed by @ and letters (with possible spaces)
-        cleanedText = cleanedText.replace(/\d{9,12}\s*@\s*[a-zA-Z]+/gi, "").trim();
+        cleanedText = cleanedText.replace(/\d{9,12}\s*@?\s*[a-zA-Z]+/gi, "").trim();
 
-        // Also remove any standalone 12-digit numbers (roll numbers)
+        // Also remove any standalone 9-12 digit numbers (roll numbers)
         cleanedText = cleanedText.replace(/\b\d{9,12}\b/g, "").trim();
 
-        // Also try removing the configured username (with flexible spacing)
+        // Also try removing the configured/detected username (with flexible spacing)
         if (username) {
-            // Create pattern that allows spaces around @
             const escapedUsername = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const flexiblePattern = escapedUsername.replace(/@/g, '\\s*@\\s*');
+            const flexiblePattern = escapedUsername.replace(/@/g, '\\s*@?\\s*');
             cleanedText = cleanedText.replace(new RegExp(flexiblePattern, "gi"), "").trim();
         }
 
         // Remove any remaining @ symbols and email-like patterns
-        cleanedText = cleanedText.replace(/@[a-zA-Z]+/gi, "").trim();
+        cleanedText = cleanedText.replace(/@[a-zA-Z]*/gi, "").trim();
 
-        // Remove common OCR noise
-        cleanedText = cleanedText.replace(/[\n\r\t]/g, " ").trim();
+        // Only keep the last line that contains a digit (the "X+Y=" line)
+        const lines = cleanedText.split(/[\n\r]+/).map(l => l.trim()).filter(l => /\d/.test(l));
+        if (lines.length > 1) cleanedText = lines[lines.length - 1];
 
-        // Remove multiple spaces
-        cleanedText = cleanedText.replace(/\s+/g, " ").trim();
+        // Remove common OCR noise / multiple spaces
+        cleanedText = cleanedText.replace(/[\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
+        // Strip trailing "=" (and anything after it, which is empty on SkillRack)
+        cleanedText = cleanedText.replace(/=.*$/, '').trim();
 
         console.log(`[Captcha] Cleaned text: "${cleanedText}"`);
 
         // ===== METHOD 1: Standard pattern with + sign =====
-        // This should match "100+3", "5+6", "23+45" etc.
         let match = cleanedText.match(/(\d+)\s*\+\s*(\d+)/);
         if (match) {
             const num1 = parseInt(match[1], 10);
             const num2 = parseInt(match[2], 10);
-            // Validate both numbers are reasonable (1-999 to handle 3-digit numbers)
-            if (num1 >= 1 && num1 <= 999 && num2 >= 1 && num2 <= 999) {
+            if (num1 >= 0 && num1 <= 999 && num2 >= 0 && num2 <= 999) {
                 const result = num1 + num2;
                 console.log(`[Captcha] Pattern 1 (X+Y): ${num1} + ${num2} = ${result}`);
                 return result;
             }
         }
 
-        // ===== METHOD 2: Handle 2-digit number that should be two single digits =====
-        // e.g., "72" is really "7+2" (OCR missed the + sign)
-        match = cleanedText.match(/^(\d{2})$/);
+        // ===== METHOD 2: Numbers with + misread as 4/t/x/* =====
+        match = cleanedText.match(/^(\d{1,2})\s*[tTxX\*]\s*(\d{1,2})$/);
         if (match) {
-            const numStr = match[1];
-            const num1 = parseInt(numStr[0], 10);
-            const num2 = parseInt(numStr[1], 10);
-            // Both should be non-zero single digits
-            if (num1 >= 1 && num1 <= 9 && num2 >= 1 && num2 <= 9) {
-                const result = num1 + num2;
-                console.log(`[Captcha] Pattern 2 (XY->X+Y): ${num1} + ${num2} = ${result}`);
-                return result;
-            }
+            const result = parseInt(match[1], 10) + parseInt(match[2], 10);
+            console.log(`[Captcha] Pattern 2 (OCR fix): ${match[1]} + ${match[2]} = ${result}`);
+            return result;
         }
 
-        // ===== METHOD 3: Handle merged 3-4 digits (1748 -> 17+48) =====
-        // Look for 3-4 digit number that could be two numbers merged
-        match = cleanedText.match(/(\d{3,4})/);
-        if (match) {
-            const numStr = match[1];
-            console.log(`[Captcha] Found merged number: ${numStr}`);
-
-            // Try splitting at different positions
-            const results = [];
-
-            for (let i = 1; i < numStr.length; i++) {
-                const num1 = parseInt(numStr.substring(0, i), 10);
-                const num2 = parseInt(numStr.substring(i), 10);
-
-                // Valid split: both numbers should be reasonable (1-99)
-                if (num1 >= 1 && num1 <= 99 && num2 >= 1 && num2 <= 99) {
-                    const sum = num1 + num2;
-                    results.push({ num1, num2, sum, split: i });
-                    console.log(`[Captcha] Possible split: ${num1} + ${num2} = ${sum}`);
-                }
-            }
-
-            // If only one valid split, use it
-            if (results.length === 1) {
-                console.log(`[Captcha] ✓ Using split: ${results[0].num1} + ${results[0].num2}`);
-                return results[0].sum;
-            }
-
-            // If multiple splits possible, prefer middle split (most common for 4 digits)
-            if (results.length > 1 && numStr.length === 4) {
-                const middleSplit = results.find(r => r.split === 2);
-                if (middleSplit) {
-                    console.log(`[Captcha] ✓ Using middle split: ${middleSplit.num1} + ${middleSplit.num2}`);
-                    return middleSplit.sum;
-                }
-            }
-
-            // Fallback: use first valid split
-            if (results.length > 0) {
-                console.log(`[Captcha] ✓ Using first split: ${results[0].num1} + ${results[0].num2}`);
-                return results[0].sum;
-            }
-        }
-
-        // ===== METHOD 3: Two separate numbers on same line =====
-        match = cleanedText.match(/(\d{1,2})\s+(\d{1,2})/);
+        // ===== METHOD 3: Two separate numbers (space where + should be) =====
+        match = cleanedText.match(/^(\d{1,3})\s+(\d{1,3})$/);
         if (match) {
             const result = parseInt(match[1], 10) + parseInt(match[2], 10);
             console.log(`[Captcha] Pattern 3 (X Y): ${match[1]} + ${match[2]} = ${result}`);
             return result;
         }
 
-        // ===== METHOD 4: Numbers with + as 4 or t or similar OCR errors =====
-        match = cleanedText.match(/(\d{1,2})\s*[4tT\+xX\*]\s*(\d{1,2})/);
+        // ===== METHOD 4: Merged digits, "+" dropped entirely (e.g. "72" -> 7+2, "1748" -> 17+48) =====
+        match = cleanedText.match(/^(\d{2,4})$/);
         if (match) {
-            const result = parseInt(match[1], 10) + parseInt(match[2], 10);
-            console.log(`[Captcha] Pattern 4 (OCR fix): ${match[1]} + ${match[2]} = ${result}`);
-            return result;
+            const numStr = match[1];
+            const results = [];
+            for (let i = 1; i < numStr.length; i++) {
+                const num1 = parseInt(numStr.substring(0, i), 10);
+                const num2 = parseInt(numStr.substring(i), 10);
+                if (num1 >= 1 && num1 <= 99 && num2 >= 1 && num2 <= 99) results.push({ num1, num2, sum: num1 + num2, split: i });
+            }
+            if (results.length) {
+                const pick = (numStr.length === 4 && results.find(r => r.split === 2)) || results[0];
+                console.log(`[Captcha] Pattern 4 (merged): ${pick.num1} + ${pick.num2} = ${pick.sum}`);
+                return pick.sum;
+            }
         }
 
         return null;
@@ -6324,40 +6418,41 @@ Compare the output character-by-character against the expected sample outputs (i
 
     function safeButtonClick(button) {
         if (!button) return;
-
-        setTimeout(() => {
-            try {
-                // Call native .click() first so inline onclick (PrimeFaces.bcn / PrimeFaces.ab) executes
-                button.click();
-            } catch (err) {
-                console.log('Button click fallback:', err);
-                const evt = new MouseEvent('click', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                button.dispatchEvent(evt);
-            }
-        }, 50);
+        try {
+            // Native .click() so the inline onclick (PrimeFaces.bcn / PrimeFaces.ab) executes
+            button.click();
+        } catch (err) {
+            console.log('Button click fallback:', err);
+            button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        }
     }
 
-    // ===== CAPTCHA RETRY TRACKING (uses localStorage for persistence across refreshes) =====
-    const CAPTCHA_MAX_AUTO_RETRIES = 3; // Stop auto-solving after this many FAILED attempts
+    // ============================================
+    // CAPTCHA RETRY TRACKING
+    // The "Proceed" button is a PrimeFaces AJAX call: a wrong answer does NOT
+    // reload the page — it just re-renders the panel and shows an
+    // "Incorrect Captcha Value" growl. So retries are driven in-page by
+    // watching the DOM after each submit. localStorage is only used to survive
+    // the (rare) full reload case.
+    // ============================================
+    const CAPTCHA_MAX_AUTO_RETRIES = 3; // attempts before asking the user
     const CAPTCHA_STORAGE_KEY = 'skillrack_captcha_retries';
     const CAPTCHA_PENDING_KEY = 'skillrack_captcha_pending';
     const CAPTCHA_FAILED_KEY = 'skillrack_captcha_failed';
+    const CAPTCHA_RESULT_TIMEOUT = 12000; // ms to wait for the AJAX response after submit
 
     function getCaptchaRetryCount() {
         return parseInt(localStorage.getItem(CAPTCHA_STORAGE_KEY) || '0', 10);
     }
-
+    function setCaptchaRetryCount(n) {
+        localStorage.setItem(CAPTCHA_STORAGE_KEY, String(n));
+        console.log(`[Captcha] Retry count: ${n}/${CAPTCHA_MAX_AUTO_RETRIES}`);
+    }
     function incrementCaptchaRetry() {
         const count = getCaptchaRetryCount() + 1;
-        localStorage.setItem(CAPTCHA_STORAGE_KEY, count.toString());
-        console.log(`[Captcha] Retry count: ${count}/${CAPTCHA_MAX_AUTO_RETRIES}`);
+        setCaptchaRetryCount(count);
         return count;
     }
-
     function resetCaptchaRetry() {
         localStorage.removeItem(CAPTCHA_STORAGE_KEY);
         localStorage.removeItem(CAPTCHA_PENDING_KEY);
@@ -6365,134 +6460,238 @@ Compare the output character-by-character against the expected sample outputs (i
         console.log('[Captcha] Retry count reset');
     }
 
-    // ===== IMPROVED: Multiple OCR attempts with different processing =====
+    function captchaGrowlError() {
+        for (const el of document.querySelectorAll('.ui-growl-item, .ui-growl-message, .ui-messages-error, .ui-message-error')) {
+            if (/incorrect captcha/i.test(el.textContent || '')) return true;
+        }
+        return false;
+    }
+    function clearCaptchaGrowl() {
+        document.querySelectorAll('.ui-growl-item').forEach(el => {
+            if (/incorrect captcha/i.test(el.textContent || '')) el.remove();
+        });
+    }
+    function captchaStillPresent() {
+        const input = document.getElementById(CAPTCHA_INPUT_ID);
+        return !!(input && input.offsetParent !== null);
+    }
+
+    // Wait for the AJAX round-trip after clicking Proceed.
+    // Resolves 'success' | 'incorrect' | 'timeout'
+    function waitForCaptchaResult(prevImageSrc) {
+        return new Promise(resolve => {
+            const start = Date.now();
+            const timer = setInterval(() => {
+                if (captchaGrowlError()) { clearInterval(timer); resolve('incorrect'); return; }
+                if (!captchaStillPresent() || isOnCodingPageGlobal()) { clearInterval(timer); resolve('success'); return; }
+                // Panel got re-rendered with a fresh image and no growl → also a failure
+                const img = findCaptchaImage();
+                if (img && prevImageSrc && img.src !== prevImageSrc && Date.now() - start > 1500) { clearInterval(timer); resolve('incorrect'); return; }
+                if (Date.now() - start > CAPTCHA_RESULT_TIMEOUT) { clearInterval(timer); resolve('timeout'); }
+            }, 200);
+        });
+    }
+
+    // Processing hierarchy: each attempt uses genuinely different image variants so a
+    // misread on attempt 1 is not simply repeated. Within an attempt every variant is
+    // OCR'd (~150-250 ms each with a warm worker) and the majority answer wins.
+    const CROP = [0.5, 1]; // bottom half = the "X+Y=" line
+    const CAPTCHA_METHODS = [
+        {
+            name: 'Bottom-line vote (smooth / nearest / thresh-first)', psm: '7', whitelist: '0123456789+=',
+            variants: [
+                img => makeCaptchaCanvas(img, { scale: 4, crop: CROP, mode: 'smooth' }),
+                img => makeCaptchaCanvas(img, { scale: 4, crop: CROP, mode: 'nearest' }),
+                img => makeCaptchaCanvas(img, { scale: 4, crop: CROP, mode: 'threshFirst' }),
+            ],
+        },
+        {
+            name: 'Bottom-line vote (alt scale / threshold)', psm: '7', whitelist: '0123456789+=',
+            variants: [
+                img => makeCaptchaCanvas(img, { scale: 5, crop: CROP, mode: 'nearest' }),
+                img => makeCaptchaCanvas(img, { scale: 4, crop: [0.42, 1], mode: 'smooth', threshold: 100 }),
+                img => makeCaptchaCanvas(img, { scale: 3, crop: CROP, mode: 'smooth', threshold: 150 }),
+            ],
+        },
+        {
+            name: 'Full image (inverted + legacy enhanced)', psm: '6', whitelist: '0123456789+=@abcdefghijklmnopqrstuvwxyz',
+            variants: [
+                img => makeCaptchaCanvas(img, { scale: 3, mode: 'smooth' }),
+                img => makeCaptchaCanvas(img, { scale: 4, mode: 'nearest' }),
+                img => processImageForOCR(img),
+            ],
+        },
+    ];
+
+    // Normalise an OCR string to "X+Y" (or null if it doesn't parse)
+    function parseCaptchaExpression(text) {
+        const cleaned = text.replace(/[\s=]+$/g, '').trim();
+        const m = cleaned.match(/(\d{1,3})\s*\+\s*(\d{1,3})\s*$/);
+        return m ? `${parseInt(m[1], 10)}+${parseInt(m[2], 10)}` : null;
+    }
+
+    // Sums the server has already rejected for the current captcha image — never re-submit them.
+    const rejectedCaptchaSums = new Set();
+
+    async function recognizeCaptchaOnce(image, attemptIdx) {
+        const lastAttempt = attemptIdx >= CAPTCHA_MAX_AUTO_RETRIES - 1;
+        // Last attempt: pool every variant of every method (9 reads) for the strongest vote
+        const method = lastAttempt
+            ? { name: 'All variants pooled', variants: CAPTCHA_METHODS.flatMap(m => m.variants.map(v => [v, m])) }
+            : { ...CAPTCHA_METHODS[Math.min(attemptIdx, CAPTCHA_METHODS.length - 1)] };
+        if (!lastAttempt) method.variants = method.variants.map(v => [v, method]);
+        console.log(`[Captcha] Using "${method.name}" processing (attempt ${attemptIdx + 1}/${CAPTCHA_MAX_AUTO_RETRIES})...`);
+
+        const votes = new Map();
+        const rawTexts = [];
+        for (const [variant, m] of method.variants) {
+            let text = '';
+            try {
+                text = await ocrCaptcha(variant(image), { psm: m.psm, whitelist: m.whitelist });
+            } catch (e) {
+                console.warn('[Captcha] OCR variant error:', e);
+                continue;
+            }
+            rawTexts.push(text.trim());
+            // Strict parse of the last line first; fall back to the smarter cleaner
+            const lastLine = text.trim().split(/[\n\r]+/).pop() || '';
+            let expr = parseCaptchaExpression(lastLine);
+            if (!expr) {
+                const r = solveCaptcha(text);
+                if (r !== null) expr = `?+${r}`; // unknown split, known sum
+            }
+            if (expr) votes.set(expr, (votes.get(expr) || 0) + 1);
+        }
+        console.log(`[Captcha] OCR results (${method.name}): ${JSON.stringify(rawTexts)}`);
+
+        // Majority wins (ties: first seen); skip anything the server already rejected
+        const sumOf = expr => { const [a, b] = expr.split('+'); return a === '?' ? parseInt(b, 10) : parseInt(a, 10) + parseInt(b, 10); };
+        let best = null, bestN = 0;
+        for (const [expr, n] of votes) {
+            const sum = sumOf(expr);
+            if (rejectedCaptchaSums.has(sum)) { console.log(`[Captcha] Skipping ${expr} = ${sum} (already rejected)`); continue; }
+            // SkillRack captchas add two numbers below 100, so anything above ~200 is an OCR artefact
+            if (sum < 0 || sum > 250) continue;
+            if (n > bestN) { best = expr; bestN = n; }
+        }
+        if (!best) return null;
+        const result = sumOf(best);
+        console.log(`[Captcha] Vote: ${best} (${bestN}/${method.variants.length}) => ${result}`);
+        return result;
+    }
+
+    let captchaInFlight = false;
+
+    // ===== Main solve loop: OCR → submit → watch AJAX result → retry (max 3) → manual =====
     async function handleCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
+        if (captchaInFlight) { console.log('[Captcha] Solver already running - skipping duplicate call'); return; }
+        if (typeof Tesseract === 'undefined') { console.log('[Captcha] Tesseract not loaded, skipping'); return; }
 
-        // Check if we've exceeded max auto-retries
-        const retryCount = getCaptchaRetryCount();
-        if (retryCount >= CAPTCHA_MAX_AUTO_RETRIES) {
-            console.log(`[Captcha] ⚠️ Max auto-retries (${CAPTCHA_MAX_AUTO_RETRIES}) reached - stopping auto-solve`);
-            handleIncorrectCaptcha();
-            return;
-        }
-
-        if (typeof Tesseract === 'undefined') {
-            console.log('[Captcha] Tesseract not loaded, skipping');
-            return;
-        }
-
-        console.log('[Captcha] Starting captcha detection...');
-
-        let image;
+        captchaInFlight = true;
         try {
-            image = await waitForCaptchaImage();
-        } catch (e) {
-            console.error('[Captcha] Failed to find captcha image:', e.message);
-            return;
-        }
-
-        const textbox = document.getElementById(CAPTCHA_INPUT_ID);
-        const button = document.getElementById(PROCEED_BTN_ID);
-
-        if (!textbox || !button) {
-            console.log("[Captcha] Input or button not found. Input:", !!textbox, "Button:", !!button);
-            return;
-        }
-
-        console.log("[Captcha] All elements found! Processing OCR...");
-
-        // Ensure image is fully loaded
-        if (!image.complete) {
-            await new Promise(resolve => {
-                image.onload = resolve;
-                setTimeout(resolve, 1000);
-            });
-        }
-
-        // ===== USE ONE OCR METHOD PER RETRY (HIERARCHY) =====
-        // Each failed submit reloads the captcha page and bumps the retry count,
-        // which advances to the next OCR method. If Enhanced keeps misreading,
-        // the retry switches to Inverted, then Original — giving each of the
-        // 3 attempts a genuinely different image processing instead of
-        // re-submitting the same wrong answer every time.
-        const processingMethods = [
-            { name: "Enhanced", fn: () => processImageForOCR(image) },
-            { name: "Inverted", fn: () => invertColors(image) },
-            { name: "Original", fn: () => image.src }
-        ];
-
-        const retryIdx = getCaptchaRetryCount();
-        const methodIdx = Math.min(retryIdx, processingMethods.length - 1);
-        const method = processingMethods[methodIdx];
-
-        console.log(`[Captcha] Using ${method.name} processing (attempt ${retryIdx + 1}/${CAPTCHA_MAX_AUTO_RETRIES})...`);
-
-        try {
-            const processedImg = method.fn();
-
-            const { data: { text } } = await Tesseract.recognize(processedImg, "eng", {
-                tessedit_char_whitelist: "0123456789+= ",
-                tessedit_pageseg_mode: "7", // Single line
-            });
-
-            console.log(`[Captcha] OCR Result (${method.name}): "${text.trim()}"`);
-            const result = solveCaptcha(text);
-
-            if (result !== null) {
-                // Validate result is reasonable (1-198 for sum of two 1-99 numbers)
-                if (result < 1 || result > 198) {
-                    console.log(`[Captcha] ⚠️ Result ${result} seems invalid`);
-                    handleIncorrectCaptcha();
-                    return;
-                }
-
-                console.log(`[Captcha] ✓ Solution found: ${result}`);
-                console.log(`[Captcha] Submitting answer...`);
-
-                // Mark that we're attempting (will be checked on next page load)
-                localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
-
-                textbox.value = result;
-                setTimeout(() => safeButtonClick(button), 100);
+            if (getCaptchaRetryCount() >= CAPTCHA_MAX_AUTO_RETRIES || localStorage.getItem(CAPTCHA_FAILED_KEY)) {
+                console.log(`[Captcha] [warn] Max auto-retries (${CAPTCHA_MAX_AUTO_RETRIES}) reached - asking for manual input`);
+                await handleIncorrectCaptcha();
                 return;
             }
 
-        } catch (error) {
-            console.error(`[Captcha] ${method.name} OCR Error:`, error);
-        }
+            console.log('[Captcha] Starting captcha detection...');
+            rejectedCaptchaSums.clear();
+            let image;
+            try {
+                image = await waitForCaptchaImage();
+            } catch (e) {
+                console.error('[Captcha] Failed to find captcha image:', e.message);
+                return;
+            }
 
-        // Method failed to produce a valid result
-        console.log(`[Captcha] ✗ ${method.name} OCR method failed`);
-        handleIncorrectCaptcha();
+            while (getCaptchaRetryCount() < CAPTCHA_MAX_AUTO_RETRIES) {
+                const attempt = getCaptchaRetryCount();
+                // Elements may have been re-rendered by the previous AJAX update → re-query every time
+                image = findCaptchaImage() || image;
+                const textbox = document.getElementById(CAPTCHA_INPUT_ID);
+                const button = document.getElementById(PROCEED_BTN_ID);
+                if (!textbox || !button) {
+                    console.log('[Captcha] Input or button not found. Input:', !!textbox, 'Button:', !!button);
+                    return;
+                }
+                if (!image.complete) {
+                    await new Promise(resolve => { image.onload = resolve; setTimeout(resolve, 1000); });
+                }
+
+                let result = null;
+                try {
+                    result = await recognizeCaptchaOnce(image, attempt);
+                } catch (error) {
+                    console.error('[Captcha] OCR Error:', error);
+                }
+
+                if (result === null) {
+                    console.log('[Captcha] [fail] OCR method failed to produce a value');
+                    incrementCaptchaRetry();
+                    continue;
+                }
+
+                console.log(`[Captcha] [ok] Solution found: ${result}, submitting...`);
+                clearCaptchaGrowl();
+                localStorage.setItem(CAPTCHA_PENDING_KEY, 'true');
+                textbox.value = result;
+                textbox.dispatchEvent(new Event('input', { bubbles: true }));
+                textbox.dispatchEvent(new Event('change', { bubbles: true }));
+                const prevSrc = image.src;
+                await new Promise(r => setTimeout(r, 100));
+                safeButtonClick(button);
+
+                const outcome = await waitForCaptchaResult(prevSrc);
+                if (outcome === 'success') {
+                    console.log('[Captcha] [ok] Captcha accepted!');
+                    resetCaptchaRetry();
+                    return;
+                }
+                localStorage.removeItem(CAPTCHA_PENDING_KEY);
+                if (outcome === 'incorrect') rejectedCaptchaSums.add(result);
+                const n = incrementCaptchaRetry();
+                console.log(`[Captcha] [fail] Answer ${result} rejected (${outcome}) - ${n}/${CAPTCHA_MAX_AUTO_RETRIES}`);
+            }
+
+            console.log('[Captcha] [warn] Max retries reached - requesting manual input');
+            localStorage.setItem(CAPTCHA_FAILED_KEY, 'true');
+            await handleIncorrectCaptcha();
+        } finally {
+            captchaInFlight = false;
+        }
     }
 
-
-    function handleIncorrectCaptcha() {
+    // Manual fallback: keeps asking until the captcha is accepted or the user cancels.
+    async function handleIncorrectCaptcha() {
         if (!SETTINGS.enableCaptchaSolver) return;
-
-        // Mark that we've had an incorrect captcha attempt
         sessionStorage.setItem('captchaAttemptFailed', 'true');
 
-        const retryCount = getCaptchaRetryCount();
-        console.log(`[Captcha] ⚠️ Auto-solve failed after ${retryCount} attempts - requesting manual input`);
+        for (;;) {
+            const retryCount = getCaptchaRetryCount();
+            console.log(`[Captcha] [warn] Auto-solve failed after ${retryCount} attempts - requesting manual input`);
+            const captext = prompt(`Captcha auto-solve failed (${retryCount} attempts).\n\nPlease look at the captcha image and enter the math result manually:\n(e.g., if you see "7 + 2", enter "9")`);
+            if (captext === null || captext.trim() === '') {
+                console.log('[Captcha] User cancelled manual input');
+                return;
+            }
+            const textbox = document.getElementById(CAPTCHA_INPUT_ID);
+            const button = document.getElementById(PROCEED_BTN_ID);
+            if (!textbox || !button) return;
 
-        const captext = prompt(`❌ Captcha auto-solve failed (${retryCount} attempts).\n\nPlease look at the captcha image and enter the math result manually:\n(e.g., if you see "7 + 2", enter "9")`);
-
-        if (captext === null || captext.trim() === '') {
-            console.log('[Captcha] User cancelled manual input');
-            return;
-        }
-
-        const textbox = document.getElementById(CAPTCHA_INPUT_ID);
-        const button = document.getElementById(PROCEED_BTN_ID);
-
-        if (textbox && button) {
-            // Reset retry count on manual input (user is solving it now)
-            resetCaptchaRetry();
-
+            clearCaptchaGrowl();
+            const img = findCaptchaImage();
             textbox.value = captext.trim();
-            setTimeout(() => safeButtonClick(button), 100);
+            await new Promise(r => setTimeout(r, 100));
+            safeButtonClick(button);
+            const outcome = await waitForCaptchaResult(img && img.src);
+            if (outcome === 'success') {
+                console.log('[Captcha] [ok] Manual captcha accepted');
+                resetCaptchaRetry();
+                return;
+            }
+            console.log(`[Captcha] [fail] Manual answer rejected (${outcome})`);
         }
     }
 
@@ -6507,10 +6706,8 @@ Compare the output character-by-character against the expected sample outputs (i
         }
     }, false);
 
-    // Check if captcha elements exist on the current page
     // Check if we're on the CODING page (has Run, Save buttons)
     function isOnCodingPageGlobal() {
-        // Check for Run button
         const buttons = document.querySelectorAll('button');
         for (const btn of buttons) {
             const text = btn.textContent || '';
@@ -6518,7 +6715,6 @@ Compare the output character-by-character against the expected sample outputs (i
                 return true;
             }
         }
-        // Check for code editor
         if (document.getElementById('txtCode') || document.querySelector('.ace_editor')) {
             return true;
         }
@@ -6526,94 +6722,43 @@ Compare the output character-by-character against the expected sample outputs (i
     }
 
     function hasCaptchaElements() {
-        // If we're on coding page with Run/Save buttons, we're NOT on captcha page
-        if (isOnCodingPageGlobal()) {
-            return false;
-        }
-
+        if (isOnCodingPageGlobal()) return false;
         const captchaInput = document.getElementById(CAPTCHA_INPUT_ID);
         const proceedBtn = document.getElementById(PROCEED_BTN_ID);
-        // Must have both input and proceed button visible
-        return captchaInput && proceedBtn && (proceedBtn.offsetParent !== null || proceedBtn.style.display !== 'none');
+        return !!(captchaInput && proceedBtn && (proceedBtn.offsetParent !== null || proceedBtn.style.display !== 'none'));
     }
 
+    let captchaInitDone = false;
     function initCaptchaSolver() {
         if (!SETTINGS.enableCaptchaSolver) return;
+        if (captchaInitDone) return;
 
-        // Log current retry state
         const currentRetries = getCaptchaRetryCount();
         const hasPending = localStorage.getItem(CAPTCHA_PENDING_KEY);
         const hasFailed = localStorage.getItem(CAPTCHA_FAILED_KEY);
         console.log(`[Captcha] State: retries=${currentRetries}, pending=${!!hasPending}, failed=${!!hasFailed}`);
 
-        // FIRST: Check if captcha elements exist on this page
         if (!hasCaptchaElements()) {
             console.log('[Captcha] No captcha on this page - skipping');
-
-            // If we're on the coding page (AI solution page), ALWAYS reset captcha state
-            // This ensures fresh start when user navigates back to solve another problem
-            if (isOnCodingPageGlobal()) {
-                console.log('[Captcha] On coding page - resetting all captcha state for fresh start');
-                resetCaptchaRetry();
-            } else if (hasPending) {
-                // Clear pending flag if we successfully passed captcha (on other pages)
-                console.log('[Captcha] ✓ Previous captcha was correct! Resetting retry count.');
-                localStorage.removeItem(CAPTCHA_PENDING_KEY);
+            // Any non-captcha page means the previous captcha (if any) was passed → fresh start
+            if (isOnCodingPageGlobal() || hasPending || currentRetries || hasFailed) {
                 resetCaptchaRetry();
             }
             return;
         }
+        captchaInitDone = true;
 
-        // We ARE on a captcha page
         console.log('[Captcha] Captcha page detected');
 
-        // Check for Incorrect Captcha error on page
-        const errors = document.getElementsByClassName(ERROR_CLASS);
-        let hasIncorrectCaptchaError = false;
-        for (let err of errors) {
-            if (err.textContent && err.textContent.includes("Incorrect Captcha")) {
-                hasIncorrectCaptchaError = true;
-                console.log('[Captcha] Found "Incorrect Captcha" error message');
-                break;
-            }
-        }
-
-        // If we had a pending submit and we're STILL on captcha page, it failed
-        // (Either explicit error OR page just reloaded with new captcha)
+        // Full-reload case: we submitted, the page reloaded and we're still on a captcha → that attempt failed
         if (hasPending) {
             localStorage.removeItem(CAPTCHA_PENDING_KEY);
-
-            // Being back on captcha page after submit = failure
             const newCount = incrementCaptchaRetry();
-            console.log(`[Captcha] ✗ Previous attempt FAILED - back on captcha page (${newCount}/${CAPTCHA_MAX_AUTO_RETRIES})`);
-
-            // Check if we've exceeded max retries
-            if (newCount >= CAPTCHA_MAX_AUTO_RETRIES) {
-                console.log('[Captcha] ⚠️ Max retries reached - requesting manual input');
-                localStorage.setItem(CAPTCHA_FAILED_KEY, 'true');
-                handleIncorrectCaptcha();
-                return;
-            }
+            console.log(`[Captcha] [fail] Previous attempt FAILED - back on captcha page (${newCount}/${CAPTCHA_MAX_AUTO_RETRIES})`);
         }
 
-        // Don't auto-solve if marked as failed
-        if (hasFailed || localStorage.getItem(CAPTCHA_FAILED_KEY)) {
-            console.log('[Captcha] Manual mode - not auto-solving (max retries exceeded)');
-            // Show prompt for manual input
-            handleIncorrectCaptcha();
-            return;
-        }
-
-        if (sessionStorage.getItem("captchaFail")) {
-            sessionStorage.removeItem("captchaFail");
-            const oldBtnId = sessionStorage.getItem("Solvebtnid");
-            if (oldBtnId) {
-                const oldBtn = document.getElementById(oldBtnId);
-                if (oldBtn) oldBtn.click();
-            }
-            return;
-        }
-
+        // Warm the OCR worker while the page is settling
+        getCaptchaWorker();
         handleCaptcha();
     }
 
@@ -6625,33 +6770,24 @@ Compare the output character-by-character against the expected sample outputs (i
             setTimeout(initCaptchaSolver, 100);
         }
 
-        window.addEventListener("load", function () {
-            setTimeout(() => {
-                // Clear the failure flag when page reloads after successful submission
-                const errors = document.getElementsByClassName(ERROR_CLASS);
-                let hasIncorrectCaptchaError = false;
-                for (let err of errors) {
-                    if (err.textContent.includes("Incorrect Captcha")) {
-                        hasIncorrectCaptchaError = true;
-                        break;
-                    }
-                }
+        // Backup: some pages render the captcha panel late (AJAX). Try again after load,
+        // and watch for a captcha panel appearing later (e.g. after clicking "Solve").
+        window.addEventListener('load', () => setTimeout(initCaptchaSolver, 500));
+        let lateObserver = null;
+        const armLateObserver = () => {
+            if (lateObserver || !document.body) return;
+            lateObserver = new MutationObserver(() => {
+                if (captchaInitDone) { lateObserver.disconnect(); return; }
+                if (captchaInFlight) return;
+                if (hasCaptchaElements()) initCaptchaSolver();
+            });
+            lateObserver.observe(document.body, { childList: true, subtree: true });
+            // Stop watching after a while — a captcha that never appears isn't coming
+            setTimeout(() => lateObserver && lateObserver.disconnect(), 60000);
+        };
+        if (document.body) armLateObserver(); else document.addEventListener('DOMContentLoaded', armLateObserver);
 
-                // Only clear flags if there's no error (meaning previous attempt was successful)
-                if (!hasIncorrectCaptchaError) {
-                    resetCaptchaRetry();
-                }
-
-                const img = findCaptchaImage();
-                const textbox = document.getElementById(CAPTCHA_INPUT_ID);
-                if (img && textbox && !textbox.value) {
-                    console.log('[Captcha] Backup initialization triggered');
-                    handleCaptcha();
-                }
-            }, 500);
-        });
-
-        console.log('Anti-cheat bypass script v6.0 loaded successfully');
+        console.log(`Anti-cheat bypass script v${SCRIPT_VERSION} loaded successfully`);
         console.log('Settings:', SETTINGS);
     });
 
@@ -7598,6 +7734,29 @@ Compare the output character-by-character against the expected sample outputs (i
         return code.trim();
     };
 
+    // ========== HELPER: fetch with timeout (top-level scope) ==========
+    // NOTE: the FindIncomplete module has its own fetchWithTimeout that is NOT
+    // visible here. Cross-origin hosts (raw.githubusercontent.com) answer with
+    // "Access-Control-Allow-Origin: *", which browsers reject when credentials
+    // are sent — so only include cookies for same-origin (SkillRack) URLs.
+    const fetchWithTimeout = async (url, options = {}, timeout = 10000) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        let sameOrigin = false;
+        try { sameOrigin = new URL(url, location.href).origin === location.origin; } catch (e) { }
+        try {
+            const res = await fetch(url, {
+                ...options,
+                signal: controller.signal,
+                credentials: sameOrigin ? 'include' : 'omit',
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.text();
+        } finally {
+            clearTimeout(id);
+        }
+    };
+
     // ========== LOCAL SERVER / GITHUB HELPER: fetch solution ==========
     const generateWithLocalServer = async () => {
         const pid = getProgramId();
@@ -8102,7 +8261,7 @@ SOLVING APPROACH:
                     }
 
                     if (calculateCodeSimilarity(code, existingCode) > 0.99) {
-                        notifyPopup('⚠️ AI returned code too similar to existing code even after retry. Please try again.');
+                        notifyPopup('AI returned code too similar to existing code even after retry. Please try again.');
                         return;
                     }
                 }
@@ -8302,6 +8461,135 @@ SOLVING APPROACH:
         };
 
         const STOP_PERSIST_KEY = 'autosolver_stopped';
+        const SKIP_LIST_KEY = 'autosolver_skipped_problems';      // { "<ProgramID>": {title, reason, ts} }
+        const SKIP_STREAK_KEY = 'autosolver_consecutive_skips';    // survives the full-page reload that "Back" causes
+
+        // ── Skipped ("temporarily can't solve") problem list ─────────────────────
+        // When a problem exhausts its retries it is recorded here and the solver
+        // moves on to the next problem instead of hammering the same one forever.
+        // The list is shown (and clearable) in Settings → Auto Solver and on the
+        // status pill when the solver is stopped.
+        function loadSkipped() {
+            try { return JSON.parse(localStorage.getItem(SKIP_LIST_KEY) || '{}') || {}; } catch (e) { return {}; }
+        }
+        function saveSkipped(map) {
+            try { localStorage.setItem(SKIP_LIST_KEY, JSON.stringify(map)); } catch (e) { }
+            document.dispatchEvent(new CustomEvent('autosolver:skiplist-changed'));
+        }
+        function getSkipped() {
+            const map = loadSkipped();
+            return Object.keys(map).map(pid => ({ pid, ...map[pid] })).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        }
+        function isSkipped(pid) {
+            return !!(pid && loadSkipped()[pid]);
+        }
+        function isSkippedTitle(title) {
+            if (!title) return false;
+            const t = title.trim().toLowerCase();
+            return Object.values(loadSkipped()).some(e => (e.title || '').trim().toLowerCase() === t);
+        }
+        function markSkipped(pid, title, reason) {
+            const map = loadSkipped();
+            const key = pid || ('title:' + (title || 'unknown').trim().toLowerCase());
+            map[key] = { title: title || '', reason: reason || 'failed', ts: Date.now() };
+            saveSkipped(map);
+            console.log(`[AutoSolver] [skip] Marked ProgramID ${key} as temporarily unsolvable (${reason})`);
+        }
+        function unskip(pid) {
+            const map = loadSkipped();
+            delete map[pid];
+            saveSkipped(map);
+        }
+        function clearSkipped() {
+            saveSkipped({});
+            try { localStorage.removeItem(SKIP_STREAK_KEY); } catch (e) { }
+            console.log('[AutoSolver] Skipped-problem list cleared');
+        }
+        function getSkipStreak() {
+            try { return parseInt(localStorage.getItem(SKIP_STREAK_KEY) || '0', 10) || 0; } catch (e) { return 0; }
+        }
+        function setSkipStreak(n) {
+            try { n > 0 ? localStorage.setItem(SKIP_STREAK_KEY, String(n)) : localStorage.removeItem(SKIP_STREAK_KEY); } catch (e) { }
+        }
+
+        // Current problem identity (ProgramID label on the coding/captcha page)
+        function currentProblemId() {
+            try { return getProgramId(); } catch (e) { return null; }
+        }
+        function currentProblemTitle() {
+            try { return (getProblemDescription().title || '').trim(); } catch (e) { return ''; }
+        }
+
+        // On a problem LIST page: the Solve button of the first problem that is not skipped.
+        // Each Solve button lives in a card / row that carries a "ProgramID- 1234" label and a title.
+        // List cards look like: <b>MFIB - Four Integers (Id-10664)</b> ... <button>Solve</button>
+        function describeSolveButton(btn) {
+            const box = btn.closest('.ui-card-content, .ui-card, tr[data-ri], .ui-panelgrid-cell, .ui-g-12') || btn.parentElement;
+            const text = box ? (box.textContent || '') : '';
+            const m = text.match(/\(\s*Id\s*[-:#]?\s*(\d{2,})\s*\)/i) || text.match(/Program\s*ID\s*[:#-]?\s*(\d{2,})/i) || text.match(/\bId\s*[-:#]\s*(\d{2,})/i);
+            const header = box && box.querySelector('b, .ui.header, .header, h1, h2, h3, h4, .ui-card-title');
+            const title = header ? header.textContent.replace(/\(\s*Id\s*[-:#]?\s*\d+\s*\)/i, '').trim() : '';
+            return { pid: m ? m[1] : null, title };
+        }
+        function findNextSolveButton() {
+            const all = [];
+            for (const btn of document.querySelectorAll('button')) {
+                const span = btn.querySelector('span.ui-button-text');
+                if (span && span.textContent.trim() === 'Solve') all.push(btn);
+            }
+            if (!all.length) return { btn: null, total: 0, skipped: 0 };
+            let skipped = 0;
+            for (const btn of all) {
+                const { pid, title } = describeSolveButton(btn);
+                if ((pid && isSkipped(pid)) || (!pid && isSkippedTitle(title))) { skipped++; continue; }
+                return { btn, pid, title, total: all.length, skipped };
+            }
+            return { btn: null, total: all.length, skipped };
+        }
+
+        // "Back" button on the coding / captcha page returns to the problem list
+        function findBackButtonForList() {
+            for (const el of document.querySelectorAll('button, a.ui-commandlink, input[type="submit"]')) {
+                const span = el.querySelector?.('span.ui-button-text');
+                const text = ((span?.textContent || el.textContent || el.value || '')).trim().toLowerCase();
+                if (text === 'back' || text === 'go back' || text === 'back to list' || text.startsWith('back ')) return el;
+            }
+            return null;
+        }
+
+        // Give up on the current problem: record it, then move to the next one.
+        async function skipCurrentAndMoveOn(reason, { countStreak = true } = {}) {
+            const pid = currentProblemId();
+            const title = currentProblemTitle();
+            if (countStreak || !isSkipped(pid)) markSkipped(pid, title, reason);
+            const streak = countStreak ? getSkipStreak() + 1 : getSkipStreak();
+            setSkipStreak(streak);
+            const maxSkips = SETTINGS.autoSolverMaxSkips || 5;
+            updateStatus(`Skipped #${pid || '?'} (${reason}) — ${streak}/${maxSkips} in a row`, 'warning');
+
+            if (streak >= maxSkips) {
+                console.log(`[AutoSolver] ${streak} problems skipped in a row — stopping (clear the skip list to continue)`);
+                stop();
+                updateStatus(`Stopped: ${streak} skipped in a row`, 'error');
+                return false;
+            }
+
+            await sleep(1000);
+            const back = findBackButtonForList();
+            if (!back) {
+                console.log('[AutoSolver] No Back button found — cannot move to next problem automatically');
+                updateStatus('Skipped — open the next problem manually', 'warning');
+                return false;
+            }
+            updateStatus('Going back to the problem list...', 'info');
+            forceClick(back, 'Back');
+            // "Back" is a JSF POST → usually a full page reload; solve() re-runs on load and
+            // picks the next non-skipped problem. If it was AJAX instead, trigger it here.
+            let waited = 0;
+            while (waited < 8000 && !isOnProblemListPage()) { await sleep(250); waited += 250; if (shouldStop) return false; }
+            if (isOnProblemListPage() && !shouldStop) setTimeout(() => solve(), 1500);
+            return true;
+        }
 
         let isRunning = false;
         let solveInvocationActive = false;
@@ -8390,7 +8678,8 @@ SOLVING APPROACH:
         // ── Exponential backoff helper ────────────────────────────────────────────
         // Returns backoff delay (ms) for the given attempt number (0-indexed)
         function getBackoffDelay(attemptIndex) {
-            const delay = CONFIG.backoffBase * Math.pow(CONFIG.backoffMultiplier, attemptIndex);
+            const base = parseInt(SETTINGS.autoSolverBackoffBase, 10) || CONFIG.backoffBase;
+            const delay = base * Math.pow(CONFIG.backoffMultiplier, attemptIndex);
             return Math.min(delay, CONFIG.backoffCap);
         }
 
@@ -8626,6 +8915,29 @@ SOLVING APPROACH:
         // ── Status indicator ─────────────────────────────────────────────────────
         let stopButton = null;
         let statusText = null;
+        let skipButton = null;
+        let clearSkipsButton = null;
+
+        function refreshClearSkipsButton() {
+            if (!clearSkipsButton) return;
+            const n = getSkipped().length;
+            clearSkipsButton.textContent = `CLEAR SKIPS (${n})`;
+            clearSkipsButton.style.display = n > 0 ? 'inline-block' : 'none';
+        }
+
+        // Manual skip (SKIP button / window.AutoSolver.skipCurrent)
+        async function skipCurrent(reason = 'manual skip') {
+            abortResultWait();
+            clearInjectedRetryContext();
+            shouldStop = true;           // unwind any running solve loop
+            await sleep(300);
+            shouldStop = false;
+            isRunning = false;
+            solveInvocationActive = false;
+            createStatusIndicator();
+            showStatus();
+            return skipCurrentAndMoveOn(reason);
+        }
 
         function updateStatus(message, type = 'info') {
             console.log(`[AutoSolver] ${message}`);
@@ -8690,6 +9002,29 @@ SOLVING APPROACH:
             });
             statusIndicator.appendChild(stopButton);
 
+            skipButton = document.createElement('button');
+            skipButton.id = 'auto-solver-skip';
+            skipButton.textContent = 'SKIP';
+            skipButton.title = "Mark this problem as temporarily unsolvable and move to the next one";
+            skipButton.style.cssText = stopButton.style.cssText + 'background:#FF9800;margin-left:4px;';
+            skipButton.addEventListener('mouseover', () => { skipButton.style.background = '#ef6c00'; });
+            skipButton.addEventListener('mouseout', () => { skipButton.style.background = '#FF9800'; });
+            skipButton.addEventListener('click', () => { skipCurrent('manual skip'); });
+            statusIndicator.appendChild(skipButton);
+
+            clearSkipsButton = document.createElement('button');
+            clearSkipsButton.id = 'auto-solver-clear-skips';
+            clearSkipsButton.style.cssText = stopButton.style.cssText + 'background:#607D8B;margin-left:4px;display:none;';
+            clearSkipsButton.title = 'Forget every problem marked "can\'t solve" so they are retried';
+            clearSkipsButton.addEventListener('click', () => {
+                clearSkipped();
+                refreshClearSkipsButton();
+                updateStatus('Skip list cleared', 'success');
+            });
+            statusIndicator.appendChild(clearSkipsButton);
+            refreshClearSkipsButton();
+            document.addEventListener('autosolver:skiplist-changed', refreshClearSkipsButton);
+
             if (document.body) {
                 document.body.appendChild(statusIndicator);
             } else {
@@ -8708,15 +9043,29 @@ SOLVING APPROACH:
         }
 
         // ── AI Generation wait ────────────────────────────────────────────────────
-        async function waitForAIGeneration() {
+        async function waitForAIGeneration(editorBefore = null) {
             const start = Date.now();
             updateStatus('Generating solution...', 'info');
+
+            // Saved solutions (GitHub bank / View Solution) land in the editor within
+            // milliseconds, long before the button ever shows "Generating". Treat a
+            // changed editor as a completed generation.
+            const editorChanged = () => {
+                if (editorBefore === null) return false;
+                try {
+                    const mf = extractMFIBTemplate();
+                    if (mf.inputs.length > 0) return mf.inputs.every(inp => ((inp.value || '') + '').trim() !== '');
+                    const now = editorContent().trim();
+                    return now.length > 0 && now !== editorBefore;
+                } catch (e) { return false; }
+            };
 
             // Phase 1: Wait up to 5s for generation to actually start
             let started = false;
             const startCheckDeadline = Date.now() + 5000;
             while (Date.now() < startCheckDeadline) {
                 if (shouldStop) return false;
+                if (editorChanged()) { console.log('[AutoSolver] Editor filled instantly (saved solution)'); return true; }
                 const btn = document.querySelector('#ai-solution-btn');
                 if (btn) {
                     const text = btn.innerText || btn.textContent || '';
@@ -8731,9 +9080,10 @@ SOLVING APPROACH:
             }
 
             if (!started) {
+                if (editorChanged()) return true;
                 console.warn('[AutoSolver] Generation did not start within 5s');
                 await sleep(3000);
-                return false;
+                return editorChanged();
             }
 
             // Phase 2: Wait for generation to complete
@@ -8841,6 +9191,21 @@ SOLVING APPROACH:
             return isVisible(captchaInput) && isVisible(proceedBtn);
         }
 
+        // Text currently in the code editor (ACE instance attached to the DOM node, or the textarea)
+        function editorContent() {
+            try { const el = document.querySelector('.ace_editor'); if (el && el.env && el.env.editor) return el.env.editor.getValue() || ''; } catch (e) { }
+            try { const el = document.querySelector('.ace_editor'); if (el && window.ace) return ace.edit(el).getValue() || ''; } catch (e) { }
+            const ta = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+            return ta ? (ta.value || '') : '';
+        }
+
+        // True when there is something worth running: code in the editor, or every MFIB blank filled
+        function editorHasSolution() {
+            const mf = extractMFIBTemplate();
+            if (mf.inputs.length > 0) return mf.inputs.every(inp => ((inp.value || '') + '').trim() !== '');
+            return editorContent().trim().length > 0;
+        }
+
         function hasCodeEditor() {
             if (document.getElementById('txtCode') !== null) return true;
             if (document.querySelector('#codediv textarea') !== null) return true;
@@ -8878,31 +9243,52 @@ SOLVING APPROACH:
             showStatus();
             updateStatus('Analyzing page...', 'info');
 
-            // On problem LIST page — click Solve first
+            // On problem LIST page — click the first Solve button that is not on the skip list
             if (isOnProblemListPage() && !isOnCodingPage()) {
-                updateStatus('Finding Solve button...', 'info');
-                console.log('[AutoSolver] On problem list page - looking for Solve button...');
-                const solveButtons = document.querySelectorAll('button');
-                for (const btn of solveButtons) {
-                    if (shouldStop) { updateStatus('Stopped', 'warning'); setTimeout(hideStatus, 2000); solveInvocationActive = false; return false; }
-                    const span = btn.querySelector('span.ui-button-text');
-                    if (span && span.textContent === 'Solve') {
-                        console.log('[AutoSolver] Found Solve button, clicking...');
-                        updateStatus('Clicking Solve...', 'info');
-                        forceClick(btn, 'Solve Problem');
-                        await sleep(3000);
-                        if (shouldStop) { hideStatus(); solveInvocationActive = false; return false; }
-                        hideStatus();
-                        if (!shouldStop) setTimeout(() => solve(), 2000);
-                        solveInvocationActive = false;
-                        return true;
-                    }
+                updateStatus('Finding next problem...', 'info');
+                const pick = findNextSolveButton();
+                if (pick.btn) {
+                    console.log(`[AutoSolver] Next problem: ProgramID ${pick.pid || '?'} "${pick.title}" (skipped ${pick.skipped}/${pick.total} on this page)`);
+                    updateStatus(`Solving ${pick.title || ('#' + (pick.pid || '?'))}...`, 'info');
+                    forceClick(pick.btn, 'Solve Problem');
+                    await sleep(3000);
+                    if (shouldStop) { hideStatus(); solveInvocationActive = false; return false; }
+                    hideStatus();
+                    if (!shouldStop) setTimeout(() => solve(), 2000);
+                    solveInvocationActive = false;
+                    return true;
                 }
-                console.log('[AutoSolver] No Solve button found on list page');
-                updateStatus('No Solve button found', 'warning');
-                setTimeout(hideStatus, 3000);
+                if (pick.total > 0) {
+                    console.log(`[AutoSolver] All ${pick.total} problems on this page are on the skip list`);
+                    updateStatus(`All ${pick.total} problems here are skipped — clear the list to retry`, 'warning');
+                } else {
+                    console.log('[AutoSolver] No Solve button found on list page');
+                    updateStatus('No Solve button found', 'warning');
+                }
+                setTimeout(hideStatus, 4000);
                 solveInvocationActive = false;
                 return false;
+            }
+
+            // On a coding/captcha page for a problem that is already on the skip list → don't retry it
+            {
+                const pid = currentProblemId();
+                if (pid && isSkipped(pid)) {
+                    const relands = (parseInt(sessionStorage.getItem('autosolver_relands') || '0', 10) || 0) + 1;
+                    sessionStorage.setItem('autosolver_relands', String(relands));
+                    console.log(`[AutoSolver] ProgramID ${pid} is on the skip list, moving on (re-landed ${relands}x)`);
+                    updateStatus(`#${pid} is skipped, moving on`, 'warning');
+                    solveInvocationActive = false;
+                    if (relands >= 3) {
+                        // The list keeps sending us to the same parked problem: stop instead of spinning
+                        stop();
+                        updateStatus(`Stopped: list keeps opening skipped #${pid}. Clear the skip list or open another part.`, 'error');
+                        return false;
+                    }
+                    await skipCurrentAndMoveOn('still skipped', { countStreak: false });
+                    return false;
+                }
+                sessionStorage.removeItem('autosolver_relands');
             }
 
             // Wait for captcha to be solved
@@ -8999,11 +9385,22 @@ SOLVING APPROACH:
                 checkStop();
                 if (!aiBtn) { updateStatus('AI button not found', 'error'); return false; }
 
+                const editorBefore = editorContent().trim();
                 forceClick(aiBtn, 'AI Solution');
 
                 // Step 2: Wait for AI generation to complete
-                const generated = await waitForAIGeneration();
+                let generated = await waitForAIGeneration(editorBefore);
                 checkStop();
+                // A "finished" generation that left SkillRack's empty template untouched is a
+                // failure too (provider error, empty answer, insertion failure). Running the
+                // template would only waste a submission.
+                if (generated && extractMFIBTemplate().inputs.length === 0) {
+                    const editorAfter = editorContent().trim();
+                    if (!editorAfter || editorAfter === editorBefore) {
+                        console.warn('[AutoSolver] Editor unchanged after generation (template only), treating as failed generation');
+                        generated = false;
+                    }
+                }
                 if (!generated) {
                     currentRetries++;
                     const backoff = getBackoffDelay(currentRetries - 1);
@@ -9016,7 +9413,17 @@ SOLVING APPROACH:
                 await sleep(SETTINGS.autoSolverDelay || CONFIG.delayAfterGen);
                 checkStop();
 
-                // Step 3: Click Run button
+                // Step 3: Click Run button (never on an empty editor: that only burns a
+                // submission and produces a meaningless "wrong output" retry context)
+                if (!editorHasSolution()) {
+                    currentRetries++;
+                    clearInjectedRetryContext();
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    console.warn('[AutoSolver] Editor is empty after generation, not clicking Run');
+                    await sleepWithCountdown(backoff, `Editor empty, retry ${currentRetries}/${maxRetries}`);
+                    checkStop();
+                    continue;
+                }
                 clearPreviousResults();
 
                 // Find the Run button — JSF generates dynamic IDs like j_id_bg, j_id_bj, etc.
@@ -9069,8 +9476,9 @@ SOLVING APPROACH:
                 // Step 5: Handle result with error-type-aware status
                 if (result === 'success') {
                     clearInjectedRetryContext();
-                    updateStatus('PASSED ✓', 'success');
-                    await sleep(CONFIG.delayBeforeNext);
+                    setSkipStreak(0);
+                    updateStatus('PASSED', 'success');
+                    await sleep(parseInt(SETTINGS.autoSolverDelayBeforeNext, 10) || CONFIG.delayBeforeNext);
                     checkStop();
 
                     const movedNext = await clickProceedNext();
@@ -9115,7 +9523,9 @@ SOLVING APPROACH:
                 }
             }
 
-            updateStatus(`Failed after ${maxRetries} attempts`, 'error');
+            updateStatus(`Failed after ${maxRetries} attempts — skipping this problem`, 'error');
+            await sleep(1500);
+            await skipCurrentAndMoveOn(`failed ${maxRetries}x`);
             return false;
         }
 
@@ -9171,6 +9581,7 @@ SOLVING APPROACH:
                 showStatus();
                 updateStatus('Stopped (click to resume)', 'warning');
 
+                refreshClearSkipsButton();
                 if (stopButton) {
                     stopButton.textContent = 'RESUME';
                     stopButton.style.background = '#4CAF50';
@@ -9239,7 +9650,15 @@ SOLVING APPROACH:
             stop,
             init,
             isRunning: () => isRunning,
-            resetFailures: () => { consecutiveFailures = 0; }
+            resetFailures: () => { consecutiveFailures = 0; setSkipStreak(0); },
+            // Skip-list API (also used by the settings panel)
+            skipCurrent,
+            getSkipped,
+            isSkipped,
+            unskip,
+            clearSkipped,
+            markSkipped,
+            findNextSolveButton
         };
     })();
 
@@ -9298,8 +9717,9 @@ SOLVING APPROACH:
             return enqueueRequest(async () => {
                 if (signal && signal.aborted) throw new Error('Cancelled');
 
-                // Rate-limiting delay: 300-500ms
-                await new Promise(r => setTimeout(r, 300 + Math.random() * 200));
+                // Rate-limiting delay: 100-200ms (SkillRack tolerates this fine; the old 300-500ms
+                // pacing made a full scan take several minutes)
+                await new Promise(r => setTimeout(r, 100 + Math.random() * 100));
 
                 if (signal && signal.aborted) throw new Error('Cancelled');
 
@@ -9691,7 +10111,7 @@ SOLVING APPROACH:
         async function crawlPage(url, transition, parentViewState, pathNames, buttonPath, statusCallback) {
             if (activeController && activeController.signal.aborted) throw new Error('Cancelled');
 
-            const currentPathName = pathNames.join(' ➔ ');
+            const currentPathName = pathNames.join(' > ');
             if (currentPathName) {
                 statusCallback(`Scraping: ${currentPathName}...`);
             }
@@ -9978,7 +10398,30 @@ SOLVING APPROACH:
             return url.split('#')[0].split('?')[0];
         }
 
-        async function runFullCrawl() {
+        function applySolvedInfo(part, solvedCounts) {
+            if (part.status === 'ok') {
+                const solvedInfo = matchSolvedInfo(part.partName, solvedCounts);
+                part.solvedCount = solvedInfo ? solvedInfo.solvedCount : 0;
+                part.ratio = part.totalCount > 0 ? (part.solvedCount / part.totalCount) : 1.0;
+            } else {
+                part.solvedCount = 0;
+                part.ratio = 0;
+            }
+        }
+
+        // Which LEVEL_URLS entry does the current page belong to? (used to scan it first)
+        function detectCurrentLevelName() {
+            const href = location.href;
+            if (/webinarcodetrack/.test(href)) return 'LACS';
+            if (/labcodeprograms/.test(href)) return 'LAB';
+            const lev = (href.match(/[?&]lev=(\d+)/) || [])[1];
+            if (lev === '100') return 'Prime';
+            if (lev) return `Level ${lev}`;
+            if (/gt=CODETUTOR/.test(href) || /codeprogram|tutorprogram/.test(href)) return 'Level 1';
+            return null;
+        }
+
+        async function runFullCrawl(onlyLevels = null) {
             if (currentState === STATE.SCANNING) return;
             setState(STATE.SCANNING);
             showStatus('Starting full scan...');
@@ -9988,50 +10431,81 @@ SOLVING APPROACH:
 
             try {
                 let allParts = [];
-                const levels = Object.keys(LEVEL_URLS);
+                // Scan the level the user is currently looking at FIRST so its incomplete
+                // parts show up within seconds; the remaining levels follow and the list
+                // is re-rendered after every level.
+                const current = detectCurrentLevelName();
+                const levels = Object.keys(LEVEL_URLS).sort((a, b) => (a === current ? -1 : b === current ? 1 : 0));
+                const onlyCurrent = (typeof onlyLevels === 'string') ? [onlyLevels] : (Array.isArray(onlyLevels) ? onlyLevels : null);
+                const failedLevels = [];
 
                 for (let i = 0; i < levels.length; i++) {
                     const levelName = levels[i];
+                    if (onlyCurrent && !onlyCurrent.includes(levelName)) continue;
                     const levelUrl = LEVEL_URLS[levelName];
-                    showStatus(`Scanning ${levelName}...`);
-                    updateLoadingMessage(`Scanning ${levelName}...`);
+                    showStatus(`Scanning ${levelName}${levelName === current ? ' (current page)' : ''}...`);
+                    updateLoadingMessage(`Scanning ${levelName} (${i + 1}/${levels.length})...`);
 
-                    const levelParts = await crawlPage(
-                        levelUrl,
-                        null,
-                        null,
-                        [levelName],
-                        [],
-                        (msg) => {
-                            showStatus(msg);
-                            updateLoadingMessage(msg);
-                        }
-                    );
+                    let levelParts = [];
+                    try {
+                        levelParts = await crawlPage(
+                            levelUrl,
+                            null,
+                            null,
+                            [levelName],
+                            [],
+                            (msg) => {
+                                showStatus(msg);
+                                updateLoadingMessage(msg);
+                            }
+                        );
+                    } catch (levelErr) {
+                        if (levelErr.message === 'Cancelled') throw levelErr;
+                        // One broken/wallet-gated level must not abort the whole scan
+                        console.warn(`FindIncomplete: ${levelName} failed: ${levelErr.message}`);
+                        failedLevels.push(levelName);
+                        levelParts = [{ partName: `${levelName} (scan failed: ${levelErr.message.slice(0, 60)})`, buttonPath: [], totalCount: 0, status: 'error' }];
+                    }
 
-                    // Add metadata fields to each resolved part
                     levelParts.forEach(p => {
                         p.levelName = levelName;
                         p.levelUrl = levelUrl;
                     });
 
                     allParts = allParts.concat(levelParts);
+
+                    // Incremental result: merge with whatever the cache already knows about
+                    // the other levels and show it right away.
+                    try {
+                        const solvedCounts = await getSolvedCounts();
+                        allParts.forEach(part => applySolvedInfo(part, solvedCounts));
+                        let previous = [];
+                        try { previous = (JSON.parse(storage.getValue('find_incomplete_cache_v2') || 'null') || {}).parts || []; } catch (e) { }
+                        const scannedNames = new Set(levels.slice(0, i + 1).filter(l => !onlyCurrent || onlyCurrent.includes(l)));
+                        const merged = allParts.concat(previous.filter(p => !scannedNames.has(p.levelName)));
+                        storage.setValue('find_incomplete_cache_v2', JSON.stringify({ parts: merged, timestamp: Date.now(), partial: i < levels.length - 1 }));
+                        if (dropdown && dropdown.style.display === 'block' && dropdown.style.opacity !== '0') {
+                            renderList(merged, Date.now());
+                        }
+                    } catch (e) {
+                        if (e.message === 'Cancelled') throw e;
+                        console.warn('FindIncomplete: incremental update failed:', e.message);
+                    }
                 }
+                if (failedLevels.length) console.warn('FindIncomplete: levels that failed to scan:', failedLevels.join(', '));
 
                 showStatus('Fetching solved counts...');
                 updateLoadingMessage('Fetching solved counts...');
                 const solvedCounts = await getSolvedCounts();
 
                 // Map solved counts to parsed parts
-                allParts.forEach(part => {
-                    if (part.status === 'ok') {
-                        const solvedInfo = matchSolvedInfo(part.partName, solvedCounts);
-                        part.solvedCount = solvedInfo ? solvedInfo.solvedCount : 0;
-                        part.ratio = part.totalCount > 0 ? (part.solvedCount / part.totalCount) : 1.0;
-                    } else {
-                        part.solvedCount = 0;
-                        part.ratio = 0;
-                    }
-                });
+                allParts.forEach(part => applySolvedInfo(part, solvedCounts));
+                if (onlyCurrent) {
+                    // Level-only scan: keep the other levels' cached results
+                    let previous = [];
+                    try { previous = (JSON.parse(storage.getValue('find_incomplete_cache_v2') || 'null') || {}).parts || []; } catch (e) { }
+                    allParts = allParts.concat(previous.filter(p => !onlyCurrent.includes(p.levelName)));
+                }
 
                 const cacheData = {
                     parts: allParts,
@@ -10111,7 +10585,14 @@ SOLVING APPROACH:
             if (forceRefresh) {
                 await runFullCrawl();
             } else if (!cache || !cache.parts) {
-                renderUnscrapedState();
+                // Nothing cached yet: scan the level the user is on right now (fast),
+                // then let them trigger the full scan for the rest.
+                const current = detectCurrentLevelName();
+                if (current) {
+                    await runFullCrawl([current]);
+                } else {
+                    renderUnscrapedState();
+                }
             } else {
                 renderList(cache.parts, cache.timestamp);
                 updateSolvedCountsSilently(cache.parts);
@@ -10316,7 +10797,7 @@ SOLVING APPROACH:
             if (incompleteList.length === 0 && failedList.length === 0) {
                 const msg = document.createElement('div');
                 msg.style.cssText = 'text-align: center; padding: 20px; color: #a1a1aa; font-style: italic;';
-                msg.innerHTML = 'All tracks completed! 🏆';
+                msg.innerHTML = UI_ICON.trophy + 'All tracks completed!';
                 dropdown.appendChild(msg);
             } else {
                 if (incompleteList.length > 0) {
@@ -10345,7 +10826,7 @@ SOLVING APPROACH:
                 if (failedList.length > 0) {
                     const failHeader = document.createElement('div');
                     failHeader.style.cssText = 'font-weight: 700; font-size: 15px; color: #f87171; margin: 14px 0 8px 0; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; display: flex; justify-content: space-between; align-items: center;';
-                    failHeader.innerHTML = '<span>⚠️ Couldn\'t Verify (Crawl Failed)</span>';
+                    failHeader.innerHTML = '<span>' + UI_ICON.warn + 'Could not verify (crawl failed)</span>';
                     listContainer.appendChild(failHeader);
 
                     failedList.forEach(item => {

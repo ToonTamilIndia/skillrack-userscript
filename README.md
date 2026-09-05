@@ -1,615 +1,387 @@
-# SkillRack Solution Bank — Beat Every Challenge, Together
+# SkillRack Userscript and Solution Bank
 
-> **Crowd-solve it once, everyone gets it.** This repo pairs a
-> **[`SKILL.md`](skill.md)** playbook with a **[`solutions/`](solutions/)** answer
-> bank (keyed by SkillRack `ProgramID`) and the **[Tampermonkey userscript](userscript.user.js)**
-> that auto-loads those answers into the editor — straight from this repo via
-> `raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
-> (the default), or from a local server (`http://localhost:3000`, for dev/testing),
-> or from AI. Contributors add verified solutions; [SKILL.md](skill.md)
-> documents the whole scraping/verification workflow.
+<p>
+  <img alt="Version" src="https://img.shields.io/badge/userscript-v7.0-2563eb?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-16a34a?style=flat-square">
+  <img alt="Solutions" src="https://img.shields.io/badge/solutions-410%2B-7c3aed?style=flat-square">
+  <img alt="AI" src="https://img.shields.io/badge/AI-DuckDuckGo%20(no%20key)-f97316?style=flat-square">
+</p>
 
-> 🔁 **Priority chain (v6.1):** 1) saved answer in `solutions/<id>.md` (GitHub raw /
-> local server) → 2) if that answer **fails the judge** (compile / runtime / wrong
-> output), the script detects the error and **falls back to the AI fixer**, feeding
-> the failing code + the judge error back to your AI provider → 3) code is rewritten
-> in the editor and you re-run. For **Level 3 (MNC Companies / CTS)**, solutions were
-> additionally cross-checked CTF-style by searching GitHub for the exact problem name
-> (e.g. `Dharaneeshwar/Cognizant-CTS-PATTERN-PROGRAMS`) and corrected against the
-> reference implementation; AI is the last-resort fallback for any problem GitHub
-> can't confirm.
+A Tampermonkey userscript for SkillRack plus a shared bank of verified solutions.
+The script restores clipboard and tab behaviour in the editor, solves the math
+captcha with OCR, fetches solved answers from this repository by ProgramID, and
+falls back to a free AI provider when no saved answer exists. The auto solver can
+work through a whole problem list on its own and parks anything it cannot solve.
 
-> ⚠️ **Please disable the script during live invigilated tests** — continuing to
-> run it mid-test may have unintended effects. Use at your own academic discretion.
+Please disable the script during invigilated tests. Use it at your own academic
+discretion. See the Disclaimer section.
 
----
+## Contents
 
-## 🧠 The Event / Collaboration
+1. [What is in this repository](#what-is-in-this-repository)
+2. [Version 7.0](#version-70)
+3. [Installation](#installation)
+4. [How a problem gets solved](#how-a-problem-gets-solved)
+5. [Auto solver](#auto-solver)
+6. [Captcha solver](#captcha-solver)
+7. [AI providers](#ai-providers)
+8. [Settings reference](#settings-reference)
+9. [Anti-cheat bypasses](#anti-cheat-bypasses)
+10. [Contributing solutions](#contributing-solutions)
+11. [Troubleshooting](#troubleshooting)
+12. [Testing with Playwright](#testing-with-playwright)
+13. [Remote control](#remote-control)
+14. [Disclaimer](#disclaimer)
+15. [Changelog](#changelog)
+16. [Credits](#credits)
 
-- **Rail:** [`skill.md`](skill.md) — the playbook (site structure, tooling, pitfalls).
-- **Bank:** [`solutions/<ProgramID>.md`](solutions/) — one markdown file per solved problem.
-- **Tools:** [`tools/`](tools/) — enumerate → fetch → verify (C, C++, Java, Python).
-- **Users submit answers** by adding `solutions/<id>.md` (format + contract in
-  [`skill.md` §2](skill.md)). A passing `verify` line is the acceptance bar.
-- The userscript pulls answers live (Settings → "Solved Solutions"). Default:
-  `raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/solutions/<id>.md`
-  (GitHub raw = the solved answer, no server needed). For dev/testing you can
-  point the "Solutions Base URL" at a local server, e.g. `http://localhost:3000`,
-  with AI as the final fallback.
-- **Contribute:** fork → `add/<id>` branch → add file → generate samples with
-  `tools/fetch.py <enum.json> 0 --out /tmp/sack_stmts.json`, then
-  `tools/verify.py solutions/<id>.md /tmp/sack_stmts.json` → PR.
+## What is in this repository
 
----
+| Path | Purpose |
+|------|---------|
+| `userscript.user.js` | The Tampermonkey script (client). |
+| `solutions/<ProgramID>.md` | One verified solution per problem, keyed by SkillRack ProgramID. |
+| `skill.md` | The playbook: site structure, solving loop, verification, contribution rules. |
+| `tools/` | Python and curl toolkit to enumerate, fetch, verify and track problems. |
+| `tools/playwright/` | Browser harness used to test the userscript against the live site. |
+| `duckduckgo-api/` | Cloudflare Worker that proxies DuckDuckGo AI Chat (keyless AI provider). |
+| `document.md` | Generated tracker of solved and pending problems. |
+| `solutions-server.js` | Optional local static server for `solutions/` during development. |
+| `kill.txt` | Remote kill switch read by the script. |
 
-# Anti-Cheat Bypass Userscript (the client)
+## Version 7.0
 
-A Tampermonkey/Greasemonkey userscript for SkillRack with AI solution generation and the walkthrough above.
+Version 7.0 is a reliability release. Every change below was verified against the
+live site with the Playwright harness in `tools/playwright/`.
 
----
+### Captcha solver rewritten
 
-## Version 6.1 Features (Latest)
+* The Proceed button on SkillRack is a PrimeFaces AJAX call. A wrong answer does
+  not reload the page; it re-renders the panel and shows an "Incorrect Captcha
+  Value" growl. Earlier versions only detected failure on page load, so after one
+  wrong guess nothing happened. The solver now watches the DOM after each submit
+  and retries in place.
+* The retry counter is no longer reset by the page load handler, so the limit of
+  three attempts is honoured. After three rejections a manual prompt appears and
+  keeps asking until the captcha is accepted.
+* OCR runs once per page. The old code started two concurrent OCR passes and
+  submitted twice.
+* Tesseract.js v7 ignores recognition parameters passed to `Tesseract.recognize`.
+  The solver now uses a persistent worker with `setParameters`, so the digit
+  whitelist and single-line mode actually apply.
+* The image is cropped to the expression line, inverted, upscaled four times and
+  read by three image variants with a majority vote. Answers the server already
+  rejected are excluded from later votes. In testing this reads fresh captchas
+  correctly on the first attempt in well over 95 percent of loads.
 
-### New in v6.1 — Failure → AI Fallback for Saved Solutions
+### Auto solver: skip and move on
 
-- **Detects judge failures** on the code the script inserted (from `solutions/<id>.md`
-  via GitHub raw / local server, or SkillRack's built-in "View Solution").
-- **No more infinite re-injection of a wrong `.md`:** when a run fails (compilation
-  error, runtime error, or wrong output), the AI button skips the saved/built-in
-  answer and goes straight to the **AI fixer**, which receives the failing code plus
-  the judge's input / expected / actual output and rewrites it.
-- Works both when you click "AI Solution" manually *and* inside the ⚡ **Auto Solver**
-  retry loop (retries now actually produce a *different*, corrected attempt).
-- Level 3 (MNC Companies / CTS) solutions cross-checked against GitHub problem-name
-  searches (CTF-style) and corrected to reference implementations where our version
-  diverged (e.g. `findMinElement`, `root`).
+* When a problem exhausts its retries it is recorded as "temporarily cannot
+  solve" and the solver clicks Back, returns to the list and opens the next
+  problem that is not on that list.
+* A problem on the list is never re-attempted, even if the solver lands on it
+  again. A pass resets the streak; after `autoSolverMaxSkips` (default 5) skips in
+  a row the solver stops instead of looping.
+* The status pill has a SKIP button for manual skips and a CLEAR SKIPS button that
+  also appears in the stopped state next to RESUME.
+* Settings, Auto Solver section, lists the skipped problems with reason and time,
+  a retry link per problem and a Clear list button.
 
-### New in v6.0
+### Saved solutions from GitHub now work
 
-- Added AI-assisted multi-fill-in-the-blank problem detection and answer insertion
-- Added an incomplete-track scanner with cached progress, retry handling, and navigation
-- Added settings for enabling the incomplete-track workflow
-- Improved AI provider model handling and settings controls
+The "Solved Solutions" feature never worked in 6.x. Its fetch helper only existed
+inside the Find Incomplete module, so every call threw a ReferenceError, and the
+request sent cookies to `raw.githubusercontent.com`, whose `*` CORS header makes
+browsers reject credentialed requests. Both are fixed and the feature is on by
+default. Roughly 390 solutions are tried before any AI call.
 
-Contribution by **[Aron-2005](https://github.com/Aron-2005)** and **[Vishnu-tppr](https://github.com/Vishnu-tppr)**.
+### Keyless AI by default
 
-### 🆕 New in v5.0 - Major Bug Fixes & Improvements
+The default provider is now DuckDuckGo AI through the proxy worker. No API key
+is required. The default model is `claude-haiku-4-5` with automatic fallback to
+`gpt-oss-120b` and others when DuckDuckGo retires a model. Users who never set a
+Gemini key are migrated automatically.
 
-#### 🔧 Fixed Code Extraction Issues
-- **Fixed C/C++ language tag stripping** - Responses with language specifiers like `c++`, `++23`, `cpp` are now properly cleaned
-- **JSON response handling** - Now properly extracts code from API responses wrapped in JSON metadata
-- **Improved language-specific comment removal** - Better handling of C/C++ style comments (`//` and `/* */`)
-- **Language specifier filtering** - Lines containing only language tags (e.g., "c++", "cpp23") are automatically removed
+### Stronger system prompt
 
-#### 🛡️ Enhanced Code Validation
-- **Code similarity checking** - Prevents submitting AI-generated code that's identical to existing code
-- **Empty code validation** - Rejects invalid or empty code responses with helpful error messages
-- **Better error messages** - Users get clear feedback if extraction or insertion fails
+The default prompt targets hidden test cases: 64-bit overflow, time limits,
+SkillRack input quirks, exact output formatting, the `head`/`tail` identifier
+ban, pre and post code handling, MFIB line counts and a self-verification pass.
+Existing custom prompts are preserved.
 
-#### 🔄 Improved Pre/Post Code Support
-- **Fixed includePrePostCode logic** - Now correctly handles both modes:
-  - When **disabled**: Full code (pre + middle + post) is sent to AI
-  - When **enabled**: Only middle code is sent to AI (useful when you want AI to fill in a function)
-- **Better code wrapping** - Ensures proper code structure in both modes
+### Auto solver reliability
 
-#### 📋 OpenAI-Compatible API Provider (Any Endpoint!)
-- **Bring your own API** - works with any OpenAI-compatible endpoint
-- **Supports**: OpenAI, OpenRouter, LM Studio, Ollama, local servers, YuppBridge, and more
-- **API key optional** - leave blank for keyless/local APIs (e.g. LM Studio, Ollama)
-- Features:
-  - Dynamically loads models from any compatible `/v1/models` endpoint
-  - Model search & filtering
-  - Health check button
-  - 6-hour model caching
-- Supported model categories: GPT-4o, Claude, Gemini, Llama, Mistral, DeepSeek, Qwen, and more!
+* Saved solutions were inserted and then wiped by SkillRack's editor hooks a
+  moment later; insertion now targets the visible editor and re-applies itself.
+* The auto solver treated an instantly inserted saved solution as a failed
+  generation because the button never showed "Generating"; a changed editor
+  now counts as a completed generation.
+* Run is never clicked on an empty editor or on SkillRack's untouched template.
+* List cards are parsed by their `(Id-1234)` suffix, so parked problems are
+  skipped reliably and re-landing on one no longer burns the skip streak.
+* Backoff and delays are configurable (`autoSolverBackoffBase`,
+  `autoSolverDelayBeforeNext`) for batch runs.
 
-#### 🦆 DuckDuckGo AI Provider (FREE!)
-- **Completely FREE** AI solution generator
-- Uses a Cloudflare Workers proxy to bypass CSP restrictions
-- Powered by DuckDuckGo AI Chat
-- Available models:
-  - **GPT-4o Mini** (OpenAI) - General-purpose
-  - **GPT-5 Mini** (OpenAI) - Reasoning
-  - **GPT-OSS 120B** (OpenAI) - Open source reasoning
-  - **Llama 4 Scout** (Meta) - Open source
-  - **Claude 3.5 Haiku** (Anthropic) - Fast responses
-  - **Mixtral Small 3** (Mistral AI) - Open source
-- No API key required!
-- Custom proxy URL support for self-hosted instances
+### Find Incomplete
 
-### 🆕 Previous Updates (v4.6-4.9)
+* Scans the level of the current page first and renders after every level.
+* Request pacing reduced from 300 to 500 ms to 100 to 200 ms per request.
+* A level that fails to scan (wallet-gated kits) no longer aborts the others.
 
-#### 🔄 Mandatory Update Check
-- Automatically checks for updates from GitHub
-- Compares your local version with the latest available version
-- Shows an update dialog if a newer version is available
-- **You must update to continue using the script** if outdated
-- "Update Now" button opens the script URL for easy updating
+### Providers
 
-#### ⚖️ First-Time Disclaimer
-- Shows a comprehensive disclaimer on first use
-- Covers legal and academic responsibility warnings
-- Must accept to use the script (saved in localStorage)
-- Includes warnings about:
-  - Academic penalties and disciplinary actions
-  - Account suspension or termination
-  - Legal consequences
-  - Damage to academic records
+* DuckDuckGo worker: syntax error fixed, token fetch retries on both
+  `duck.ai` and `duckduckgo.com`. Note that DuckDuckGo rate limits and
+  sometimes blocks the shared Cloudflare egress IP; self-hosting the worker
+  gives you your own quota.
+* Default model ids refreshed against the live endpoints: OpenRouter
+  `z-ai/glm-5.2:free`, NVIDIA `deepseek-ai/deepseek-v4-pro-0813`.
 
-#### 🚫 Remote Kill Switch
-- Script can be remotely disabled by the author if necessary
-- Checks `kill.txt` on GitHub (contains `true` or `false`)
-- If disabled, shows a "Script Disabled" message
-- Useful for emergency situations or maintenance
+### Other fixes
 
-### 🎛️ Settings Panel
-Click the ⚙️ button (bottom-right corner) to toggle features on/off:
-- All bypasses can be individually enabled/disabled
-- Settings are saved to localStorage
-- Changes take effect after page reload
+* A `mutation.addNodes` typo that raised "not iterable" errors on every DOM change.
+* Version and banner updated to 7.0.
 
-### 🤖 AI Solution Generator
-- Automatically generates code solutions using AI
-- Supports **8 AI Providers**:
-  - **Google Gemini** - Free tier available
-  - **OpenAI (ChatGPT)** - Paid
-  - **OpenRouter (Multi-Model)** - Free & Paid models
-  - **G4F (g4f.space)** - Alternative provider
-  - **DuckDuckGo AI** - FREE, no API key needed!
-  - **Puter.js** - FREE, no API key needed
-  - **OpenAI-Compatible API** - works with OpenAI, OpenRouter, LM Studio, Ollama, local servers, YuppBridge, etc.
-  - **NVIDIA NIM** - Free tier from build.nvidia.com
-- Works on both tutorial pages (generates middle code portion) and code track pages (generates complete solution)
-- Purple "🤖 AI Solution" button appears next to Save/Run buttons
-- Configure your API key in the settings panel
+### Known limitation
 
-#### 🆕 Dynamic OpenRouter Model Selection (v4.5+)
-- **Fetches models dynamically** from OpenRouter API
-- **Smart caching** (6-hour cache) to avoid excessive API calls
-- **Search & filter** models by name, author, or group
-- **"Show free only"** checkbox to filter free models
-- **Grouped by provider** (Google, Anthropic, OpenAI, Meta, etc.)
-- **Refresh button** to get the latest models
-- Hundreds of models available including:
-  - ⭐ Free models (Gemini, DeepSeek, Llama, Qwen, etc.)
-  - Premium models (Claude, GPT-4o, Gemini Pro, etc.)
-
-#### 🆕 G4F Provider Support (v4.4+)
-- Integration with g4f.space API
-- Dynamic model fetching with caching
-- Search and filter functionality
-- Auto model selection option
-
-### ⚡ Auto Solver (Experimental)
-- **Fully automated problem solving**
-- Clicks AI Solution button → Waits for generation → Runs code → Handles results
-- Automatic retry on failure (configurable max retries)
-- Proceeds to next problem on success
-- **Stop button** to halt at any time
-- Status indicator shows current operation
-- ⚠️ Experimental feature - use at your own risk
-
-### 🔢 Auto Captcha Solver (Credit: [adithyagenie](https://github.com/adithyagenie/skillrack-captcha-solver))
-- Automatically solves math captcha using Tesseract.js OCR
-- **Dynamically finds captcha images** - works across different pages
-- Inverts image colors for better OCR accuracy
-- Handles retry on failure
-- **Optional username parsing**: If your username contains '+' and numbers (e.g., `abcd123+21@xyz`), set it in the settings panel
-
-### 1. Tab Switch Detection Bypass
-- Spoofs `document.visibilityState` to always return `'visible'`
-- Spoofs `document.hidden` to always return `false`
-- Blocks `visibilitychange` event listeners
-
-### 2. Copy/Paste/Cut Functionality Restoration
-- Intercepts clipboard events at capture phase (runs before jQuery handlers)
-- Pre-emptive ACE editor interception - blocks restrictions before they're applied
-- Keyboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+Z) work in the code editor
-- Overrides jQuery's `$.fn.bind()` and `$.fn.on()` to filter out clipboard event bindings
-- Restores native Clipboard API functionality
-
-### 3. Drag & Drop Restrictions Removal
-- Removes `ondragstart`, `ondrop`, `onselectstart` attributes from `<body>` and all elements
-- Runs on page load and periodically to catch dynamic content
-
-### 4. Text Selection Enablement
-- Injects CSS to force `user-select: text !important` on all elements
-- Blocks `selectstart` event prevention
-- Restores right-click context menu
-
-### 5. ACE Editor Bypass
-Handles ACE Editor-specific restrictions:
-
-| Blocking Method | Bypass Solution |
-|----------------|-----------------|
-| `commands.addCommand({name: 'bte', bindKey: 'ctrl-c\|ctrl-v\|...'})` | Intercepts and blocks command registration |
-| `commands.on("exec", ...)` paste blocking | Filters out exec handlers that block clipboard |
-| `container.addEventListener("drop", ...)` | Adds working drop handler in capture phase |
-| Anti-bulk-paste (30+ char detection) | Intercepts change handlers and `setValue()` to block reset attempts |
-| `cs()` function diff check | Overrides to always sync code |
-
-### 6. Fullscreen Enforcement Bypass
-- Intercepts `requestFullscreen()` and `exitFullscreen()` calls
-- Blocks fullscreen change event listeners
-- Spoofs `document.fullscreenElement` to always return a value
-
-### 7. Multi-Monitor Detection Prevention
-- Spoofs `window.screen` properties (`left: 0`, `top: 0`, `isExtended: false`)
-- Normalizes mouse movement tracking
-
-### 8. Heartbeat/Telemetry Blocking
-- Intercepts XMLHttpRequest and Fetch API
-- Blocks requests to specific proctoring/telemetry endpoints
-- Returns fake successful responses
-
----
+Function-style problems whose saved `.md` holds a full program while the page
+supplies pre and post code can still fail; the middle-code extraction is not
+yet reliable for those files.
 
 ## Installation
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Greasemonkey](https://www.greasespot.net/)
-2. Create a new userscript
-3. Copy the contents of `userscript.js` into the editor
-4. Save and enable the script
-5. **Accept the disclaimer** on first run
-6. Configure your settings and API keys
+1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Edge, Firefox, Safari).
+2. Open `userscript.user.js` in this repository and copy its contents into a new
+   Tampermonkey script, or install it from the raw URL:
+   `https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main/userscript.user.js`
+3. Log in to SkillRack. Accept the disclaimer on first run.
+4. Open the settings panel with the gear button in the bottom right corner.
+   Everything works with default settings; no API key is needed.
 
----
+## How a problem gets solved
 
-## Settings Panel
+When you press AI Solution, or when the auto solver runs, the script tries these
+sources in order and stops at the first one that produces code:
 
-Click the **⚙️ gear button** in the bottom-right corner to open settings:
+1. SkillRack's own View Solution button, when the site offers one.
+2. `solutions/<ProgramID>.md` from this repository (or your local server).
+3. The configured AI provider, with the problem statement, sample I/O and any
+   pre or post code.
 
-### Anti-Cheat Bypasses
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Tab Detection Bypass | Prevent tab switch detection | ✅ On |
-| Copy/Paste Bypass | Enable clipboard in code editor | ✅ On |
-| Fullscreen Bypass | Skip fullscreen enforcement | ✅ On |
-| Multi-Monitor Bypass | Block monitor detection | ✅ On |
-| Block Telemetry | Block heartbeat requests | ✅ On |
+If the inserted code fails the judge, the next attempt skips the saved answer and
+sends the failing code together with the judge output (input, expected, actual)
+to the AI provider so it can fix the real cause. After the retry limit the
+problem is parked on the skip list and the solver moves on.
 
-### Editor Features
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Drag & Drop | Enable drag & drop text | ✅ On |
-| Text Selection | Enable text selection | ✅ On |
-| Context Menu | Enable right-click menu | ✅ On |
+## Auto solver
 
-### Captcha Solver
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Auto-Solve Captcha | Automatically solve math captcha | ✅ On |
-| Username (optional) | Your username for captcha parsing | (empty) |
+Enable "Enable AI Solver" and "Auto Solver" in settings, then open a problem list
+or a problem page. The solver:
 
-### AI Solution Generator
-| Setting | Description | Default |
-|---------|-------------|---------|
-| Enable AI Solver | Show AI solution button | ❌ Off |
-| ⚡ Auto Solver | Auto-solve & submit (experimental) | ❌ Off |
-| AI Provider | Choose Gemini, OpenAI, OpenRouter, G4F, DuckDuckGo, Puter, OpenAI-Compatible API, or NVIDIA NIM | Gemini |
-| Gemini API Key | Your Google Gemini API key | (empty) |
-| OpenAI API Key | Your OpenAI API key | (empty) |
-| OpenRouter API Key | Your OpenRouter API key | (empty) |
-| OpenRouter Model | Dynamic model selection with search | Gemini 2.0 Flash |
-| G4F API Key | Your G4F API key | (empty) |
-| G4F Model | Dynamic model selection | Auto |
-| DuckDuckGo Model | Select from 6 free models | GPT-4o Mini |
-| DuckDuckGo API URL | Custom proxy URL (optional) | (default proxy) |
-| OpenAI-Compatible API URL | Any OpenAI-compatible base URL (e.g. https://host/v1) | (empty) |
-| OpenAI-Compatible API Key | Optional — leave blank for keyless/local APIs | (empty) |
-| OpenAI-Compatible Model | Dynamic selection (OpenAI, OpenRouter, LM Studio, Ollama, etc.) | gpt-4o |
-| NVIDIA NIM API Key | Free key from build.nvidia.com (nvapi-...) | (empty) |
-| NVIDIA NIM Model | Dynamic selection of free NIM models | deepseek-v4-pro |
+1. Opens the first problem on the list that is not on the skip list.
+2. Waits for the captcha solver to pass the captcha.
+3. Generates a solution, inserts it and presses Run.
+4. On success presses Proceed Next and continues.
+5. On failure retries with the judge output as context, up to
+   `autoSolverMaxRetries` times, then skips the problem and goes back to the list.
 
----
+Controls on the status pill: STOP, SKIP, CLEAR SKIPS and, when stopped, RESUME.
+The stop state persists across reloads.
 
-## AI Solution Generator Setup
+## Captcha solver
 
-### Using Google Gemini (Free)
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Create an API key
-3. Paste it in the settings panel under "Gemini API Key"
+The captcha image is 350 by 50 pixels, white text on black, with the roll number
+on the first line and an expression such as `23+7=` on the second. The solver
+crops the second line, inverts it, upscales it and reads it with Tesseract.js
+using a whitelist of digits, plus and equals. Three image variants vote; the
+majority answer is submitted. Rejected answers are excluded from later votes.
+After three rejections a prompt asks you to type the answer.
 
-### Using OpenAI (Paid)
-1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
-2. Create an API key
-3. Paste it in the settings panel under "OpenAI API Key"
-4. Change "AI Provider" to "OpenAI (ChatGPT)"
+The username field in settings is optional. The username is detected from the
+page header and stripped from any full-image OCR pass automatically.
 
-### Using OpenRouter (Free & Paid Models) ⭐ Recommended
-1. Go to [OpenRouter](https://openrouter.ai/keys)
-2. Create an API key (free tier available)
-3. Paste it in the settings panel under "OpenRouter API Key"
-4. Change "AI Provider" to "OpenRouter (Multi-Model)"
-5. **Search or browse** models using the dynamic selector
-6. Check "Show free only" to filter free models
+## AI providers
 
-#### Popular Free Models on OpenRouter:
-| Model | Provider | Specialty |
-|-------|----------|-----------|
-| Gemini 2.0 Flash | Google | Fast, general purpose |
-| DeepSeek R1 | DeepSeek | Reasoning |
-| Qwen3 Coder 480B | Qwen | Coding |
-| Llama 3.3 70B | Meta | General purpose |
-| Claude 3 Haiku | Anthropic | Fast responses |
+| Provider | Key | Notes |
+|----------|-----|-------|
+| DuckDuckGo AI (default) | none | Proxied through a Cloudflare Worker. Models: `claude-haiku-4-5`, `gpt-oss-120b`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gemma-4-31b`, `mistral-small-4`, `mistral-small-2603`, `claude-4-5-haiku`. Availability changes without notice; the script falls back automatically. |
+| Google Gemini | free tier | Key from Google AI Studio. |
+| OpenAI | paid | Key from platform.openai.com. |
+| OpenRouter | free and paid | Dynamic model list with search and a free-only filter. |
+| G4F | account | g4f.space. |
+| Puter.js | none | Loaded from js.puter.com. |
+| OpenAI-compatible | optional | Any `/v1` endpoint: OpenAI, OpenRouter, LM Studio, Ollama, local servers. |
+| NVIDIA NIM | free tier | Keys start with `nvapi-`. |
 
-### Using G4F (g4f.space)
-1. Go to [G4F](https://g4f.space)
-2. Create an account and get an API key
-3. Paste it in the settings panel under "G4F API Key"
-4. Change "AI Provider" to "G4F (g4f.space)"
-5. Select a model or use "Auto" for automatic selection
+### Self-hosting the DuckDuckGo proxy
 
-### Using DuckDuckGo AI (FREE - No API Key!) ⭐ Recommended
-1. Change "AI Provider" to "🦆 DuckDuckGo AI (FREE!)"
-2. Select a model from the dropdown
-3. **No API key needed!**
-
-#### Available DuckDuckGo Models:
-| Model | Provider | Specialty |
-|-------|----------|-----------|
-| GPT-4o Mini | OpenAI | General purpose |
-| GPT-5 Mini | OpenAI | Reasoning (Beta) |
-| GPT-OSS 120B | OpenAI | Open source reasoning |
-| Llama 4 Scout | Meta | Open source |
-| Claude 3.5 Haiku | Anthropic | Fast responses |
-| Mixtral Small 3 | Mistral AI | Open source |
-
-#### Self-Hosting the Proxy
-If you want to host your own proxy:
-1. Clone the `duckduckgo-api` folder
-2. Run `npm install && wrangler deploy`
-3. Update the "DuckDuckGo API URL" in settings
-
-### Using the OpenAI-Compatible API Provider ⭐ Power Users
-Works with **any** OpenAI-compatible API endpoint. API key is **optional**.
-
-#### Step 1: Pick an Endpoint
-Any OpenAI-compatible host works, for example:
-- **OpenAI** — `https://api.openai.com/v1` (requires key)
-- **OpenRouter** — `https://openrouter.ai/api/v1` (requires key)
-- **LM Studio** (local) — `http://localhost:1234/v1` (no key needed)
-- **Ollama** (local) — `http://localhost:11434/v1` (no key needed)
-- **YuppBridge** (self-hosted) — `https://your-yuppbridge.example.com` ([self-host guide](https://github.com/cloudWaddie/yuppbridge))
-
-#### Step 2: Configure in Settings
-1. Change "AI Provider" to "OpenAI-Compatible API (Any)"
-2. Enter your **API URL** (base URL, e.g. `https://host/v1`)
-3. Enter your **API Key** — **optional**; leave blank for keyless/local APIs
-4. Click 🔄 to load available models from `/v1/models`
-5. Use the search to find models (e.g., "gpt-4", "claude", "gemini")
-6. Click ❤️ to check API health
-
-#### API Endpoints Used
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/v1/models` | GET | List available models |
-| `/v1/chat/completions` | POST | OpenAI-compatible chat |
-
-#### Popular Models (example):
-| Model | Provider | Specialty |
-|-------|----------|-----------|
-| gpt-4o | OpenAI | Most capable |
-| gpt-4o-mini | OpenAI | Fast & efficient |
-| claude-3-opus | Anthropic | Advanced reasoning |
-| claude-3-sonnet | Anthropic | Balanced |
-| gemini-1.5-pro | Google | Multimodal |
-| llama-3-70b | Meta | Open source |
-| mistral-large | Mistral | European AI |
-| deepseek-coder | DeepSeek | Coding specialist |
-
-### Using NVIDIA NIM (Free Tier) ⭐
-NVIDIA NIM provides free API access to popular open models (Llama, Nemotron, DeepSeek, Kimi, Qwen, GLM, and more).
-
-1. Get a free API key at [build.nvidia.com](https://build.nvidia.com) — keys start with `nvapi-`
-2. Change "AI Provider" to "NVIDIA NIM (Free Tier)"
-3. Paste your key in the "NVIDIA NIM API Key" field
-4. Click 🔄 to load available free models
-5. Use the search to find a model (e.g., "deepseek", "nemotron", "glm")
-
-> Model caching (6 hours) avoids repeated API calls. Entering a valid `nvapi-` key loads the live model list; without a key it uses a built-in free catalog.
-
----
-
-## Auto Solver Usage
-
-⚠️ **Experimental Feature - Use at Your Own Risk**
-
-1. Enable both "Enable AI Solver" and "⚡ Auto Solver" in settings
-2. Configure your AI provider and API key
-3. Navigate to a problem page
-4. The auto solver will:
-   - Wait for captcha to be solved (if present)
-   - Click the AI Solution button
-   - Wait for code generation
-   - Click Run to execute
-   - Handle success/failure
-   - Proceed to next problem on success
-5. **Click the STOP button** to halt at any time
-
----
-
-## How It Works
-
-### Initialization Flow (v4.6)
-```
-Script Loads
-     ↓
-Check Kill Switch (GitHub kill.txt)
-     ↓ (if enabled)
-Check for Updates (compare versions)
-     ↓ (if up to date)
-Show Disclaimer (first time only)
-     ↓ (if accepted)
-Initialize All Features
+```bash
+cd duckduckgo-api
+npm install
+wrangler login
+wrangler deploy
 ```
 
-### Event Interception Strategy
-```
-User Action (Ctrl+V)
-        ↓
-Capture Phase (our listeners run FIRST)
-  → stopImmediatePropagation()
-  → Native clipboard action proceeds
-        ↓
-Bubbling Phase (site's jQuery handlers)
-  → Event never reaches here (blocked)
+Set the worker URL in settings under "DuckDuckGo API URL". See
+`duckduckgo-api/README.md` for the API key option and endpoints.
+
+## Settings reference
+
+### Anti-cheat bypasses
+
+| Setting | Default |
+|---------|---------|
+| Tab Detection Bypass | on |
+| Copy/Paste Bypass | on |
+| Fullscreen Bypass | on |
+| Multi-Monitor Bypass | on |
+| Block Telemetry | on |
+
+### Editor features
+
+| Setting | Default |
+|---------|---------|
+| Drag and Drop | on |
+| Text Selection | on |
+| Context Menu | on |
+| Full Screen Copy Mode | off |
+| Popup Mode (status pills) | off |
+
+### Captcha solver
+
+| Setting | Default |
+|---------|---------|
+| Auto-Solve Captcha | on |
+| Username (optional) | empty, auto-detected |
+
+### AI and auto solver
+
+| Setting | Default |
+|---------|---------|
+| Enable AI Solver | on |
+| AI Provider | DuckDuckGo AI |
+| DuckDuckGo Model | claude-haiku-4-5 |
+| DuckDuckGo API URL | default proxy |
+| System prompt | v7 default (editable) |
+| Auto Solver | off |
+| Auto Solver max retries | 3 |
+| Auto Solver max skips in a row | 5 |
+| Solved Solutions (GitHub / local server) | on |
+| Solutions Base URL | GitHub raw URL of this repository |
+| Incomplete Question scanner | on |
+
+Reload the page after changing settings.
+
+## Anti-cheat bypasses
+
+| Area | Method |
+|------|--------|
+| Tab switching | `document.visibilityState` and `document.hidden` are spoofed; `visibilitychange` listeners are blocked. |
+| Clipboard | Capture-phase listeners run before the site's jQuery handlers; ACE command registration for `bte` is intercepted; late-injected blocking scripts are neutralised. |
+| Drag and drop, selection | Inline `ondragstart`, `ondrop` and `onselectstart` attributes are removed; `user-select: text` is forced. |
+| Fullscreen | `fscr()` and the fullscreen dialog are neutralised so Proceed still submits. |
+| Multi-monitor | `window.screen` position properties are normalised. |
+| Telemetry | Heartbeat and proctoring endpoints receive a fake successful response. |
+
+## Contributing solutions
+
+One problem is one file, `solutions/<ProgramID>.md`:
+
+````md
+# Id 12345 - Problem Name
+
+```c
+<full source code>
 ```
 
-### ACE Editor Command Override
-```
-Site tries: txtCode.commands.addCommand({name: 'bte', bindKey: 'ctrl-c|ctrl-v'...})
-                                ↓
-Script intercepts ace.edit() before site code runs
-                                ↓
-Blocks 'bte' command registration
-                                ↓
-Clipboard shortcuts work normally
-```
+Verified: <sample input> -> <sample output>
+````
 
-### Dynamic Model Loading (OpenRouter)
-```
-User opens settings panel
-        ↓
-Fetch models from OpenRouter API
-        ↓
-Cache for 6 hours
-        ↓
-Group by provider (Free first)
-        ↓
-Enable search & filtering
-```
-
----
+Workflow: fork, branch `add/<id>`, add the file, run
+`python3 tools/verify.py solutions/<id>.md <stmts.json>`, regenerate the tracker
+with `python3 tools/status.py --md document.md`, open a pull request with the
+passing verify line in the body. The full process, including enumeration and
+fetching statements, is in `skill.md`.
 
 ## Troubleshooting
 
-### Script not loading?
-- Check if you accepted the disclaimer
-- Check browser console for kill switch status
-- Make sure you have the latest version
+| Symptom | Check |
+|---------|-------|
+| Script does not load | Accept the disclaimer; look for kill switch messages in the console. |
+| Captcha not solved | Wait for Tesseract to download on first run (a few seconds). Console lines start with `[Captcha]`. After three rejections a prompt appears. |
+| Saved solution not used | The console shows `[Solutions] Used <url>` on success or `[LocalServer] Failed` with the reason. A 404 means no file exists for that ProgramID yet. |
+| AI returns nothing | Console lines start with `[AI]` or `[DuckDuckGo]`. A 429 means the proxy is rate limited; wait a minute. |
+| Auto solver keeps stopping | Open Settings, Auto Solver, and clear the skip list, or raise `autoSolverMaxSkips`. |
+| Clipboard still blocked | Confirm the script runs at `document-start` and reload. |
 
-### Clipboard still not working?
-- Check browser console for "Blocked" messages
-- Ensure the script runs at `document-start`
-- Try refreshing the page after enabling the script
+## Testing with Playwright
 
-### ACE Editor bypass not working?
-- The editor variable might have a different name
-- Check if the editor loads dynamically (increase timeout values)
-- Open browser console to see bypass status messages
+`tools/playwright/` contains the harness used to verify the script. It logs in
+with credentials from environment variables, injects Tesseract and the
+userscript, opens the Daily Challenge page (which always shows a captcha) and
+records what the script does.
 
-### Captcha solver not working?
-- Wait for Tesseract.js to load (may take a few seconds on first run)
-- Check console for "Captcha elements not found" message
-- If stuck in a loop, close and reopen the tab
+```bash
+cd tools/playwright
+npm install
+npx playwright install chromium
+SKILLRACK_USER=... SKILLRACK_PASS=... node repro.js        # captcha happy path
+SKILLRACK_USER=... SKILLRACK_PASS=... node ocrbench.js     # OCR accuracy on fresh captchas
+SKILLRACK_USER=... SKILLRACK_PASS=... node autotest.js     # auto solver with DuckDuckGo
+```
 
-### AI Solution not appearing?
-- Make sure you've entered your API key in settings
-- Check if the problem description is visible on the page
-- Look for error messages in the browser console
+See `tools/README.md` for details.
 
-### OpenRouter models not loading?
-- Click the 🔄 refresh button
-- Check your internet connection
-- Models are cached for 6 hours
+## Remote control
 
-### Auto Solver stuck?
-- Click the **STOP** button
-- Check console for error messages
-- Increase delay settings if needed
-
----
-
-## Remote Control
-
-### Kill Switch
-The author can remotely disable the script by setting `kill.txt` to `false`:
-- `true` - Script works normally
-- `false` - Script is disabled with a message
-
-This is used for:
-- Emergency situations
-- Maintenance periods
-- Security concerns
-
----
+The script reads `kill.txt` from this repository on start. `true` allows the
+script to run; `false` disables it with a message. It also compares its version
+with the `@version` of the script on GitHub and asks the user to update when a
+newer version exists. Both checks fail open when GitHub is unreachable.
 
 ## Disclaimer
 
-⚠️ **IMPORTANT - READ CAREFULLY:**
-
-- This script is provided **"AS IS"** without any warranty of any kind.
-- The author(s) are **NOT RESPONSIBLE** for any consequences arising from the use of this script, including but not limited to:
-  - Academic penalties or disciplinary actions
-  - Account suspension or termination
-  - Legal consequences
-  - Any damage to your academic record
-- By using this script, you acknowledge that bypassing anti-cheat measures may violate your institution's academic integrity policies.
-- You are **solely responsible** for your actions and any consequences that may result.
-- This script is for **educational purposes only**.
-
-**⚠️ Remember to disable this script during actual tests and examinations.**
-
----
+This script is provided as is, without warranty of any kind. The authors are not
+responsible for any consequences of its use, including academic penalties,
+account suspension or legal consequences. Bypassing anti-cheat measures may
+violate your institution's academic integrity policy. You are solely responsible
+for your actions. Disable the script during tests and examinations.
 
 ## Changelog
 
+### v7.0
+
+* Captcha solver rewritten: AJAX-aware retry, three attempts then manual prompt,
+  single OCR run, real Tesseract parameters, cropped and voted OCR.
+* Auto solver parks unsolvable problems and moves on; skip list with clear and
+  retry controls; stop after a configurable number of consecutive skips.
+* Solved Solutions from GitHub fixed (scope and CORS) and enabled by default.
+* DuckDuckGo AI is the default provider; model list refreshed; automatic model
+  fallback; users without a Gemini key migrated.
+* New default system prompt aimed at hidden test cases.
+* Fixed the `addNodes` typo that spammed console errors.
+
 ### v6.1
-- 🔁 Saved-solution failure → AI fallback: judge failures detected, AI fixes the
-  failing code instead of re-injecting the same wrong answer
-- 🔧 AI button now skips saved/built-in code on retry after a failed run
-- 🔍 Level 3 (MNC / CTS) answers cross-checked via GitHub problem-name search and
-  corrected to reference implementations
+
+* Judge failures on saved solutions fall back to the AI fixer.
+* Level 3 answers cross-checked against reference implementations.
 
 ### v6.0
-- Added multi-fill-in-the-blank AI solving support
-- Added incomplete-track scanning and navigation
-- Improved AI model and settings handling
-- Preserved the project kill-switch endpoint
-- Contribution by [Aron-2005](https://github.com/Aron-2005) and [Vishnu-tppr](https://github.com/Vishnu-tppr)
 
-### v4.6
-- ✨ Mandatory update check with dialog
-- ✨ First-time disclaimer acceptance
-- ✨ Remote kill switch functionality
-- 🔧 Improved script initialization flow
+* Multi fill-in-the-blank support, incomplete-track scanner, provider and
+  settings improvements. Contributed by Aron-2005 and Vishnu-tppr.
 
-### v4.5
-- ✨ Dynamic OpenRouter model selection via API
-- ✨ Model search and filtering
-- ✨ "Show free only" filter
-- ✨ Model caching (6 hours)
-- 🔧 Fixed stop button functionality in Auto Solver
+### v4.6 and earlier
 
-### v4.4
-- ✨ G4F (g4f.space) provider support
-- ✨ Dynamic G4F model loading
-- ✨ Auto Solver feature (experimental)
-- 🔧 Various bug fixes
-
-### v4.3
-- ✨ OpenRouter integration with 30+ models
-- ✨ Custom model ID support
-- 🔧 Improved AI prompt engineering
-
-### v4.2
-- ✨ Improved captcha solver
-- 🔧 Dynamic captcha image detection
-
-### v4.1
-- ✨ Settings panel UI
-- ✨ AI Solution Generator
-- ✨ Multiple AI provider support
-
----
+* Update check, disclaimer, kill switch, OpenRouter and G4F providers, settings
+  panel, AI solution generator, captcha solver.
 
 ## License
 
-MIT License
+MIT
 
 ## Credits
 
-- **ToonTamilIndia** - Main development
-- **[Aron-2005](https://github.com/Aron-2005)** and **[Vishnu-tppr](https://github.com/Vishnu-tppr)** - Multi-fill-in-the-blank support, incomplete-track scanner, and AI/settings improvements
-- **[adithyagenie](https://github.com/adithyagenie/skillrack-captcha-solver)** - Captcha solver implementation
+* ToonTamilIndia: main development.
+* [Aron-2005](https://github.com/Aron-2005) and [Vishnu-tppr](https://github.com/Vishnu-tppr): MFIB support, incomplete-track scanner, provider improvements.
+* [adithyagenie](https://github.com/adithyagenie/skillrack-captcha-solver): original captcha solver.
