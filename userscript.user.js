@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      7.0
+// @version      7.1
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -20,7 +20,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '7.0';
+    const SCRIPT_VERSION = '7.1';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -5338,6 +5338,27 @@ Emit ONLY the final executable solution.`,
             domArea.value = code;
             domArea.dispatchEvent(new Event('input', { bubbles: true }));
             domArea.dispatchEvent(new Event('change', { bubbles: true }));
+            // CODETUTOR-style "normal" pages have no ACE instance — just the #txtCode
+            // textarea — and SkillRack's reset hooks can wipe a value set programmatically
+            // just like they do to ACE sessions. Re-assert it on a short delay so a
+            // solution is not silently lost before the Run click.
+            const verifyTa = (attempt) => {
+                try {
+                    const ta = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+                    if (!ta || ta.value.trim() !== code.trim()) {
+                        console.warn(`[SkillRack] Textarea content was reset after insertion, re-applying (attempt ${attempt})`);
+                        const ta2 = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+                        if (ta2) {
+                            ta2.value = code;
+                            ta2.dispatchEvent(new Event('input', { bubbles: true }));
+                            ta2.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        if (attempt < 3) setTimeout(() => verifyTa(attempt + 1), 600);
+                    }
+                } catch (e) { }
+            };
+            setTimeout(() => verifyTa(1), 400);
+            setTimeout(() => verifyTa(2), 1500);
             return true;
         }
         return false;
@@ -7669,6 +7690,14 @@ Emit ONLY the final executable solution.`,
 
     let isAiGenerationInProgress = false;
 
+    // Last code inserted into the editor by the generation flow (built-in solution,
+    // saved .md, or AI). SkillRack's reset hooks can wipe a programmatically inserted
+    // value in the gap between "generation finished" and the Run click, so the auto
+    // solver keeps the last solution around and re-asserts it in the live editor
+    // right before submitting (see AutoSolver.ensureSolutionInEditor).
+    let lastInjectedSolution = null;
+    const getLastInjectedSolution = () => lastInjectedSolution;
+
     // ========== UTILITY: Compare code similarity ==========
     const calculateCodeSimilarity = (code1, code2) => {
         // Simple similarity check: compare normalized code strings
@@ -7855,6 +7884,7 @@ Emit ONLY the final executable solution.`,
 
                 const code = pre ? pre.textContent.trim() : '';
                 if (code && code.length > 10) {
+                    lastInjectedSolution = code;
                     injectCodeToActiveEditor(code);
 
                     // Hide the solution panel after extracting code
@@ -7891,6 +7921,7 @@ Emit ONLY the final executable solution.`,
             try {
                 const localCode = await generateWithLocalServer();
                 if (localCode && localCode.trim().length >= 10) {
+                    lastInjectedSolution = localCode;
                     const injected = injectCodeToActiveEditor(localCode);
                     if (injected) {
                         console.log('[Solutions] Solution inserted successfully from GitHub/local server');
@@ -8274,6 +8305,7 @@ SOLVING APPROACH:
                     }
                 }
 
+                lastInjectedSolution = code;
                 const injected = injectCodeToActiveEditor(code);
                 if (injected) {
                     console.log(errorInfo.hasError ? 'AI fix applied successfully' : 'AI solution inserted successfully');
@@ -9221,6 +9253,73 @@ SOLVING APPROACH:
             return extractMFIBTemplate().inputs.length > 0;
         }
 
+        // ── Pre-Run editor guard ──────────────────────────────────────────────────
+        // "Generation finished" only proves the code was inserted a moment ago. SkillRack's
+        // reset hooks (anti-bulk-paste / reset-on-change) can wipe a programmatically
+        // inserted solution afterwards — if Run is clicked then, the form submits an empty
+        // editor and the judge answers "Actual Output: (EMPTY)". This guard re-applies the
+        // last inserted solution whenever the live editor is empty and only returns true
+        // once the editor provably holds runnable content.
+        async function ensureSolutionInEditor() {
+            if (editorHasSolution()) return true;
+            const mf = extractMFIBTemplate();
+            if (mf.inputs.length > 0) return false; // MFIB blanks: all or nothing — regenerate
+
+            const lastCode = getLastInjectedSolution();
+            if (!lastCode || !lastCode.trim()) return false;
+
+            console.warn('[AutoSolver] Editor is empty before Run — re-applying last solution');
+            const deadline = Date.now() + 4000;
+            while (Date.now() < deadline && !shouldStop) {
+                injectCodeToActiveEditor(lastCode);
+                for (let i = 0; i < 4 && !shouldStop; i++) {
+                    await sleep(250);
+                    if (editorHasSolution()) return true;
+                }
+            }
+            return editorHasSolution();
+        }
+
+        // Copy the live ACE session into the hidden #txtCode textarea so the JSF submit
+        // payload carries the code shown in the editor. Plain-textarea pages are already in
+        // sync; this matters for ACE pages whose textarea can lag behind the editor instance.
+        // (SkillRack's own overridden cs()/oncompile() re-sync on submit too, so no need to
+        // invoke cs() here — the un-overridden original could run diff/reset checks.)
+        function syncEditorToForm() {
+            try {
+                let val = null;
+                const aceEl = document.querySelector('.ace_editor');
+                const ed = (aceEl && aceEl.env && aceEl.env.editor) ||
+                    (window.txtCode && typeof window.txtCode.getSession === 'function' ? window.txtCode : null);
+                if (ed && typeof ed.getSession === 'function') {
+                    val = ed.getSession().getValue() || '';
+                }
+                const ta = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+                if (val == null) {
+                    if (ta) val = ta.value;
+                    else return;
+                }
+                if (ta) ta.value = val;
+                const $ = window.jQuery || window.$;
+                if ($ && $("#txtCode").length) $("#txtCode").val(val);
+            } catch (e) { }
+        }
+
+        // Wait for the AI Solution button, actively re-adding it when SkillRack re-renders
+        // the editor/button area (a Run result can drop our injected button for a moment).
+        async function waitForAiButton(timeout = 8000) {
+            const start = Date.now();
+            while (Date.now() - start < timeout && !shouldStop) {
+                const el = document.getElementById('ai-solution-btn');
+                if (el && el.offsetParent !== null) return el;
+                if (!el) {
+                    try { addAISolutionButton(); } catch (e) { }
+                }
+                await sleep(300);
+            }
+            return null;
+        }
+
         // ── Main solve function ───────────────────────────────────────────────────
         async function solve() {
             if (!SETTINGS.enableAutoSolver || !SETTINGS.enableAISolver) {
@@ -9389,9 +9488,21 @@ SOLVING APPROACH:
                 await sleep(500);
                 checkStop();
 
-                const aiBtn = await waitFor('#ai-solution-btn', 5000);
+                const aiBtn = await waitForAiButton(8000);
                 checkStop();
-                if (!aiBtn) { updateStatus('AI button not found', 'error'); return false; }
+                if (!aiBtn) {
+                    // A failed run makes SkillRack re-render the button row and can drop our
+                    // injected AI button for a moment. Do not abort the whole problem here:
+                    // count this attempt as failed so the loop retries with backoff (and
+                    // eventually skips & moves on) instead of dying silently.
+                    currentRetries++;
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    console.warn(`[AutoSolver] AI button not found — attempt ${currentRetries}/${maxRetries} failed`);
+                    updateStatus(`AI button missing — retry ${currentRetries}/${maxRetries}`, 'warning');
+                    await sleepWithCountdown(backoff, `AI button missing, retry ${currentRetries}/${maxRetries}`);
+                    checkStop();
+                    continue;
+                }
 
                 const editorBefore = editorContent().trim();
                 forceClick(aiBtn, 'AI Solution');
@@ -9422,8 +9533,10 @@ SOLVING APPROACH:
                 checkStop();
 
                 // Step 3: Click Run button (never on an empty editor: that only burns a
-                // submission and produces a meaningless "wrong output" retry context)
-                if (!editorHasSolution()) {
+                // submission and produces a meaningless "wrong output" retry context).
+                // Generation success above only proves the code was inserted moments ago;
+                // SkillRack's reset hooks can wipe it before we get here, so re-assert it now.
+                if (!await ensureSolutionInEditor()) {
                     currentRetries++;
                     clearInjectedRetryContext();
                     const backoff = getBackoffDelay(currentRetries - 1);
@@ -9466,10 +9579,30 @@ SOLVING APPROACH:
                 checkStop();
 
                 if (!runBtn) {
-                    updateStatus('Run button not found', 'error');
-                    console.error('[AutoSolver] Could not find Run button on page');
-                    return false;
+                    // Same policy as a missing AI button: keep the retry/skip flow alive
+                    // instead of silently aborting this problem.
+                    currentRetries++;
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    console.warn('[AutoSolver] Run button not found — treating attempt as failed');
+                    updateStatus(`Run button missing — retry ${currentRetries}/${maxRetries}`, 'warning');
+                    await sleepWithCountdown(backoff, `Run button missing, retry ${currentRetries}/${maxRetries}`);
+                    checkStop();
+                    continue;
                 }
+
+                // Last-moment re-assert + ACE → #txtCode sync. The submission form reads
+                // #txtCode, so if the editor was emptied or the textarea lags behind the
+                // ACE session, Run would compile nothing. Never submit an empty editor.
+                if (!await ensureSolutionInEditor()) {
+                    currentRetries++;
+                    clearInjectedRetryContext();
+                    const backoff = getBackoffDelay(currentRetries - 1);
+                    console.warn('[AutoSolver] Editor emptied right before Run, not clicking Run');
+                    await sleepWithCountdown(backoff, `Editor emptied, retry ${currentRetries}/${maxRetries}`);
+                    checkStop();
+                    continue;
+                }
+                syncEditorToForm();
 
                 forceClick(runBtn, 'Run');
 

@@ -180,6 +180,14 @@ opens the next unsolved problem. Nothing on the list is retried until the user
 clears it (Settings, Auto Solver, Clear list) or clicks retry on one entry.
 After `autoSolverMaxSkips` consecutive skips the solver stops.
 
+Run is never clicked on an empty editor. SkillRack's reset hooks can wipe a
+programmatically inserted solution in the gap between generation and submit, so
+the solver keeps the last inserted code, re-asserts it in the live editor (ACE
+session or plain `#txtCode` textarea) and syncs ACE → `#txtCode` immediately
+before the Run click; if the editor still cannot hold the code the attempt is
+retried rather than submitted empty. A missing AI or Run button during a retry
+re-adds the button and counts as a failed attempt instead of aborting.
+
 The captcha solver crops the expression line, inverts and upscales it, reads it
 with a Tesseract worker restricted to digits, plus and equals, and votes across
 three image variants. It watches the DOM after each submit, retries up to three

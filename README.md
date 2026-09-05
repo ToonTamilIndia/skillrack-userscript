@@ -1,7 +1,7 @@
 # SkillRack Userscript and Solution Bank
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/userscript-v7.0-2563eb?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/userscript-v7.1-2563eb?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-16a34a?style=flat-square">
   <img alt="Solutions" src="https://img.shields.io/badge/solutions-410%2B-7c3aed?style=flat-square">
   <img alt="AI" src="https://img.shields.io/badge/AI-DuckDuckGo%20(no%20key)-f97316?style=flat-square">
@@ -19,7 +19,7 @@ discretion. See the Disclaimer section.
 ## Contents
 
 1. [What is in this repository](#what-is-in-this-repository)
-2. [Version 7.0](#version-70)
+2. [Version 7.1](#version-71)
 3. [Installation](#installation)
 4. [How a problem gets solved](#how-a-problem-gets-solved)
 5. [Auto solver](#auto-solver)
@@ -49,9 +49,32 @@ discretion. See the Disclaimer section.
 | `solutions-server.js` | Optional local static server for `solutions/` during development. |
 | `kill.txt` | Remote kill switch read by the script. |
 
+## Version 7.1
+
+Version 7.1 fixes the auto solver submitting an **empty editor** on normal
+problem pages (CODETUTOR / CODETRACK), which made the judge answer
+`Actual Output: (EMPTY)` even though the log showed a solution had been
+generated.
+
+* SkillRack's editor hooks can wipe a programmatically inserted solution in the
+gap between "solution generated" and the Run click. The auto solver now keeps
+the last inserted solution and **re-asserts it in the live editor right before
+clicking Run** — on ACE pages and on plain-`#txtCode` textarea pages — and only
+submits once the editor provably holds code.
+* Before submitting, the solver **syncs the ACE session into the hidden
+`#txtCode` textarea** (the field the JSF form actually POSTs), so the payload
+cannot lag behind what the editor shows.
+* A missing AI button or Run button on a retry no longer aborts the problem:
+the button is re-added if SkillRack re-rendered the button row, and a genuinely
+missing button counts as a failed attempt with backoff, so the solver retries
+and eventually parks the problem and moves on instead of stopping silently.
+* Plain-textarea injection (`injectCodeToActiveEditor`) now re-applies itself
+after SkillRack reset hooks wipe the value, matching the protection ACE pages
+already had.
+
 ## Version 7.0
 
-Version 7.0 is a reliability release. Every change below was verified against the
+Version 7.0 was a reliability release. Every change below was verified against the
 live site with the Playwright harness in `tools/playwright/`.
 
 ### Captcha solver rewritten
@@ -311,6 +334,7 @@ fetching statements, is in `skill.md`.
 | Captcha not solved | Wait for Tesseract to download on first run (a few seconds). Console lines start with `[Captcha]`. After three rejections a prompt appears. |
 | Saved solution not used | The console shows `[Solutions] Used <url>` on success or `[LocalServer] Failed` with the reason. A 404 means no file exists for that ProgramID yet. |
 | AI returns nothing | Console lines start with `[AI]` or `[DuckDuckGo]`. A 429 means the proxy is rate limited; wait a minute. |
+| Auto solver submits empty code (`Actual Output: (EMPTY)`) | SkillRack's editor hooks can wipe injected code between generation and Run. Fixed in 7.1: the solver re-applies the generated solution and syncs `#txtCode` right before Run. Update the script, clear any skipped problems, and retry. |
 | Auto solver keeps stopping | Open Settings, Auto Solver, and clear the skip list, or raise `autoSolverMaxSkips`. |
 | Clipboard still blocked | Confirm the script runs at `document-start` and reload. |
 
@@ -348,6 +372,15 @@ violate your institution's academic integrity policy. You are solely responsible
 for your actions. Disable the script during tests and examinations.
 
 ## Changelog
+
+### v7.1
+
+* Auto solver never runs an empty editor: it re-asserts the last generated
+  solution and syncs ACE → `#txtCode` immediately before clicking Run, fixing
+  `Actual Output: (EMPTY)` runs on normal problem pages.
+* Missing AI/Run buttons during retries now re-add the button and keep the
+  retry-and-skip flow alive instead of aborting the problem silently.
+* Textarea-only injection re-applies itself after SkillRack reset hooks wipe it.
 
 ### v7.0
 
