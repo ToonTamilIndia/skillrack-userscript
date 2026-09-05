@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      6.1
+// @version      6.2
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -20,7 +20,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '6.1';
+    const SCRIPT_VERSION = '6.2';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -4539,16 +4539,118 @@ Compare the output character-by-character against the expected sample outputs (i
         const aceCheck = setInterval(() => {
             if (window.ace && !aceIntercepted) {
                 interceptAce();
-                clearInterval(aceCheck);
             }
         }, 50);
         setTimeout(() => clearInterval(aceCheck), 10000);
+
+        // ============================================
+        // PATCH EXISTING ACE EDITORS (created before interception)
+        // Some editors are created before ace.edit is wrapped.
+        // Find them via DOM and patch their commands.
+        // ============================================
+        const patchExistingEditors = () => {
+            document.querySelectorAll('.ace_editor').forEach(el => {
+                const editor = el.env?.editor || el.env?.editor;
+                if (!editor || editor._patchedByBypass) return;
+                editor._patchedByBypass = true;
+
+                if (editor.commands) {
+                    // Remove the 'bte' command that blocks clipboard shortcuts
+                    try {
+                        const cmds = editor.commands.commands || {};
+                        if (cmds.bte) {
+                            delete cmds.bte;
+                            console.log('[SkillRack Bypass] Removed bte command from existing editor');
+                        }
+                    } catch (e) {}
+
+                    // Block future addCommand calls that disable clipboard
+                    const origAddCommand = editor.commands.addCommand.bind(editor.commands);
+                    editor.commands.addCommand = function (command) {
+                        if (command && command.name === 'bte') {
+                            console.log('[SkillRack Bypass] Blocked bte command on existing editor');
+                            return;
+                        }
+                        if (command && command.bindKey) {
+                            const bindKey = typeof command.bindKey === 'string'
+                                ? command.bindKey
+                                : (command.bindKey.win || command.bindKey.mac || '');
+                            if ((bindKey.includes('ctrl-v') || bindKey.includes('cmd-v')) &&
+                                command.exec && command.exec.toString().includes('function() {}')) {
+                                console.log('[SkillRack Bypass] Blocked empty paste command on existing editor');
+                                return;
+                            }
+                        }
+                        return origAddCommand(command);
+                    };
+
+                    // Remove paste-blocking exec handlers
+                    const origCommandsOn = editor.commands.on.bind(editor.commands);
+                    editor.commands.on = function (event, callback) {
+                        if (event === 'exec' && callback) {
+                            const cbStr = callback.toString();
+                            if (cbStr.includes('paste') && cbStr.includes('preventDefault')) {
+                                console.log('[SkillRack Bypass] Removed paste-blocking exec handler from existing editor');
+                                return;
+                            }
+                        }
+                        return origCommandsOn(event, callback);
+                    };
+                }
+
+                // Patch session change handler (anti-bulk-paste)
+                if (editor.session) {
+                    const origSessionOn = editor.session.on.bind(editor.session);
+                    editor.session.on = function (event, callback) {
+                        if (event === 'change' && callback) {
+                            const cbStr = callback.toString();
+                            if (cbStr.includes('diff') || cbStr.includes('nowsnew') || cbStr.includes('nowsold')) {
+                                console.log('[SkillRack Bypass] Replaced anti-paste change handler on existing editor');
+                                return origSessionOn(event, function () {
+                                    const $ = window.jQuery || window.$;
+                                    if ($ && $("#txtCode").length) {
+                                        $("#txtCode").val(editor.getSession().getValue());
+                                    }
+                                });
+                            }
+                        }
+                        return origSessionOn(event, callback);
+                    };
+                }
+
+                console.log('[SkillRack Bypass] Patched existing ACE editor');
+            });
+        };
+
+        // Patch existing editors immediately and on DOM changes
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', patchExistingEditors);
+        } else {
+            patchExistingEditors();
+        }
+        setTimeout(patchExistingEditors, 1000);
+        setTimeout(patchExistingEditors, 3000);
+
+        // Watch for dynamically created editors
+        const editorObserver = new MutationObserver(() => {
+            patchExistingEditors();
+        });
+        if (document.body) {
+            editorObserver.observe(document.body, { childList: true, subtree: true });
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                editorObserver.observe(document.body, { childList: true, subtree: true });
+            });
+        }
 
         // ============================================
         // KEYBOARD EVENT INTERCEPTION (for Ctrl+V in ACE)
         // ============================================
 
         // Intercept keydown at the highest priority to ensure Ctrl+V works
+        // Track whether we handled paste via Clipboard API to avoid double-insertion
+        let _pasteHandledByClipboardAPI = false;
+
         window.addEventListener('keydown', function (e) {
             // Handle Ctrl+V / Cmd+V
             if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
@@ -4556,34 +4658,37 @@ Compare the output character-by-character against the expected sample outputs (i
                 const aceContainer = activeEl?.closest('.ace_editor');
 
                 if (aceContainer && aceContainer.env?.editor) {
+                    // Stop other keydown handlers (ACE's blocked bte handler, etc.)
+                    // but DON'T preventDefault — let the browser fire the native paste event
+                    // so our native paste handler can catch clipboardData as fallback
                     e.stopImmediatePropagation();
-                    // Don't preventDefault - allow the native paste event to fire
 
                     const editor = aceContainer.env.editor;
+                    const session = editor.getSession();
+                    const $ = window.jQuery || window.$;
 
-                    // Try Clipboard API first (works if permissions granted)
-                    // Fall back to native paste event handling
+                    const syncHiddenTextarea = () => {
+                        if ($ && $("#txtCode").length) {
+                            $("#txtCode").val(session.getValue());
+                        }
+                    };
+
+                    // Try Clipboard API first
                     if (navigator.clipboard && navigator.clipboard.readText) {
+                        _pasteHandledByClipboardAPI = false;
                         navigator.clipboard.readText().then(text => {
                             if (text) {
-                                const session = editor.getSession();
-                                const $ = window.jQuery || window.$;
-
-                                // Insert text directly
                                 session.insert(editor.getCursorPosition(), text);
-
-                                // Sync with hidden textarea immediately
-                                if ($ && $("#txtCode").length) {
-                                    $("#txtCode").val(session.getValue());
-                                }
+                                syncHiddenTextarea();
+                                _pasteHandledByClipboardAPI = true;
                             }
                         }).catch(err => {
-                            // Clipboard API failed - this is expected without permissions
-                            // The native paste event should still work through ACE's built-in handling
-                            console.log('Clipboard API not available, using native paste');
+                            // Clipboard API failed — the native paste event will handle it
+                            console.log('[SkillRack Bypass] Clipboard API unavailable, using native paste');
                         });
                     }
                 }
+                return; // Don't process further
             }
 
             // Handle Ctrl+C / Cmd+C
@@ -4807,15 +4912,26 @@ Compare the output character-by-character against the expected sample outputs (i
         originalAddEventListener.call(document, 'cut', blockClipboardPrevention, true);
         originalAddEventListener.call(document, 'paste', blockClipboardPrevention, true);
 
-        // Handle native paste event for ACE editor (fallback when Clipboard API is blocked)
-        originalAddEventListener.call(document, 'paste', function (e) {
-            const activeEl = document.activeElement;
-            const aceContainer = activeEl?.closest('.ace_editor');
+        // Handle native paste event for ACE editor.
+        // We register this on the editor element during capture phase, BEFORE
+        // the document-level blockClipboardPrevention fires (which would block it).
+        // By calling stopImmediatePropagation on the editor, we prevent the
+        // event from reaching the document-level blockClipboardPrevention,
+        // ensuring our handler runs and jQuery's handlers don't.
+        const nativePasteHandler = (e) => {
+            // Skip if already handled by Clipboard API in keydown handler
+            if (_pasteHandledByClipboardAPI) {
+                _pasteHandledByClipboardAPI = false;
+                return;
+            }
+
+            const aceContainer = e.target?.closest?.('.ace_editor') || e.target?.parentElement?.closest?.('.ace_editor');
 
             if (aceContainer && aceContainer.env?.editor && e.clipboardData) {
                 const text = e.clipboardData.getData('text/plain');
                 if (text) {
                     e.preventDefault();
+                    e.stopImmediatePropagation(); // Block document-level handlers (jQuery)
                     const editor = aceContainer.env.editor;
                     const session = editor.getSession();
                     const $ = window.jQuery || window.$;
@@ -4829,12 +4945,61 @@ Compare the output character-by-character against the expected sample outputs (i
                     }
                 }
             }
+        };
+
+        // Also listen on document for non-ACE paste events (question text copying)
+        originalAddEventListener.call(document, 'paste', function (e) {
+            if (_pasteHandledByClipboardAPI) {
+                _pasteHandledByClipboardAPI = false;
+                return;
+            }
+            // For non-ACE elements, let the browser handle the paste normally
+            // blockClipboardPrevention already stopped jQuery from blocking it
         }, false);
 
-        // Also intercept at window level
+        // Watch for ACE editors and attach the native paste handler
+        const attachPasteHandler = (editorEl) => {
+            if (editorEl._pasteHandlerAttached) return;
+            editorEl._pasteHandlerAttached = true;
+            originalAddEventListener.call(editorEl, 'paste', nativePasteHandler, true);
+        };
+
+        // Attach to existing editors
+        const attachToExistingEditors = () => {
+            document.querySelectorAll('.ace_editor').forEach(attachPasteHandler);
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', attachToExistingEditors);
+        } else {
+            attachToExistingEditors();
+        }
+        setTimeout(attachToExistingEditors, 500);
+
+        // Watch for dynamically created editors
+        const editorAttachObserver = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === 1) {
+                        if (node.classList?.contains('ace_editor')) {
+                            attachPasteHandler(node);
+                        }
+                        node.querySelectorAll?.('.ace_editor').forEach(attachPasteHandler);
+                    }
+                }
+            }
+        });
+        if (document.body) {
+            editorAttachObserver.observe(document.body, { childList: true, subtree: true });
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                editorAttachObserver.observe(document.body, { childList: true, subtree: true });
+            });
+        }
+
+        // Also intercept at window level for copy/cut (not paste — handled above)
         originalAddEventListener.call(window, 'copy', blockClipboardPrevention, true);
         originalAddEventListener.call(window, 'cut', blockClipboardPrevention, true);
-        originalAddEventListener.call(window, 'paste', blockClipboardPrevention, true);
 
         // Override jQuery's bind/on methods to ignore clipboard events
         // BUT preserve PrimeFaces functionality
@@ -4844,33 +5009,40 @@ Compare the output character-by-character against the expected sample outputs (i
                 const originalBind = jq.fn.bind;
                 const originalOn = jq.fn.on;
 
-                const filterClipboardEvents = function (events) {
-                    if (typeof events === 'string') {
-                        // Only filter direct clipboard events, not namespaced ones from PrimeFaces
-                        const eventList = events.split(/\s+/);
-                        const filtered = eventList.filter(e => {
-                            const baseEvent = e.split('.')[0];
-                            // Only block if it's a simple cut/copy/paste without namespace
-                            // This preserves PrimeFaces events like 'change.primefaces'
-                            return !['cut', 'copy', 'paste'].includes(baseEvent) || e.includes('.');
-                        });
-                        return filtered.join(' ');
-                    }
-                    return events;
-                };
-
                 jq.fn.bind = function (events, ...args) {
                     if (typeof events === 'string' && ['cut', 'copy', 'paste'].some(e => events === e)) {
-                        return this; // Only block exact matches
+                        return this; // Block clipboard event bindings
                     }
                     return originalBind.call(this, events, ...args);
                 };
 
                 jq.fn.on = function (events, ...args) {
                     if (typeof events === 'string' && ['cut', 'copy', 'paste'].some(e => events === e)) {
-                        return this; // Only block exact matches
+                        return this; // Block clipboard event bindings
                     }
                     return originalOn.call(this, events, ...args);
+                };
+
+                // Also intercept $(document).ready() to prevent late clipboard blocking
+                const originalReady = jq.fn.ready;
+                jq.fn.ready = function (fn) {
+                    if (typeof fn === 'function') {
+                        const fnStr = fn.toString();
+                        if (fnStr.includes('cut copy paste') || fnStr.includes('cut').length > 0 && fnStr.includes('paste')) {
+                            // This ready handler contains clipboard blocking — neuter it
+                            const origFn = fn;
+                            return originalReady.call(this, function () {
+                                // Re-bind jQuery bind/on AFTER this handler runs to re-intercept
+                                if (jq.fn.bind !== originalBind) {
+                                    jq.fn.bind = originalBind;
+                                }
+                                if (jq.fn.on !== originalOn) {
+                                    jq.fn.on = originalOn;
+                                }
+                            });
+                        }
+                    }
+                    return originalReady.call(this, fn);
                 };
 
                 console.log('jQuery clipboard event binding intercepted');
@@ -4880,6 +5052,57 @@ Compare the output character-by-character against the expected sample outputs (i
 
         // Stop checking after 5 seconds
         setTimeout(() => clearInterval(waitForJQuery), 5000);
+
+        // ============================================
+        // MUTATION OBSERVER: Catch late paste-blocking scripts
+        // SkillRack injects inline <script> blocks that bind
+        // $(document).bind("cut copy paste", ...) AFTER the
+        // userscript runs. We remove these handlers at the
+        // MutationObserver level.
+        // ============================================
+        const pasteBlockObserver = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                for (const node of mutation.addNodes) {
+                    if (node.nodeType === 1) {
+                        // Check if it's a script with clipboard blocking
+                        const scripts = node.tagName === 'SCRIPT' ? [node] : (node.querySelectorAll?.('script') || []);
+                        for (const script of scripts) {
+                            if (script.textContent && (
+                                script.textContent.includes('cut copy paste') ||
+                                script.textContent.includes('cut copy paste')
+                            )) {
+                                // Remove the clipboard blocking lines from the script
+                                script.textContent = script.textContent.replace(
+                                    /\$\(document\)\.ready\s*\(\s*function\s*\(\)\s*\{[^}]*cut copy paste[^}]*\}\s*\)/g,
+                                    '// paste-block removed'
+                                );
+                                console.log('[SkillRack Bypass] Removed late clipboard blocking script');
+                            }
+                        }
+                        // Also check for inline oncut/oncopy/onpaste handlers
+                        if (node.nodeType === 1) {
+                            node.removeAttribute?.('oncut');
+                            node.removeAttribute?.('oncopy');
+                            node.removeAttribute?.('onpaste');
+                            if (node.querySelectorAll) {
+                                node.querySelectorAll('[oncut],[oncopy],[onpaste]').forEach(el => {
+                                    el.removeAttribute('oncut');
+                                    el.removeAttribute('oncopy');
+                                    el.removeAttribute('onpaste');
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        if (document.body) {
+            pasteBlockObserver.observe(document.body, { childList: true, subtree: true });
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                pasteBlockObserver.observe(document.body, { childList: true, subtree: true });
+            });
+        }
 
         // Restore clipboard API if available
         if (navigator.clipboard) {
