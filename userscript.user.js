@@ -9682,6 +9682,9 @@ SOLVING APPROACH:
                 }
 
                 const editorBefore = editorContent().trim();
+                // Forget any solution from a previous problem/attempt: only code inserted by
+                // THIS generation should count when we re-assert it after the reset race below.
+                lastInjectedSolution = null;
                 forceClick(aiBtn, 'AI Solution');
 
                 // Step 2: Wait for AI generation to complete
@@ -9691,10 +9694,18 @@ SOLVING APPROACH:
                 // failure too (provider error, empty answer, insertion failure). Running the
                 // template would only waste a submission.
                 if (generated && extractMFIBTemplate().inputs.length === 0) {
-                    const editorAfter = editorContent().trim();
-                    if (!editorAfter || editorAfter === editorBefore) {
-                        console.warn('[AutoSolver] Editor unchanged after generation (template only), treating as failed generation');
-                        generated = false;
+                    // SkillRack's reset hook can wipe the just-inserted solution in a race with
+                    // this check, so reading the editor right now can wrongly show the template
+                    // even though generation succeeded. ensureSolutionInEditor() re-applies the
+                    // last inserted solution and waits until the editor provably holds it; only
+                    // if it still cannot (no code was ever inserted) is this a failed generation.
+                    const settled = await ensureSolutionInEditor();
+                    if (!settled) {
+                        const editorAfter = editorContent().trim();
+                        if (!editorAfter || editorAfter === editorBefore) {
+                            console.warn('[AutoSolver] Editor unchanged after generation (template only), treating as failed generation');
+                            generated = false;
+                        }
                     }
                 }
                 if (!generated) {
