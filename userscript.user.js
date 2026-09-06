@@ -4780,8 +4780,7 @@ Emit ONLY the final executable solution.`,
                         _pasteHandledByClipboardAPI = false;
                         navigator.clipboard.readText().then(text => {
                             if (text) {
-                                session.insert(editor.getCursorPosition(), text);
-                                syncHiddenTextarea();
+                                pasteIntoEditor(editor, text);
                                 _pasteHandledByClipboardAPI = true;
                             }
                         }).catch(err => {
@@ -5038,12 +5037,8 @@ Emit ONLY the final executable solution.`,
                     const session = editor.getSession();
                     const $ = window.jQuery || window.$;
 
-                    // Insert text directly
-                    session.insert(editor.getCursorPosition(), text);
-
-                    // Sync with hidden textarea (randomized id on Daily Test)
-                    const ta = getEditorTextarea();
-                    if (ta) ta.value = session.getValue();
+                    // Insert text and keep it (SkillRack's diff-reset wipes large pastes)
+                    pasteIntoEditor(editor, text);
                 }
             }
         };
@@ -5320,7 +5315,84 @@ Emit ONLY the final executable solution.`,
         return tas.find(t => t.classList.contains('ui-inputtextarea') && t.id) || tas.find(t => t.id) || tas[0] || null;
     }
 
+    // Insert text at the editor cursor and KEEP it. SkillRack's anti-paste change handler
+    // resets the editor to the (stale, often empty) hidden textarea when a paste adds more
+    // than a few characters, which silently wipes larger pastes. This re-applies the intended
+    // content and keeps the submit textarea in sync, so pasting a full solution works.
+    function pasteIntoEditor(editor, text) {
+        try {
+            const session = editor.getSession();
+            const doc = session.getDocument ? session.getDocument() : null;
+            const cur = editor.getCursorPosition();
+            const val = session.getValue();
+            let offset;
+            try { offset = doc && doc.positionToIndex ? doc.positionToIndex(cur) : val.length; } catch (e) { offset = val.length; }
+            const expected = val.slice(0, offset) + text + val.slice(offset);
+            const $ = window.jQuery || window.$;
+            const syncTa = () => {
+                const ta = getEditorTextarea();
+                if (ta) ta.value = expected;
+                if ($ && $('#txtCode').length) $('#txtCode').val(expected);
+            };
+            // Sync the hidden textarea FIRST. SkillRack's diff-reset handler resets the editor
+            // to the textarea value, so if the textarea already holds the intended content the
+            // reset becomes a no-op instead of wiping a large paste.
+            syncTa();
+            session.setValue(expected);
+            if (typeof editor.clearSelection === 'function') editor.clearSelection();
+            syncTa();
+            // Belt-and-braces: re-apply a couple of times in case a reset still slips through.
+            const reapply = (attempt) => {
+                try {
+                    if (session.getValue() !== expected) { syncTa(); session.setValue(expected); if (typeof editor.clearSelection === 'function') editor.clearSelection(); }
+                    syncTa();
+                } catch (e) { }
+                if (attempt < 3) setTimeout(() => reapply(attempt + 1), 180);
+            };
+            setTimeout(() => reapply(0), 0);
+        } catch (e) { console.warn('[SkillRack] pasteIntoEditor error:', e); }
+    }
+
+    // Append any missing closing braces/brackets so a solution that lost its trailing
+    // `}` (e.g. a function-style template whose post-code brace was stripped) still
+    // compiles instead of failing with "reached end of file while parsing". Counts only
+    // real code — braces inside string/char literals and // or /* */ comments are ignored.
+    // C-family only (C, C++, Java); Python and others are returned unchanged.
+    function balanceCodeBraces(code, lang) {
+        try {
+            const l = (lang || getSelectedLanguage() || '').toLowerCase();
+            const cLike = l === 'c' || l.startsWith('c++') || l === 'cpp' || l === 'java';
+            if (!cLike || !code) return code;
+            let curly = 0, square = 0, paren = 0;
+            let inStr = false, inChar = false, inLine = false, inBlock = false;
+            for (let i = 0; i < code.length; i++) {
+                const c = code[i], n = code[i + 1];
+                if (inLine) { if (c === '\n') inLine = false; continue; }
+                if (inBlock) { if (c === '*' && n === '/') { inBlock = false; i++; } continue; }
+                if (inStr) { if (c === '\\') { i++; } else if (c === '"') inStr = false; continue; }
+                if (inChar) { if (c === '\\') { i++; } else if (c === "'") inChar = false; continue; }
+                if (c === '/' && n === '/') { inLine = true; i++; continue; }
+                if (c === '/' && n === '*') { inBlock = true; i++; continue; }
+                if (c === '"') { inStr = true; continue; }
+                if (c === "'") { inChar = true; continue; }
+                if (c === '{') curly++; else if (c === '}') { if (curly > 0) curly--; }
+                else if (c === '[') square++; else if (c === ']') { if (square > 0) square--; }
+                else if (c === '(') paren++; else if (c === ')') { if (paren > 0) paren--; }
+            }
+            // Do not touch code that is inside an unterminated string/comment (can't reason safely).
+            if (inStr || inChar || inBlock) return code;
+            let out = code;
+            if (paren > 0) out += ')'.repeat(paren);
+            if (square > 0) out += '\n' + ']'.repeat(square);
+            if (curly > 0) out += '\n' + Array(curly).fill('}').join('\n');
+            if (out !== code) console.warn('[SkillRack] Balanced code: appended ' + curly + ' \'}\', ' + square + ' \']\', ' + paren + ' \')\'');
+            return out;
+        } catch (e) { return code; }
+    }
+
     function injectCodeToActiveEditor(code) {
+        // Never insert C-family code with a missing trailing brace.
+        code = balanceCodeBraces(code);
         // Prefer the editor instance attached to the VISIBLE .ace_editor element; the
         // cached instance can belong to a previous (replaced) panel after an AJAX update.
         let editor = null;
@@ -5551,10 +5623,13 @@ Emit ONLY the final executable solution.`,
                 }
             }
 
-            // 2.5.3 Remove change event listeners that do char limit detection (15-char / 30-char / diff / nowsnew / nowsold)
-            if (editor.session && editor.session._eventRegistry && editor.session._eventRegistry.change) {
-                const originalChangeHandlers = editor.session._eventRegistry.change;
-                editor.session._eventRegistry.change = originalChangeHandlers.filter(handler => {
+            // 2.5.3 Remove change event listeners that do char limit detection (15-char / 30-char / diff / nowsnew / nowsold).
+            // SkillRack registers this reset handler on BOTH editor._eventRegistry.change and
+            // editor.session._eventRegistry.change depending on the page, so clean both — the
+            // editor-level one is what silently wipes large pastes.
+            const stripDiffHandlers = (reg) => {
+                if (!reg || !reg.change) return;
+                reg.change = reg.change.filter(handler => {
                     const handlerStr = handler.toString();
                     if (handlerStr.includes('diff') || handlerStr.includes('nowsnew') || handlerStr.includes('nowsold') || handlerStr.includes('nlen') || handlerStr.includes('olen')) {
                         console.log('Removed anti-paste change handler');
@@ -5562,7 +5637,9 @@ Emit ONLY the final executable solution.`,
                     }
                     return true;
                 });
-            }
+            };
+            stripDiffHandlers(editor._eventRegistry);
+            if (editor.session) stripDiffHandlers(editor.session._eventRegistry);
 
             // 2.5.5 Enable drop events on ACE container
             if (editor.container) {
@@ -5571,10 +5648,7 @@ Emit ONLY the final executable solution.`,
                     e.stopImmediatePropagation();
                     const text = e.dataTransfer?.getData('text/plain');
                     if (text && editor.session) {
-                        editor.session.insert(editor.getCursorPosition(), text);
-                        // Sync with hidden textarea (randomized id on Daily Test)
-                        const ta = getEditorTextarea();
-                        if (ta) ta.value = editor.session.getValue();
+                        pasteIntoEditor(editor, text);
                     }
                 }, true);
 
