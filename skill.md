@@ -68,7 +68,7 @@ a redirect, so detect it by the presence of the `j_username` input.
 
 ## 2. Solution file format
 
-One markdown file per problem at `solutions/<ProgramID>.md`:
+One markdown file per problem per language at `solutions/<lang>/<ProgramID>.md`:
 
 ````md
 # Id 12345 - Problem Name
@@ -81,7 +81,7 @@ Verified: <sample input> -> <sample output>
 ````
 
 * The ProgramID is the stable key. The userscript requests
-  `solutions/<ProgramID>.md` by it.
+  `solutions/<lang>/<ProgramID>.md` by it.
 * The fence language tag (`c`, `cpp`, `java`, `python`, `sql`) selects the
   toolchain for `verify.py` and tells the userscript which editor language to
   expect.
@@ -105,7 +105,7 @@ Verified: <sample input> -> <sample output>
    problem name (`"<problem name>" skillrack`, `site:github.com "<problem name>"`).
    A found reference is cross-checked against the statement. Only when nothing
    is found, or the reference fails, write the solution yourself or with AI.
-5. Verify. `python3 tools/verify.py solutions/<id>.md /tmp/stmts.json`. C and C++
+5. Verify. `python3 tools/verify.py solutions/<lang>/<id>.md /tmp/stmts.json`. C and C++
    compile with `gcc`/`g++ -w -O2`, Java with `javac`, Python with `python3`.
    Exit code 0 means every sample passed. Function-only problems have no `main`
    and cannot link; build a small harness that reads the sample input, calls the
@@ -120,7 +120,7 @@ Verified: <sample input> -> <sample output>
 `tools/playwright/autosolve.js` drives the real site in headless Chromium: it
 logs in, opens a part list, turns on the userscript's auto solver with the
 keyless DuckDuckGo provider, and writes every solution that passes the judge to
-`solutions/<ProgramID>.md` with a `Verified:` line. Problems the solver cannot
+`solutions/<lang>/<ProgramID>.md` with a `Verified:` line. Problems the solver cannot
 pass after three attempts are parked on its skip list and become the to-do list
 for a human contributor.
 
@@ -149,7 +149,7 @@ and `PART` the part index (in View button order).
 
 ## 5. Contribution model
 
-Rules: one problem is one `solutions/<id>.md`; real code that compiles; a
+Rules: one problem is one `solutions/<lang>/<id>.md`; real code that compiles; a
 `Verified` line that reflects a real run; do not edit someone else's file
 without adding a note; no personal data and no cookies in any committed file.
 
@@ -158,7 +158,7 @@ tracker with `tools/status.py --md document.md`, open a pull request with the
 passing verify line in the body. That line is the acceptance bar.
 
 Once merged, a solution is live for every user immediately. The userscript
-fetches `raw.githubusercontent.com/<owner>/skillrack-userscript/main/solutions/<id>.md`
+fetches `raw.githubusercontent.com/<owner>/skillrack-userscript/main/solutions/<lang>/<id>.md`
 with `credentials: 'omit'` (GitHub answers `Access-Control-Allow-Origin: *`, so
 a credentialed request would be rejected). For development the "Solutions Base
 URL" setting can point at `http://localhost:3000` with `node solutions-server.js`.
@@ -168,7 +168,7 @@ URL" setting can point at `http://localhost:3000` with `node solutions-server.js
 Order of sources when a solution is requested:
 
 1. SkillRack's own View Solution, when present.
-2. `solutions/<ProgramID>.md` from GitHub or the local server.
+2. `solutions/<lang>/<ProgramID>.md` from GitHub or the local server (by editor language).
 3. The AI provider (DuckDuckGo by default, no key), with statement, samples and
    pre or post code.
 

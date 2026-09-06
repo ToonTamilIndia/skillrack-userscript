@@ -17,18 +17,25 @@ const server = http.createServer((req, res) => {
     }
 
     const urlPath = decodeURIComponent(req.url.split('?')[0]);
-    // Expected: /solutions/<programId>.md
-    const m = urlPath.match(/^\/solutions\/(\d+)\.md$/);
-    if (!m) {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not Found. Expected /solutions/<ProgramID>.md');
-        return;
+    // Language-scoped: /solutions/<lang>/<programId>.md  (e.g. /solutions/c/2571.md)
+    // Legacy flat:     /solutions/<programId>.md          (served from solutions/c for back-compat)
+    let m = urlPath.match(/^\/solutions\/([a-z0-9+]+)\/(\d+)\.md$/);
+    let file;
+    if (m) {
+        file = path.join(SOLUTIONS_DIR, m[1], m[2] + '.md');
+    } else {
+        m = urlPath.match(/^\/solutions\/(\d+)\.md$/);
+        if (!m) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not Found. Expected /solutions/<lang>/<ProgramID>.md or /solutions/<ProgramID>.md');
+            return;
+        }
+        // Legacy flat path -> look under solutions/c (the historical default language)
+        file = path.join(SOLUTIONS_DIR, 'c', m[1] + '.md');
     }
-
-    const file = path.join(SOLUTIONS_DIR, m[1] + '.md');
     if (!file.startsWith(SOLUTIONS_DIR) || !fs.existsSync(file)) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('No solution found for ProgramID ' + m[1]);
+        res.end('No solution found: ' + urlPath);
         return;
     }
 
@@ -45,5 +52,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
     console.log(`SkillRack solutions server running at http://localhost:${PORT}`);
-    console.log(`  e.g. http://localhost:${PORT}/solutions/2571.md`);
+    console.log(`  e.g. http://localhost:${PORT}/solutions/c/2571.md`);
 });

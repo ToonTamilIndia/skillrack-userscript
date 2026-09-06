@@ -24,18 +24,27 @@ def lang_of(tag):
             'py': 'python', 'python3': 'python', 'python': 'python'}.get(t, t or '?')
 
 def iter_solutions():
+    # Bank is organized as solutions/<lang>/<id>.md; legacy flat solutions/<id>.md is
+    # still read (treated as C). Keyed by "<lang>:<id>" so the same ProgramID can hold a
+    # solution in more than one language without one overwriting the other.
     out = {}
     if not os.path.isdir(SOL):
         return out
-    for fn in sorted(os.listdir(SOL)):
-        if not fn.endswith('.md'):
-            continue
-        pid = fn[:-3]
-        text = open(os.path.join(SOL, fn), encoding='utf-8', errors='replace').read()
+    def add(path, pid, default_lang=None):
+        text = open(path, encoding='utf-8', errors='replace').read()
         nm = re.search(r'^#\s*Id\s+\S+?\s*[—-]\s*(.+)$', text, re.M)
         m = FENCE.search(text)
-        out[pid] = {'id': pid, 'name': (html.unescape(nm.group(1).strip()) if nm else '?'),
-                    'lang': lang_of(m.group(1)) if m else '?'}
+        lang = lang_of(m.group(1)) if m else (default_lang or '?')
+        out['{}:{}'.format(lang, pid)] = {
+            'id': pid, 'name': (html.unescape(nm.group(1).strip()) if nm else '?'), 'lang': lang}
+    for entry in sorted(os.listdir(SOL)):
+        full = os.path.join(SOL, entry)
+        if os.path.isdir(full):
+            for fn in sorted(os.listdir(full)):
+                if fn.endswith('.md'):
+                    add(os.path.join(full, fn), fn[:-3], default_lang=entry)
+        elif entry.endswith('.md'):
+            add(full, entry[:-3], default_lang='c')
     return out
 
 def flatten_enum(raw):

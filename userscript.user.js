@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Anti-Cheat Bypass
 // @namespace    http://tampermonkey.net/
-// @version      7.1
+// @version      7.3
 // @description  Bypass tab switching, copy/paste restrictions, full-screen enforcement, auto-solve captcha, and AI-powered solution generator
 // @author       ToonTamilIndia (Captcha solver by adithyagenie)
 // @match        https://*.skillrack.com/*
@@ -20,7 +20,7 @@
     // ============================================
     // SCRIPT VERSION & REMOTE URLS
     // ============================================
-    const SCRIPT_VERSION = '7.1';
+    const SCRIPT_VERSION = '7.3';
     const REMOTE_SCRIPT_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/userscript.user.js';
     const KILL_SWITCH_URL = 'https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/refs/heads/main/kill.txt';
     const DISCLAIMER_ACCEPTED_KEY = 'skillrack_bypass_disclaimer_accepted';
@@ -620,6 +620,11 @@ Emit ONLY the final executable solution.`,
 
         // ========== AUTO SOLVER SETTINGS ==========
         enableAutoSolver: false,
+        // Advanced Mode: submit the solution straight through PrimeFaces' AJAX request
+        // (setting the hidden submit field directly) instead of driving the ACE editor and
+        // clicking Run. Sidesteps SkillRack's editor reset/paste hooks entirely. Off by
+        // default; enabling it shows a warning the user must accept.
+        enableAdvancedMode: false,
         autoSolverMaxRetries: 3,
         autoSolverDelay: 500,
         // After this many problems skipped in a row (no pass in between) the auto solver stops
@@ -678,6 +683,7 @@ Emit ONLY the final executable solution.`,
                     merged.v7ProviderMigrated = true;
                 }
                 // Migrate: ensure new local-server settings exist (GitHub solutions need no server → on by default)
+                if (merged.enableAdvancedMode === undefined) merged.enableAdvancedMode = false;
                 if (merged.enableLocalServer === undefined) merged.enableLocalServer = true;
                 if (merged.autoSolverMaxSkips === undefined) merged.autoSolverMaxSkips = 5;
                 if (merged.localServerUrl === undefined) merged.localServerUrl = "https://raw.githubusercontent.com/ToonTamilIndia/skillrack-userscript/main";
@@ -2988,6 +2994,32 @@ Emit ONLY the final executable solution.`,
         }
         panelContent.appendChild(autoSolverToggle);
 
+        // Advanced Mode toggle (direct AJAX submit) — gated behind a warning the user accepts
+        const advancedToggle = createToggle('enableAdvancedMode', 'Advanced Mode (direct submit)', SETTINGS.enableAdvancedMode, 'Submit via the site\'s AJAX request instead of driving the editor. More reliable, but experimental.');
+        const advancedCheckbox = advancedToggle.querySelector('input[type="checkbox"]');
+        if (advancedCheckbox) {
+            advancedCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    const confirmed = confirm(
+                        'ADVANCED MODE - DIRECT SUBMIT\n\n' +
+                        'Instead of typing into the code editor and clicking Run, the auto solver\n' +
+                        'sets the hidden code field and fires the site\'s own submit request directly.\n\n' +
+                        '• More reliable: skips the editor reset / paste hooks entirely\n' +
+                        '• Works the same on Daily Test and normal problem pages\n' +
+                        '• EXPERIMENTAL — the code you see in the editor may briefly differ from\n' +
+                        '  what was submitted\n\n' +
+                        'Enable Advanced Mode?'
+                    );
+                    if (!confirmed) {
+                        e.target.checked = false;
+                        SETTINGS.enableAdvancedMode = false;
+                        saveSettings(SETTINGS);
+                    }
+                }
+            });
+        }
+        panelContent.appendChild(advancedToggle);
+
         // Skipped ("temporarily can't solve") problems — list + clear
         const skipWrapper = document.createElement('div');
         skipWrapper.id = 'autosolver-skip-wrapper';
@@ -4561,10 +4593,8 @@ Emit ONLY the final executable solution.`,
                                     console.log('Blocked ACE anti-paste change handler');
                                     // Replace with a simple sync handler that always syncs
                                     return originalSessionOn(event, function (e) {
-                                        const $ = window.jQuery || window.$;
-                                        if ($ && $("#txtCode").length) {
-                                            $("#txtCode").val(editor.getSession().getValue());
-                                        }
+                                        const ta = getEditorTextarea();
+                                        if (ta) ta.value = editor.getSession().getValue();
                                     });
                                 }
                             }
@@ -4573,10 +4603,8 @@ Emit ONLY the final executable solution.`,
 
                         // Also add our own change handler to ensure sync always happens
                         editor.session.on('change', function (e) {
-                            const $ = window.jQuery || window.$;
-                            if ($ && $("#txtCode").length) {
-                                $("#txtCode").val(editor.getSession().getValue());
-                            }
+                            const ta = getEditorTextarea();
+                            if (ta) ta.value = editor.getSession().getValue();
                         });
                     }
                 }
@@ -5013,10 +5041,9 @@ Emit ONLY the final executable solution.`,
                     // Insert text directly
                     session.insert(editor.getCursorPosition(), text);
 
-                    // Sync with hidden textarea
-                    if ($ && $("#txtCode").length) {
-                        $("#txtCode").val(session.getValue());
-                    }
+                    // Sync with hidden textarea (randomized id on Daily Test)
+                    const ta = getEditorTextarea();
+                    if (ta) ta.value = session.getValue();
                 }
             }
         };
@@ -5278,6 +5305,21 @@ Emit ONLY the final executable solution.`,
         return null;
     }
 
+    // The hidden textarea the JSF form actually submits for the code. On normal pages
+    // (CODETUTOR/CODETRACK) it is #txtCode; on Daily Test/Challenge pages the id is
+    // randomized (e.g. ecsqbma1788675274365), so fall back to the non-ACE textarea inside
+    // the same form as the visible ACE editor. Getting this right matters because the
+    // userscript's ACE bypass removes SkillRack's own change handler that copies the ACE
+    // session into that textarea, so the auto solver must sync it explicitly before Run.
+    function getEditorTextarea() {
+        const direct = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+        if (direct) return direct;
+        const aceEl = [...document.querySelectorAll('.ace_editor')].find(el => el.offsetParent !== null) || document.querySelector('.ace_editor');
+        const scope = (aceEl && aceEl.closest('form')) || document;
+        const tas = [...scope.querySelectorAll('textarea')].filter(t => !t.classList.contains('ace_text-input'));
+        return tas.find(t => t.classList.contains('ui-inputtextarea') && t.id) || tas.find(t => t.id) || tas[0] || null;
+    }
+
     function injectCodeToActiveEditor(code) {
         // Prefer the editor instance attached to the VISIBLE .ace_editor element; the
         // cached instance can belong to a previous (replaced) panel after an AJAX update.
@@ -5288,8 +5330,8 @@ Emit ONLY the final executable solution.`,
         } catch (e) { }
         if (!editor) editor = getActiveAceEditor();
         const $ = window.jQuery || window.$;
-        const $area = $ ? ($('#txtCode').length ? $('#txtCode') : $('#codediv textarea')) : null;
-        const domArea = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+        const domArea = getEditorTextarea();
+        const $area = ($ && domArea) ? $(domArea) : null;
 
         if (domArea) domArea.value = code;
         if ($area && $area.length) $area.val(code);
@@ -5344,10 +5386,10 @@ Emit ONLY the final executable solution.`,
             // solution is not silently lost before the Run click.
             const verifyTa = (attempt) => {
                 try {
-                    const ta = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+                    const ta = getEditorTextarea();
                     if (!ta || ta.value.trim() !== code.trim()) {
                         console.warn(`[SkillRack] Textarea content was reset after insertion, re-applying (attempt ${attempt})`);
-                        const ta2 = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+                        const ta2 = getEditorTextarea();
                         if (ta2) {
                             ta2.value = code;
                             ta2.dispatchEvent(new Event('input', { bubbles: true }));
@@ -5530,11 +5572,9 @@ Emit ONLY the final executable solution.`,
                     const text = e.dataTransfer?.getData('text/plain');
                     if (text && editor.session) {
                         editor.session.insert(editor.getCursorPosition(), text);
-                        // Sync with hidden textarea
-                        const $ = window.jQuery || window.$;
-                        if ($ && $("#txtCode").length) {
-                            $("#txtCode").val(editor.session.getValue());
-                        }
+                        // Sync with hidden textarea (randomized id on Daily Test)
+                        const ta = getEditorTextarea();
+                        if (ta) ta.value = editor.session.getValue();
                     }
                 }, true);
 
@@ -5554,15 +5594,16 @@ Emit ONLY the final executable solution.`,
             window._csOverridden = true;
             const originalCs = window.cs;
             window.cs = function () {
-                // Just sync the value, don't do the diff check
-                if (window.txtCode && window.jQuery) {
-                    const $ = window.jQuery;
-                    if ($("#txtCode").length && window.txtCode.getSession) {
-                        const val = window.txtCode.getSession().getValue();
-                        // Always sync, even if empty (user might have cleared the editor)
-                        $("#txtCode").val(val);
-                    }
-                }
+                // Just sync the value, don't do the diff check. Works for both the #txtCode
+                // global editor (normal pages) and the randomized ACE instance (Daily Test).
+                try {
+                    const aceEl = [...document.querySelectorAll('.ace_editor')].find(el => el.offsetParent !== null) || document.querySelector('.ace_editor');
+                    const ed = (aceEl && aceEl.env && aceEl.env.editor) || (window.txtCode && window.txtCode.getSession ? window.txtCode : null);
+                    if (!ed || !ed.getSession) return;
+                    const val = ed.getSession().getValue();
+                    const ta = getEditorTextarea();
+                    if (ta) ta.value = val;
+                } catch (e) { }
             };
             console.log('Overrode cs() function');
         }
@@ -7786,6 +7827,19 @@ Emit ONLY the final executable solution.`,
         }
     };
 
+    // Map the editor language to the solutions/<lang>/ bank subdirectory.
+    // The bank is organized by language because a ProgramID is shared across language
+    // tracks (e.g. id 2622 "Minimum Sum" exists in both C and Python), so a single flat
+    // solutions/<id>.md could hold only one language and would overwrite the others.
+    const bankLangDir = () => {
+        const l = (getSelectedLanguage() || 'C').toLowerCase();
+        if (l.startsWith('c++')) return 'cpp';
+        if (l === 'java') return 'java';
+        if (l === 'python' || l === 'py' || l === 'python3') return 'python';
+        if (l === 'sql') return 'sql';
+        return 'c';
+    };
+
     // ========== LOCAL SERVER / GITHUB HELPER: fetch solution ==========
     const generateWithLocalServer = async () => {
         const pid = getProgramId();
@@ -7794,15 +7848,21 @@ Emit ONLY the final executable solution.`,
         const base = (SETTINGS.localServerUrl || DEFAULT_SETTINGS.localServerUrl).replace(/\/+$/, '');
 
         // If it's a GitHub raw URL, also try the other branch (main <-> master)
-        const candidates = [base];
+        const bases = [base];
         if (/raw\.githubusercontent\.com\//.test(base)) {
-            if (base.includes('/main')) candidates.push(base.replace('/main', '/master'));
-            else if (base.includes('/master')) candidates.push(base.replace('/master', '/main'));
+            if (base.includes('/main')) bases.push(base.replace('/main', '/master'));
+            else if (base.includes('/master')) bases.push(base.replace('/master', '/main'));
         }
 
+        // Prefer the language-scoped path solutions/<lang>/<id>.md; fall back to the legacy
+        // flat solutions/<id>.md for banks that have not been reorganized yet.
+        const langDir = bankLangDir();
+        const candidates = [];
+        for (const b of bases) candidates.push(`${b}/solutions/${langDir}/${pid}.md`);
+        for (const b of bases) candidates.push(`${b}/solutions/${pid}.md`);
+
         let lastErr = null;
-        for (const b of candidates) {
-            const url = `${b}/solutions/${pid}.md`;
+        for (const url of candidates) {
             try {
                 const raw = await fetchWithTimeout(url, { cache: 'no-store' }, SETTINGS.localServerTimeout || 5000);
                 const codeMatch = raw.match(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/);
@@ -9235,7 +9295,7 @@ SOLVING APPROACH:
         function editorContent() {
             try { const el = document.querySelector('.ace_editor'); if (el && el.env && el.env.editor) return el.env.editor.getValue() || ''; } catch (e) { }
             try { const el = document.querySelector('.ace_editor'); if (el && window.ace) return ace.edit(el).getValue() || ''; } catch (e) { }
-            const ta = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+            const ta = getEditorTextarea();
             return ta ? (ta.value || '') : '';
         }
 
@@ -9294,15 +9354,132 @@ SOLVING APPROACH:
                 if (ed && typeof ed.getSession === 'function') {
                     val = ed.getSession().getValue() || '';
                 }
-                const ta = document.getElementById('txtCode') || document.querySelector('#codediv textarea');
+                const ta = getEditorTextarea();
                 if (val == null) {
                     if (ta) val = ta.value;
                     else return;
                 }
-                if (ta) ta.value = val;
-                const $ = window.jQuery || window.$;
-                if ($ && $("#txtCode").length) $("#txtCode").val(val);
+                if (ta) {
+                    ta.value = val;
+                    ta.dispatchEvent(new Event('input', { bubbles: true }));
+                    ta.dispatchEvent(new Event('change', { bubbles: true }));
+                    const $ = window.jQuery || window.$;
+                    if ($) $(ta).val(val);
+                }
             } catch (e) { }
+        }
+
+        // ── Advanced Mode: submit straight through PrimeFaces' AJAX request ─────────
+        // Instead of driving the ACE editor and clicking Run (which trips SkillRack's
+        // reset/paste hooks), set the hidden submit field directly and fire the exact
+        // PrimeFaces.ab request the Run button would fire. PrimeFaces serializes the form
+        // (picking up our field), POSTs it, and applies the partial response, so
+        // waitForResult() and clickProceedNext() keep working unchanged.
+        function parseAbConfig(onclick) {
+            if (!onclick) return null;
+            const block = onclick.match(/PrimeFaces\.ab\(\{([\s\S]*?)\}\s*\)/);
+            if (!block) return null;
+            const body = block[1];
+            const cfg = {};
+            // Values (p, u) contain commas inside quotes, so grab each key's quoted value
+            // directly rather than splitting the object on commas.
+            for (const key of ['s', 'f', 'p', 'u', 'ps', 'onst', 'onco']) {
+                const m = body.match(new RegExp('(?:^|[,{])\\s*' + key + '\\s*:\\s*"([^"]*)"'));
+                if (m) cfg[key] = m[1];
+            }
+            return cfg.s ? cfg : null;
+        }
+
+        function findSubmitButton(label) {
+            for (const btn of document.querySelectorAll('button')) {
+                const t = (btn.querySelector('span.ui-button-text')?.textContent || btn.textContent || '').trim();
+                if (label === 'run' && t === 'Run') return btn;
+                if (label === 'save' && t === 'Save') return btn;
+            }
+            return null;
+        }
+
+        // Apply a JSF partial-response's <update> blocks to the DOM by id (fallback path only;
+        // PrimeFaces.ab already does this for the primary path).
+        function applyPartialUpdate(xmlText) {
+            try {
+                const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+                doc.querySelectorAll('update').forEach(upd => {
+                    const id = upd.getAttribute('id');
+                    if (!id || /ViewState/.test(id)) return;
+                    const el = document.getElementById(id);
+                    if (el) el.innerHTML = upd.textContent;
+                });
+            } catch (e) { }
+        }
+
+        async function submitViaFetch(btn, cfg, ta, code) {
+            const form = (cfg && document.getElementById(cfg.f)) || btn.closest('form');
+            if (!form) return false;
+            const params = new URLSearchParams();
+            for (const el of form.elements) {
+                if (!el.name || el === ta) continue;
+                if ((el.type === 'submit' || el.type === 'button') && el !== btn) continue;
+                if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) continue;
+                params.append(el.name, el.value);
+            }
+            params.set(ta.name, code);
+            const src = (cfg && cfg.s) || btn.id;
+            params.set('jakarta.faces.partial.ajax', 'true');
+            params.set('jakarta.faces.source', src);
+            params.set('jakarta.faces.partial.execute', (cfg && cfg.p) || src);
+            params.set('jakarta.faces.partial.render', (cfg && cfg.u) || 'progresspanel srmsg');
+            if (!params.has(src)) params.append(src, src);
+            try {
+                const resp = await fetch(form.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'Faces-Request': 'partial/ajax', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: params.toString(),
+                    credentials: 'include',
+                });
+                const text = await resp.text();
+                const vs = text.match(/<update id="[^"]*ViewState[^"]*"><!\[CDATA\[([\s\S]*?)\]\]><\/update>/);
+                if (vs) { const vsi = form.querySelector('input[name="jakarta.faces.ViewState"]'); if (vsi) vsi.value = vs[1]; }
+                applyPartialUpdate(text);
+                return true;
+            } catch (e) { console.warn('[AutoSolver][advanced] fetch submit failed', e); return false; }
+        }
+
+        // Submit the current solution (last generated code, else the editor content) without
+        // clicking Run. Returns true once the request has been dispatched.
+        async function submitViaAjax(label = 'run') {
+            const code = ((getLastInjectedSolution() || '').trim()) || editorContent().trim();
+            if (!code) { console.warn('[AutoSolver][advanced] no code to submit'); return false; }
+            const btn = findSubmitButton(label);
+            if (!btn) { console.warn('[AutoSolver][advanced] no ' + label + ' button found'); return false; }
+            const ta = getEditorTextarea();
+            if (!ta) { console.warn('[AutoSolver][advanced] no submit textarea found'); return false; }
+            const cfg = parseAbConfig(btn.getAttribute('onclick'));
+            // SkillRack's Run is asynchronous: the submit response installs a PrimeFaces Poll
+            // ("snappoll") whose setup script must run for the verdict to arrive. A hand-built
+            // fetch() does not execute that script, so the result never comes. PrimeFaces.ab
+            // does run response scripts, so it is the right engine — we just have to guarantee
+            // the code is in the submit field when it serializes. Replicate the site's own Run
+            // sequence exactly: put the code in the editor, sync it via oncompile(), then ab().
+            if (window.PrimeFaces && typeof window.PrimeFaces.ab === 'function' && cfg) {
+                try { injectCodeToActiveEditor(code); } catch (e) { }
+                // Settle: wait until the editor provably holds the code (verify/re-apply runs).
+                const deadline = Date.now() + 3000;
+                while (Date.now() < deadline && editorContent().trim() !== code.trim() && !shouldStop) {
+                    await sleep(150);
+                }
+                if (ta) ta.value = code;                                    // belt-and-braces
+                try { if (typeof window.oncompile === 'function') window.oncompile(); } catch (e) { }  // ACE -> submit field
+                if (ta && !ta.value.trim()) ta.value = code;               // oncompile must not blank it
+                console.log('[AutoSolver][advanced] submitting via PrimeFaces.ab (field len ' + (ta ? ta.value.length : 0) + ') ' + JSON.stringify(cfg));
+                window.PrimeFaces.ab(cfg);
+                return true;
+            }
+            // Fallback: hand-built POST (verdict detection is best-effort without the poller).
+            console.log('[AutoSolver][advanced] PrimeFaces.ab unavailable, using raw fetch');
+            const ok = await submitViaFetch(btn, cfg, ta, code);
+            if (ok) { try { injectCodeToActiveEditor(code); } catch (e) { } }
+            return ok;
         }
 
         // Wait for the AI Solution button, actively re-adding it when SkillRack re-renders
@@ -9547,6 +9724,24 @@ SOLVING APPROACH:
                 }
                 clearPreviousResults();
 
+                // Advanced Mode: submit directly through PrimeFaces' AJAX request instead of
+                // finding and clicking the Run button + syncing the editor. Falls back to the
+                // normal click path if the direct submit could not be dispatched.
+                if (SETTINGS.enableAdvancedMode) {
+                    const submitted = await submitViaAjax('run');
+                    if (submitted) {
+                        updateStatus('Submitted (advanced)...', 'info');
+                    } else {
+                        currentRetries++;
+                        const backoff = getBackoffDelay(currentRetries - 1);
+                        console.warn('[AutoSolver][advanced] direct submit failed — treating attempt as failed');
+                        updateStatus(`Advanced submit failed — retry ${currentRetries}/${maxRetries}`, 'warning');
+                        await sleepWithCountdown(backoff, `Advanced submit failed, retry ${currentRetries}/${maxRetries}`);
+                        checkStop();
+                        continue;
+                    }
+                } else {
+
                 // Find the Run button — JSF generates dynamic IDs like j_id_bg, j_id_bj, etc.
                 // so we CANNOT hardcode a specific ID. Use text-based detection instead.
                 const findRunButton = () => {
@@ -9605,6 +9800,7 @@ SOLVING APPROACH:
                 syncEditorToForm();
 
                 forceClick(runBtn, 'Run');
+                } // end normal (non-advanced) submit path
 
                 // Step 4: Wait for result
                 const resultController = createResultWaitController();
@@ -9799,7 +9995,9 @@ SOLVING APPROACH:
             unskip,
             clearSkipped,
             markSkipped,
-            findNextSolveButton
+            findNextSolveButton,
+            // Debug hooks used by tools/playwright (DOM probes); not part of the UI
+            _debug: { injectCodeToActiveEditor, editorContent, editorHasSolution, ensureSolutionInEditor, syncEditorToForm, hasCodeEditor, hasCaptcha, extractMFIBTemplate, getSelectedLanguage, getProblemDescription, currentProblemId, waitForResult, resume, stop, submitViaAjax, getEditorTextarea, parseAbConfig }
         };
     })();
 

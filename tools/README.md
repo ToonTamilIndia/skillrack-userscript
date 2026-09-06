@@ -10,7 +10,7 @@ No third-party Python deps; uses `curl`, `gcc`/`g++`/`javac`/`python3` for code.
 | `enum.py` | enumerate unsolved problems for a pack (CODETUTOR) or level (CODETRACK via `--lev 2..6/100`) |
 | `fetch.py` | fetch statements + sample I/O for enumerated ids (CODETUTOR packs) |
 | `fetchlev.py` | fetch statements + samples for enumerated ids on any CODETRACK level (`--lev`) |
-| `verify.py` | compile & test a `solutions/<id>.md` against recorded samples |
+| `verify.py` | compile & test a `solutions/<lang>/<id>.md` against recorded samples |
 | `compile.py` | language-aware compile/run (C, C++, Java, Python) |
 | `mkbatch.py` | split ids into parallel solve batches |
 | `status.py` | inventory + tracker: solved vs pending, per-language/section, writes `document.md` |
@@ -32,7 +32,7 @@ python3 tools/fetch.py /tmp/sack_c_enum.json 0 --out /tmp/sack_c_stmts.json
 python3 tools/enum.py 0 --lev 3 --json /tmp/sack_lev3.json
 python3 tools/fetchlev.py /tmp/sack_lev3.json --lev 3 --out /tmp/sack_lev3_stmts.json
 python3 tools/mkbatch.py /tmp/sack_c_stmts.json --n 8 --outdir /tmp/sack_batches
-# solve each batch (see ../skill.md) writing solutions/<id>.md
+# solve each batch (see ../skill.md) writing solutions/<lang>/<id>.md
 python3 tools/verify.py solutions/6650.md /tmp/sack_stmts.json
 python3 tools/status.py /tmp/sack_stmts.json          # solved vs pending
 python3 tools/status.py --md document.md              # regenerate the tracker

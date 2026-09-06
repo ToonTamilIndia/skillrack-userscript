@@ -1,7 +1,7 @@
 # SkillRack Userscript and Solution Bank
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/userscript-v7.1-2563eb?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/userscript-v7.3-2563eb?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-16a34a?style=flat-square">
   <img alt="Solutions" src="https://img.shields.io/badge/solutions-410%2B-7c3aed?style=flat-square">
   <img alt="AI" src="https://img.shields.io/badge/AI-DuckDuckGo%20(no%20key)-f97316?style=flat-square">
@@ -19,7 +19,9 @@ discretion. See the Disclaimer section.
 ## Contents
 
 1. [What is in this repository](#what-is-in-this-repository)
-2. [Version 7.1](#version-71)
+2. [Version 7.3](#version-73)
+3. [Version 7.2](#version-72)
+3. [Version 7.1](#version-71)
 3. [Installation](#installation)
 4. [How a problem gets solved](#how-a-problem-gets-solved)
 5. [Auto solver](#auto-solver)
@@ -40,7 +42,7 @@ discretion. See the Disclaimer section.
 | Path | Purpose |
 |------|---------|
 | `userscript.user.js` | The Tampermonkey script (client). |
-| `solutions/<ProgramID>.md` | One verified solution per problem, keyed by SkillRack ProgramID. |
+| `solutions/<lang>/<ProgramID>.md` | One verified solution per problem per language, keyed by SkillRack ProgramID (e.g. `solutions/c/2571.md`). |
 | `skill.md` | The playbook: site structure, solving loop, verification, contribution rules. |
 | `tools/` | Python and curl toolkit to enumerate, fetch, verify and track problems. |
 | `tools/playwright/` | Browser harness used to test the userscript against the live site. |
@@ -48,6 +50,54 @@ discretion. See the Disclaimer section.
 | `document.md` | Generated tracker of solved and pending problems. |
 | `solutions-server.js` | Optional local static server for `solutions/` during development. |
 | `kill.txt` | Remote kill switch read by the script. |
+
+## Version 7.3
+
+Version 7.3 adds an optional Advanced Mode and reorganizes the solution bank by
+language.
+
+**Advanced Mode (direct submit).** A new toggle in Settings (off by default,
+enabling it shows a warning you must accept) makes the auto solver submit
+through SkillRack's own network request instead of driving the editor and
+clicking Run. It puts the code in the submit field, calls the page's `oncompile()`
+to sync it, then fires the exact PrimeFaces AJAX request the Run button would
+fire and lets the site's progress poller return the verdict. This sidesteps the
+editor reset and paste hooks entirely, and behaves the same on Daily Test pages
+(randomized editor ids) and normal problem pages. Verified live: a bank solution
+submitted this way passes the judge and reveals Proceed Next exactly as a manual
+Run does.
+
+**Language-scoped solution bank.** A ProgramID is shared across language tracks
+(for example id 2622 "Minimum Sum - M out of N" exists in both C and Python), so
+a single flat `solutions/<ProgramID>.md` could hold only one language and would
+overwrite the others. The bank is now organized as `solutions/<lang>/<ProgramID>.md`
+(`solutions/c/2571.md`, `solutions/python/2622.md`, ...). The userscript fetches
+`solutions/<lang>/<id>.md` for the current editor language and falls back to the
+legacy flat `solutions/<id>.md`. The 463 existing C solutions moved to
+`solutions/c/`. `solutions-server.js`, `tools/status.py` and the Playwright
+batch solver were updated to the new layout.
+
+## Version 7.2
+
+Version 7.2 extends the empty-editor fix to **Daily Test and Daily Challenge**
+pages, whose editor DOM differs from a normal problem page.
+
+* On a normal page the submit textarea is always `#txtCode`. On a Daily
+Test/Challenge page SkillRack gives the ACE editor and its hidden textarea a
+**randomized id** (for example `ecsqbma1788675274365`) and defines no `txtCode`
+global. The sync code that copied the ACE session into `#txtCode` therefore did
+nothing on those pages and relied on SkillRack's own change handler, which the
+userscript's paste bypass removes.
+* A new `getEditorTextarea()` resolver finds the real submit textarea on every
+page type: `#txtCode` when present, otherwise the non-ACE textarea inside the
+same form as the visible ACE editor. Injection, the pre-Run re-assert, the
+ACE-to-textarea sync, paste, drop, the change handler and the `cs()`/Save
+override all use it, so code reaches the judge on Daily Test exactly as it does
+on a normal page.
+* Verified live with Playwright DOM analysis on both a Daily Test page and a
+normal CODETUTOR track page: the injected solution survives SkillRack's reset
+and the Run POST carries the code in the correct (randomized or `#txtCode`)
+field.
 
 ## Version 7.1
 
@@ -187,7 +237,7 @@ When you press AI Solution, or when the auto solver runs, the script tries these
 sources in order and stops at the first one that produces code:
 
 1. SkillRack's own View Solution button, when the site offers one.
-2. `solutions/<ProgramID>.md` from this repository (or your local server).
+2. `solutions/<lang>/<ProgramID>.md` from this repository (or your local server), by editor language.
 3. The configured AI provider, with the problem statement, sample I/O and any
    pre or post code.
 
@@ -308,7 +358,7 @@ Reload the page after changing settings.
 
 ## Contributing solutions
 
-One problem is one file, `solutions/<ProgramID>.md`:
+One problem is one file per language, `solutions/<lang>/<ProgramID>.md`:
 
 ````md
 # Id 12345 - Problem Name
@@ -321,7 +371,7 @@ Verified: <sample input> -> <sample output>
 ````
 
 Workflow: fork, branch `add/<id>`, add the file, run
-`python3 tools/verify.py solutions/<id>.md <stmts.json>`, regenerate the tracker
+`python3 tools/verify.py solutions/<lang>/<id>.md <stmts.json>`, regenerate the tracker
 with `python3 tools/status.py --md document.md`, open a pull request with the
 passing verify line in the body. The full process, including enumeration and
 fetching statements, is in `skill.md`.

@@ -2,7 +2,7 @@
 """Verify a solution (markdown solution file) against recorded sample I/O.
 
 Usage:
-  python3 verify.py <solutions/<id>.md> [<samples json>] [--lang c|cpp|java|python]
+  python3 verify.py <solutions/<lang>/<id>.md> [<samples json>] [--lang c|cpp|java|python]
 
 Lang is auto-detected from the code fence tag inside the .md unless overridden.
 Reads samples for <id> from the samples JSON (default tools/data/stmts_all.json),

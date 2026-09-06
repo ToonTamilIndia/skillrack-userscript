@@ -1,5 +1,5 @@
 // Batch auto-solve: navigate to a problem list, let the userscript's Auto Solver (DuckDuckGo, no key)
-// work through it, and save every passed solution as solutions/<ProgramID>.md.
+// work through it, and save every passed solution as solutions/<lang>/<ProgramID>.md.
 // Env: TRACK (pack index), SUB (sub-challenge index), PART (part button index), N (problems), WAIT (ms), SOLUTIONS_DIR
 const { open, ensureLogin } = require('./lib');
 const fs = require('fs'); const path = require('path');
@@ -71,8 +71,11 @@ const LANG_TAG = { c: 'c', 'c++': 'cpp', cpp: 'cpp', java: 'java', python: 'pyth
       if (/PASSED|Proceed Next|Moving to next/i.test(st.status) && candidate && candidate.pid && !solved[candidate.pid] && (!st.pid || st.pid === candidate.pid)) {
         const c = candidate; solved[c.pid] = c;
         const tag = LANG_TAG[(c.lang || '').toLowerCase().split(/[\s(]/)[0]] || (c.lang || 'text').toLowerCase().split(/[\s(]/)[0];
+        const langDir = { c: 'c', cpp: 'cpp', java: 'java', python: 'python', sql: 'sql' }[tag] || tag;
+        const outDir = path.join(SOLUTIONS_DIR, langDir);
+        fs.mkdirSync(outDir, { recursive: true });
         const md = `# Id ${c.pid} - ${c.title || 'Untitled'}\n\n\`\`\`${tag}\n${c.code.trim()}\n\`\`\`\n\nVerified: passed the SkillRack judge sample test case(s) on ${new Date().toISOString().slice(0, 10)} via the userscript auto solver (DuckDuckGo claude-haiku-4-5)\n`;
-        const outFile = path.join(SOLUTIONS_DIR, `${c.pid}.md`);
+        const outFile = path.join(outDir, `${c.pid}.md`);
         if (fs.existsSync(outFile)) console.log(`${TAG}kept existing ${c.pid}.md (bank solution)`); else fs.writeFileSync(outFile, md);
         console.log(`${TAG}SOLVED ${Object.keys(solved).length}/${N}: ProgramID ${c.pid} "${c.title}" (${tag})`);
       }
